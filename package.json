@@ -5,9 +5,9 @@
   "scripts": {
     "start": "expo start",
     "reset-project": "node ./scripts/reset-project.js",
-    "android": "expo start --android",
+    "android": "expo start --android --tunnel",
     "ios": "expo start --ios",
-    "web": "expo start --web",
+    "web": "expo start --web --tunnel",
     "lint": "expo lint"
   },
   "dependencies": {
