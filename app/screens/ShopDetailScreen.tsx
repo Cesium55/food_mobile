@@ -1,8 +1,8 @@
 import HorizontalOfferBlock from "@/components/offers/horizontalOfferBlock";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useOffers } from "@/hooks/useOffers";
-import { useSellers } from "@/hooks/useSellers";
-import { useShops } from "@/hooks/useShops";
+import { usePublicSeller } from "@/hooks/usePublicSeller";
+import { useShopPoint } from "@/hooks/useShopPoints";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -10,16 +10,14 @@ import { SafeAreaView } from "react-native-safe-area-context";
 export default function ShopDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const { getShopById } = useShops();
-  const { getSellerById } = useSellers();
   const { getOffersByShop } = useOffers();
 
   const shopId = Number(id);
-  const shop = getShopById(shopId);
+  const { shopPoint, loading, error } = useShopPoint(shopId);
   const shopOffers = getOffersByShop(shopId);
-  const seller = shop ? getSellerById(shop.sellerId) : null;
+  const { seller } = usePublicSeller(shopPoint?.seller_id || null);
 
-  if (!shop) {
+  if (loading) {
     return (
       <SafeAreaView style={styles.safeArea} edges={['top']}>
         <View style={styles.header}>
@@ -29,12 +27,33 @@ export default function ShopDetailScreen() {
           >
             <IconSymbol name="arrow.left" color="#333" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Магазин не найден</Text>
+          <Text style={styles.headerTitle}>Загрузка...</Text>
+          <View style={styles.headerSpacer} />
+        </View>
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorIcon}>⏳</Text>
+          <Text style={styles.errorText}>Загрузка данных магазина...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (error || !shopPoint) {
+    return (
+      <SafeAreaView style={styles.safeArea} edges={['top']}>
+        <View style={styles.header}>
+          <TouchableOpacity 
+            style={styles.headerBackButton}
+            onPress={() => router.back()}
+          >
+            <IconSymbol name="arrow.left" color="#333" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Ошибка</Text>
           <View style={styles.headerSpacer} />
         </View>
         <View style={styles.errorContainer}>
           <Text style={styles.errorIcon}>🔍</Text>
-          <Text style={styles.errorText}>Магазин не найден</Text>
+          <Text style={styles.errorText}>{error || 'Магазин не найден'}</Text>
         </View>
       </SafeAreaView>
     );
@@ -50,7 +69,7 @@ export default function ShopDetailScreen() {
           <IconSymbol name="arrow.left" color="#333" />
         </TouchableOpacity>
         <Text style={styles.headerTitle} numberOfLines={1}>
-          {shop.shortName}
+          Торговая точка #{shopPoint.id}
         </Text>
         <View style={styles.headerSpacer} />
       </View>
@@ -62,18 +81,12 @@ export default function ShopDetailScreen() {
             <Text style={styles.shopIconText}>🏪</Text>
           </View>
           <View style={styles.shopDetails}>
-            <Text style={styles.shopName}>{shop.fullName}</Text>
             {seller && (
               <Text style={styles.sellerName}>📦 {seller.short_name}</Text>
             )}
-            <Text style={styles.shopAddress}>📍 {shop.address}</Text>
-            {shop.phone && (
-              <TouchableOpacity>
-                <Text style={styles.shopPhone}>📞 {shop.phone}</Text>
-              </TouchableOpacity>
-            )}
-            {shop.workingHours && (
-              <Text style={styles.shopHours}>🕒 {shop.workingHours}</Text>
+            <Text style={styles.shopAddress}>📍 {shopPoint.address_formated || shopPoint.address_raw}</Text>
+            {shopPoint.city && (
+              <Text style={styles.shopCity}>🏙️ {shopPoint.city}</Text>
             )}
           </View>
         </View>
@@ -210,15 +223,10 @@ const styles = StyleSheet.create({
     color: '#666',
     marginBottom: 4,
   },
-  shopPhone: {
+  shopCity: {
     fontSize: 14,
     color: '#2196F3',
     marginBottom: 4,
-  },
-  shopHours: {
-    fontSize: 14,
-    color: '#4CAF50',
-    fontWeight: '600',
   },
   statsCard: {
     backgroundColor: '#fff',

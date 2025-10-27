@@ -1,9 +1,9 @@
 import { TabScreen } from "@/components/TabScreen";
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import { useSellerMe } from "@/hooks/useSeller";
+import { useShopPoints } from "@/hooks/useShopPoints";
 import { router } from "expo-router";
-import { useState } from "react";
 import {
-    Modal,
     ScrollView,
     StyleSheet,
     Text,
@@ -11,99 +11,9 @@ import {
     View
 } from "react-native";
 
-interface ShopPoint {
-    id: number;
-    shortName: string;
-    fullName: string;
-    address: string;
-    city: string;
-    latitude: number;
-    longitude: number;
-    phone: string;
-    workingHours: string;
-}
-
 export default function PointsScreen() {
-    // Демо-данные торговых точек
-    const [points] = useState<ShopPoint[]>([
-        {
-            id: 1,
-            shortName: "Свежесть",
-            fullName: "Свежесть на Ленина",
-            address: "ул. Ленина, 45",
-            city: "Москва",
-            latitude: 55.755819,
-            longitude: 37.617644,
-            phone: "+7 (495) 123-45-67",
-            workingHours: "08:00 - 22:00",
-        },
-        {
-            id: 2,
-            shortName: "Свежесть",
-            fullName: "Свежесть на Мира",
-            address: "пр. Мира, 12",
-            city: "Москва",
-            latitude: 55.781908,
-            longitude: 37.632771,
-            phone: "+7 (495) 234-56-78",
-            workingHours: "09:00 - 21:00",
-        },
-        {
-            id: 3,
-            shortName: "Свежесть",
-            fullName: "Свежесть на Пушкина",
-            address: "ул. Пушкина, 23",
-            city: "Санкт-Петербург",
-            latitude: 55.764393,
-            longitude: 37.625212,
-            phone: "+7 (812) 345-67-89",
-            workingHours: "08:00 - 22:00",
-        },
-        {
-            id: 4,
-            shortName: "Свежесть",
-            fullName: "Свежесть на Невском",
-            address: "Невский пр., 120",
-            city: "Санкт-Петербург",
-            latitude: 59.931402,
-            longitude: 30.360575,
-            phone: "+7 (812) 456-78-90",
-            workingHours: "09:00 - 21:00",
-        },
-        {
-            id: 5,
-            shortName: "Свежесть",
-            fullName: "Свежесть на Красной",
-            address: "ул. Красная, 78",
-            city: "Казань",
-            latitude: 55.796127,
-            longitude: 49.106414,
-            phone: "+7 (843) 567-89-01",
-            workingHours: "08:00 - 22:00",
-        },
-        {
-            id: 6,
-            shortName: "Свежесть",
-            fullName: "Свежесть на Баумана",
-            address: "ул. Баумана, 34",
-            city: "Казань",
-            latitude: 55.789736,
-            longitude: 49.122831,
-            phone: "+7 (843) 678-90-12",
-            workingHours: "09:00 - 21:00",
-        },
-    ]);
-
-    const [selectedCity, setSelectedCity] = useState<string | null>(null);
-    const [showCityFilter, setShowCityFilter] = useState(false);
-
-    // Получаем список уникальных городов
-    const cities = Array.from(new Set(points.map(p => p.city))).sort();
-
-    // Фильтруем точки по выбранному городу
-    const filteredPoints = selectedCity
-        ? points.filter(p => p.city === selectedCity)
-        : points;
+    const { seller } = useSellerMe();
+    const { shopPoints, loading, error } = useShopPoints(seller?.id);
 
     const handlePointPress = (pointId: number) => {
         router.push(`/(admin)/(points)/${pointId}`);
@@ -113,10 +23,25 @@ export default function PointsScreen() {
         router.push('/(admin)/(points)/new');
     };
 
-    const handleCitySelect = (city: string | null) => {
-        setSelectedCity(city);
-        setShowCityFilter(false);
-    };
+    if (loading) {
+        return (
+            <TabScreen title="Торговые точки">
+                <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+                    <Text style={{ fontSize: 16, color: '#666' }}>Загрузка данных...</Text>
+                </View>
+            </TabScreen>
+        );
+    }
+
+    if (error) {
+        return (
+            <TabScreen title="Торговые точки">
+                <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+                    <Text style={{ fontSize: 16, color: '#ff3b30' }}>{error}</Text>
+                </View>
+            </TabScreen>
+        );
+    }
 
     return (
         <TabScreen title="Торговые точки">
@@ -127,15 +52,6 @@ export default function PointsScreen() {
                         Торговые точки сети
                     </Text>
                     <View style={styles.headerButtons}>
-                        <TouchableOpacity 
-                            style={[styles.filterButton, selectedCity && styles.filterButtonActive]}
-                            onPress={() => setShowCityFilter(true)}
-                        >
-                            <IconSymbol name="filter" size={20} color={selectedCity ? "#fff" : "#007AFF"} />
-                            <Text style={[styles.filterButtonText, selectedCity && styles.filterButtonTextActive]}>
-                                {selectedCity || 'Город'}
-                            </Text>
-                        </TouchableOpacity>
                         <TouchableOpacity 
                             style={styles.addButton}
                             onPress={handleAddPoint}
@@ -152,13 +68,10 @@ export default function PointsScreen() {
                     showsVerticalScrollIndicator={false}
                 >
                     <Text style={styles.countText}>
-                        {selectedCity 
-                            ? `Точек в городе ${selectedCity}: ${filteredPoints.length} из ${points.length}`
-                            : `Всего точек: ${points.length}`
-                        }
+                        Всего точек: {shopPoints.length}
                     </Text>
 
-                    {filteredPoints.map((point) => (
+                    {shopPoints.map((point) => (
                         <TouchableOpacity
                             key={point.id}
                             style={styles.pointCard}
@@ -170,94 +83,25 @@ export default function PointsScreen() {
                             </View>
                             
                             <View style={styles.pointInfo}>
-                                <Text style={styles.pointName}>{point.fullName}</Text>
-                                <Text style={styles.pointCity}>🏙️ {point.city}</Text>
-                                <Text style={styles.pointAddress}>📍 {point.address}</Text>
-                                <Text style={styles.pointPhone}>📞 {point.phone}</Text>
-                                <Text style={styles.pointHours}>🕒 {point.workingHours}</Text>
+                                <Text style={styles.pointName}>Торговая точка #{point.id}</Text>
+                                {point.city && <Text style={styles.pointCity}>🏙️ {point.city}</Text>}
+                                <Text style={styles.pointAddress}>📍 {point.address_formated || point.address_raw}</Text>
                             </View>
 
                             <IconSymbol name="chevron.right" color="#999" size={20} />
                         </TouchableOpacity>
                     ))}
 
-                    {filteredPoints.length === 0 && (
+                    {shopPoints.length === 0 && (
                         <View style={styles.emptyContainer}>
                             <Text style={styles.emptyIcon}>🏪</Text>
-                            <Text style={styles.emptyText}>
-                                {selectedCity ? `Нет точек в городе ${selectedCity}` : 'Нет торговых точек'}
-                            </Text>
+                            <Text style={styles.emptyText}>Нет торговых точек</Text>
                             <Text style={styles.emptySubtext}>
-                                {selectedCity 
-                                    ? 'Попробуйте выбрать другой город или сбросить фильтр'
-                                    : 'Нажмите "Добавить" чтобы создать первую точку'
-                                }
+                                Нажмите "Добавить" чтобы создать первую точку
                             </Text>
                         </View>
                     )}
                 </ScrollView>
-
-                {/* Модальное окно фильтра по городам */}
-                <Modal
-                    visible={showCityFilter}
-                    animationType="slide"
-                    transparent={true}
-                    onRequestClose={() => setShowCityFilter(false)}
-                >
-                    <View style={styles.modalOverlay}>
-                        <View style={styles.modalContent}>
-                            <View style={styles.modalHeader}>
-                                <Text style={styles.modalTitle}>Фильтр по городу</Text>
-                                <TouchableOpacity onPress={() => setShowCityFilter(false)}>
-                                    <IconSymbol name="xmark" size={24} color="#666" />
-                                </TouchableOpacity>
-                            </View>
-
-                            <ScrollView style={styles.modalScroll}>
-                                {/* Опция "Все города" */}
-                                <TouchableOpacity
-                                    style={[
-                                        styles.cityOption,
-                                        !selectedCity && styles.cityOptionSelected
-                                    ]}
-                                    onPress={() => handleCitySelect(null)}
-                                >
-                                    <Text style={[
-                                        styles.cityOptionText,
-                                        !selectedCity && styles.cityOptionTextSelected
-                                    ]}>
-                                        Все города
-                                    </Text>
-                                    {!selectedCity && (
-                                        <IconSymbol name="checkmark" size={20} color="#007AFF" />
-                                    )}
-                                </TouchableOpacity>
-
-                                {/* Список городов */}
-                                {cities.map((city) => (
-                                    <TouchableOpacity
-                                        key={city}
-                                        style={[
-                                            styles.cityOption,
-                                            selectedCity === city && styles.cityOptionSelected
-                                        ]}
-                                        onPress={() => handleCitySelect(city)}
-                                    >
-                                        <Text style={[
-                                            styles.cityOptionText,
-                                            selectedCity === city && styles.cityOptionTextSelected
-                                        ]}>
-                                            {city}
-                                        </Text>
-                                        {selectedCity === city && (
-                                            <IconSymbol name="checkmark" size={20} color="#007AFF" />
-                                        )}
-                                    </TouchableOpacity>
-                                ))}
-                            </ScrollView>
-                        </View>
-                    </View>
-                </Modal>
             </View>
         </TabScreen>
     );

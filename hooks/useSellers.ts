@@ -1,24 +1,12 @@
 import { API_ENDPOINTS } from '@/constants/api';
 import { getApiUrl } from '@/constants/env';
+import { PublicSeller } from '@/hooks/usePublicSeller';
 import { authFetch } from '@/utils/authFetch';
 import { useEffect, useState } from 'react';
 
-export interface Seller {
-  id: number;
-  full_name: string;
-  short_name: string;
-  inn: string;
-  type: number;
-  ogrn: string;
-  master_id: number;
-  status: number;
-  verification_level: number;
-  registration_doc_url: string;
-  balance: number;
-}
 
 export const useSellers = () => {
-  const [sellers, setSellers] = useState<Seller[]>([]);
+  const [sellers, setSellers] = useState<PublicSeller[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -46,15 +34,15 @@ export const useSellers = () => {
     fetchSellers();
   }, []);
 
-  const getSellerById = (id: number): Seller | undefined => {
+  const getSellerById = (id: number): PublicSeller | undefined => {
     return sellers.find(seller => seller.id === id);
   };
 
-  const getSellersByStatus = (status: number): Seller[] => {
+  const getSellersByStatus = (status: number): PublicSeller[] => {
     return sellers.filter(seller => seller.status === status);
   };
 
-  const getSellersByVerificationLevel = (level: number): Seller[] => {
+  const getSellersByVerificationLevel = (level: number): PublicSeller[] => {
     return sellers.filter(seller => seller.verification_level === level);
   };
 

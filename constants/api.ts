@@ -75,6 +75,12 @@ export const API_ENDPOINTS = {
     SUGGESTIONS: '/search/suggestions',
     HISTORY: '/search/history',
   },
+  
+  // Торговые точки
+  SHOP_POINTS: {
+    BASE: '/shop-points',
+    CREATE_BY_ADDRESS: '/shop-points/by-address',
+  },
 } as const;
 
 // Функция для получения полного URL endpoint'а

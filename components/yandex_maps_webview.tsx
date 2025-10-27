@@ -1,47 +1,56 @@
-import { useState } from "react";
-import { StyleSheet, View } from "react-native";
+import { useShopPoint } from "@/hooks/useShopPoints";
+import { useRef, useState } from "react";
+import { ActivityIndicator, StyleSheet, View } from "react-native";
 import { WebView } from 'react-native-webview';
 import ShopModal from './ShopModal';
 
-// Демо-данные магазина
-const demoShop = {
-  id: 1,
-  name: "Продуктовый магазин 'Свежие продукты'",
-  address: "ул. Ленина, 15",
-  phone: "+7 (495) 123-45-67",
-  rating: 4.5,
-  image: "https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=400",
-  description: "Свежие продукты каждый день! Широкий ассортимент овощей, фруктов, мяса и молочных продуктов. Качественные товары по доступным ценам.",
-  workingHours: "Пн-Вс: 8:00 - 22:00",
-  distance: "0.5 км"
-};
-
 export default function YandexMapsWebView() {
+  const webViewRef = useRef<WebView>(null);
   const [modalVisible, setModalVisible] = useState(false);
+  const [selectedShopPointId, setSelectedShopPointId] = useState<number | null>(null);
+  
+  // Получаем данные торговой точки через API
+  const { shopPoint, loading } = useShopPoint(selectedShopPointId);
 
-  const handleMarkerClick = () => {
+  const handleMarkerClick = (shopPointId: number) => {
+    // Устанавливаем ID торговой точки для загрузки данных
+    setSelectedShopPointId(shopPointId);
     setModalVisible(true);
   };
 
   const handleCloseModal = () => {
     setModalVisible(false);
+    setSelectedShopPointId(null);
   };
+
+  // Преобразуем данные из API в формат для ShopModal
+  const shopData = shopPoint ? {
+    id: shopPoint.id,
+    name: `Торговая точка #${shopPoint.id}`,
+    address: shopPoint.address_formated || shopPoint.address_raw
+  } : null;
 
   return (
     <View style={styles.container}>
       <WebView
-        source={{ uri: 'https://gembos.ru/debug/template' }}
+        ref={webViewRef}
+        source={{ 
+          uri: `https://gembos.ru/maps/shop-points?v=${Date.now()}` // Добавляем timestamp для обхода кэша
+        }}
         originWhitelist={['*']}
         javaScriptEnabled
+        cacheEnabled={false}
+        incognito={true}
+        sharedCookiesEnabled={false}
         style={styles.webview}
         onMessage={(event) => {
           console.log("WebView message received:", event.nativeEvent.data);
           try {
             const data = JSON.parse(event.nativeEvent.data);
             console.log("Parsed data:", data);
-            if (data.type === 'markerClick') {
-              console.log("Opening modal...");
-              handleMarkerClick();
+            if (data.type === 'markerClick' && data.shopPointId) {
+              console.log("Navigating to shop point:", data.shopPointId);
+              handleMarkerClick(data.shopPointId);
             }
           } catch (error) {
             console.log('Error parsing WebView message:', error);
@@ -49,11 +58,19 @@ export default function YandexMapsWebView() {
         }}
       />
       
-      <ShopModal
-        visible={modalVisible}
-        shop={demoShop}
-        onClose={handleCloseModal}
-      />
+      {loading && (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#007AFF" />
+        </View>
+      )}
+
+      {shopData && (
+        <ShopModal
+          visible={modalVisible}
+          shop={shopData}
+          onClose={handleCloseModal}
+        />
+      )}
     </View>
   );
 }
@@ -64,6 +81,16 @@ const styles = StyleSheet.create({
   },
   webview: {
     flex: 1,
+  },
+  loadingContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
 });
 

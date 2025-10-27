@@ -1,6 +1,8 @@
 import { TabScreen } from "@/components/TabScreen";
 import { IconSymbol } from "@/components/ui/icon-symbol";
-import { useState } from "react";
+import { useSellerMe } from "@/hooks/useSeller";
+import { useFocusEffect } from "expo-router";
+import { useCallback, useState } from "react";
 import {
     Alert,
     Image,
@@ -16,14 +18,29 @@ export default function ShopScreen() {
     // Режим редактирования
     const [isEditing, setIsEditing] = useState(false);
     
-    // Демонстрационные данные
-    const [imageUrl, setImageUrl] = useState("https://via.placeholder.com/150");
-    const [fullName, setFullName] = useState("Продуктовая сеть 'Свежесть'");
-    const [shortName, setShortName] = useState("Свежесть");
-    const [description, setDescription] = useState("Крупнейшая региональная сеть продуктовых магазинов. Мы предлагаем широкий ассортимент свежих продуктов по доступным ценам.");
-    const [contacts, setContacts] = useState("+7 (800) 123-45-67\ninfo@svezhest.ru");
+    // Загрузка данных из API
+    const { seller, loading, error } = useSellerMe();
+    
+    // Локальное состояние для редактируемых полей
+    const [fullName, setFullName] = useState("");
+    const [shortName, setShortName] = useState("");
+    const [description, setDescription] = useState("");
+    const [imageUrl, setImageUrl] = useState<string | null>(null);
     
     const [hasChanges, setHasChanges] = useState(false);
+
+    // Обновляем локальное состояние при загрузке данных
+    useFocusEffect(
+        useCallback(() => {
+            if (seller) {
+                setFullName(seller.full_name);
+                setShortName(seller.short_name);
+                setDescription(seller.description);
+                setImageUrl(seller.images && seller.images.length > 0 ? seller.images[0].path : null);
+                setHasChanges(false);
+            }
+        }, [seller])
+    );
 
     const handleEdit = () => {
         setIsEditing(true);
@@ -39,9 +56,14 @@ export default function ShopScreen() {
                     text: "Да",
                     style: "destructive",
                     onPress: () => {
+                        if (seller) {
+                            setFullName(seller.full_name);
+                            setShortName(seller.short_name);
+                            setDescription(seller.description);
+                            setImageUrl(seller.images && seller.images.length > 0 ? seller.images[0].path : null);
+                        }
                         setIsEditing(false);
                         setHasChanges(false);
-                        // В реальном приложении здесь бы восстанавливались исходные данные
                     }
                 }
             ]
@@ -49,6 +71,7 @@ export default function ShopScreen() {
     };
 
     const handleSave = () => {
+        // TODO: Реализовать сохранение данных через API
         Alert.alert(
             "Сохранение",
             "Изменения сохранены успешно!\n(Демонстрационный режим)",
@@ -87,6 +110,26 @@ export default function ShopScreen() {
             setHasChanges(true);
         };
     };
+
+    if (loading) {
+        return (
+            <TabScreen title="Управление магазином">
+                <View style={[styles.container, styles.centered]}>
+                    <Text style={styles.loadingText}>Загрузка данных...</Text>
+                </View>
+            </TabScreen>
+        );
+    }
+
+    if (error || !seller) {
+        return (
+            <TabScreen title="Управление магазином">
+                <View style={[styles.container, styles.centered]}>
+                    <Text style={styles.errorText}>{error || 'Ошибка загрузки данных'}</Text>
+                </View>
+            </TabScreen>
+        );
+    }
 
     return (
         <TabScreen title="Управление магазином">
@@ -131,12 +174,12 @@ export default function ShopScreen() {
                             <View style={styles.imagePlaceholder}>
                                 <IconSymbol name="bag.fill" size={60} color="#ccc" />
                             </View>
-                            {imageUrl && imageUrl !== "https://via.placeholder.com/150" ? (
+                            {imageUrl && (
                                 <Image 
                                     source={{ uri: imageUrl }}
                                     style={styles.image}
                                 />
-                            ) : null}
+                            )}
                             {isEditing && (
                                 <View style={styles.imageOverlay}>
                                     <IconSymbol name="camera" size={24} color="#fff" />
@@ -146,84 +189,151 @@ export default function ShopScreen() {
                         </TouchableOpacity>
                     </View>
 
-                    {/* Полное название */}
-                    <View style={styles.fieldContainer}>
-                        <Text style={styles.label}>Полное название</Text>
-                        {isEditing ? (
-                            <TextInput
-                                style={styles.input}
-                                value={fullName}
-                                onChangeText={handleFieldChange(setFullName)}
-                                placeholder="Введите полное название"
-                                autoCapitalize="words"
-                            />
-                        ) : (
-                            <View style={styles.valueContainer}>
-                                <Text style={styles.valueText}>{fullName}</Text>
-                            </View>
-                        )}
-                    </View>
+                    {/* Редактируемые поля */}
+                    <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>Основная информация</Text>
+                        
+                        <View style={styles.fieldContainer}>
+                            <Text style={styles.label}>Полное название</Text>
+                            {isEditing ? (
+                                <TextInput
+                                    style={styles.input}
+                                    value={fullName}
+                                    onChangeText={handleFieldChange(setFullName)}
+                                    placeholder="Введите полное название"
+                                    autoCapitalize="words"
+                                />
+                            ) : (
+                                <View style={styles.valueContainer}>
+                                    <Text style={styles.valueText}>{fullName}</Text>
+                                </View>
+                            )}
+                        </View>
 
-                    {/* Короткое название */}
-                    <View style={styles.fieldContainer}>
-                        <Text style={styles.label}>Короткое название</Text>
-                        {isEditing ? (
-                            <TextInput
-                                style={styles.input}
-                                value={shortName}
-                                onChangeText={handleFieldChange(setShortName)}
-                                placeholder="Введите короткое название"
-                                autoCapitalize="words"
-                            />
-                        ) : (
-                            <View style={styles.valueContainer}>
-                                <Text style={styles.valueText}>{shortName}</Text>
-                            </View>
-                        )}
-                    </View>
+                        <View style={styles.fieldContainer}>
+                            <Text style={styles.label}>Короткое название</Text>
+                            {isEditing ? (
+                                <TextInput
+                                    style={styles.input}
+                                    value={shortName}
+                                    onChangeText={handleFieldChange(setShortName)}
+                                    placeholder="Введите короткое название"
+                                    autoCapitalize="words"
+                                />
+                            ) : (
+                                <View style={styles.valueContainer}>
+                                    <Text style={styles.valueText}>{shortName}</Text>
+                                </View>
+                            )}
+                        </View>
 
-                    {/* Описание */}
-                    <View style={styles.fieldContainer}>
-                        <Text style={styles.label}>Описание</Text>
-                        {isEditing ? (
-                            <TextInput
-                                style={[styles.input, styles.textArea]}
-                                value={description}
-                                onChangeText={handleFieldChange(setDescription)}
-                                placeholder="Введите описание торговой сети"
-                                multiline
-                                numberOfLines={4}
-                                textAlignVertical="top"
-                            />
-                        ) : (
-                            <View style={styles.valueContainer}>
-                                <Text style={styles.valueText}>{description}</Text>
-                            </View>
-                        )}
-                    </View>
-
-                    {/* Контакты */}
-                    <View style={styles.fieldContainer}>
-                        <Text style={styles.label}>Контакты</Text>
-                        {isEditing ? (
-                            <>
+                        <View style={styles.fieldContainer}>
+                            <Text style={styles.label}>Описание</Text>
+                            {isEditing ? (
                                 <TextInput
                                     style={[styles.input, styles.textArea]}
-                                    value={contacts}
-                                    onChangeText={handleFieldChange(setContacts)}
-                                    placeholder="Введите контактную информацию"
+                                    value={description}
+                                    onChangeText={handleFieldChange(setDescription)}
+                                    placeholder="Введите описание"
                                     multiline
-                                    numberOfLines={3}
+                                    numberOfLines={4}
                                     textAlignVertical="top"
                                 />
-                                <Text style={styles.hint}>Телефон, email, адрес и другая контактная информация</Text>
-                            </>
-                        ) : (
-                            <View style={styles.valueContainer}>
-                                <Text style={styles.valueText}>{contacts}</Text>
-                            </View>
-                        )}
+                            ) : (
+                                <View style={styles.valueContainer}>
+                                    <Text style={styles.valueText}>{description || 'Не указано'}</Text>
+                                </View>
+                            )}
+                        </View>
                     </View>
+
+                    {/* Только для чтения поля (скрыты в режиме редактирования) */}
+                    {!isEditing && (
+                        <View style={styles.section}>
+                            <Text style={styles.sectionTitle}>Дополнительная информация</Text>
+                            
+                            <View style={styles.fieldContainer}>
+                                <Text style={styles.label}>Email</Text>
+                                <View style={styles.valueContainer}>
+                                    <Text style={styles.valueText}>{seller.email}</Text>
+                                </View>
+                            </View>
+
+                            <View style={styles.fieldContainer}>
+                                <Text style={styles.label}>Телефон</Text>
+                                <View style={styles.valueContainer}>
+                                    <Text style={styles.valueText}>{seller.phone || 'Не указан'}</Text>
+                                </View>
+                            </View>
+
+                            <View style={styles.fieldContainer}>
+                                <Text style={styles.label}>Баланс</Text>
+                                <View style={styles.valueContainer}>
+                                    <Text style={styles.valueText}>{seller.balance.toFixed(2)} ₽</Text>
+                                </View>
+                            </View>
+
+                            <View style={styles.fieldContainer}>
+                                <Text style={styles.label}>ИНН</Text>
+                                <View style={styles.valueContainer}>
+                                    <Text style={styles.valueText}>{seller.inn}</Text>
+                                </View>
+                            </View>
+
+                            <View style={styles.fieldContainer}>
+                                <Text style={styles.label}>ОГРН</Text>
+                                <View style={styles.valueContainer}>
+                                    <Text style={styles.valueText}>{seller.ogrn}</Text>
+                                </View>
+                            </View>
+
+                            <View style={styles.fieldContainer}>
+                                <Text style={styles.label}>Тип организации</Text>
+                                <View style={styles.valueContainer}>
+                                    <Text style={styles.valueText}>{seller.is_IP ? 'ИП' : 'ООО'}</Text>
+                                </View>
+                            </View>
+
+                            <View style={styles.fieldContainer}>
+                                <Text style={styles.label}>Статус</Text>
+                                <View style={styles.valueContainer}>
+                                    <Text style={styles.valueText}>
+                                        {seller.status === 0 ? 'Неактивен' : 
+                                         seller.status === 1 ? 'Активен' : 
+                                         seller.status === 2 ? 'Заблокирован' : 'Неизвестен'}
+                                    </Text>
+                                </View>
+                            </View>
+
+                            <View style={styles.fieldContainer}>
+                                <Text style={styles.label}>Уровень верификации</Text>
+                                <View style={styles.valueContainer}>
+                                    <Text style={styles.valueText}>{seller.verification_level}</Text>
+                                </View>
+                            </View>
+
+                            <View style={styles.fieldContainer}>
+                                <Text style={styles.label}>ID продавца</Text>
+                                <View style={styles.valueContainer}>
+                                    <Text style={styles.valueText}>{seller.id}</Text>
+                                </View>
+                            </View>
+
+                            <View style={styles.fieldContainer}>
+                                <Text style={styles.label}>Master ID</Text>
+                                <View style={styles.valueContainer}>
+                                    <Text style={styles.valueText}>{seller.master_id || 'Не указан'}</Text>
+                                </View>
+                            </View>
+
+                            <View style={styles.fieldContainer}>
+                                <Text style={styles.label}>URL регистрационного документа</Text>
+                                <View style={styles.valueContainer}>
+                                    <Text style={styles.valueText}>{seller.registration_doc_url || 'Не указан'}</Text>
+                                </View>
+                            </View>
+                        </View>
+                    )}
 
                     {/* Кнопка сохранения (только в режиме редактирования) */}
                     {isEditing && (
@@ -259,6 +369,18 @@ export default function ShopScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
+    },
+    centered: {
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    loadingText: {
+        fontSize: 16,
+        color: '#666',
+    },
+    errorText: {
+        fontSize: 16,
+        color: '#ff3b30',
     },
     header: {
         flexDirection: 'row',
@@ -297,8 +419,7 @@ const styles = StyleSheet.create({
         padding: 16,
         paddingBottom: 40,
     },
-    imageSection: {
-        alignItems: 'center',
+    section: {
         marginBottom: 24,
     },
     sectionTitle: {
@@ -306,6 +427,10 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         marginBottom: 16,
         color: '#333',
+    },
+    imageSection: {
+        alignItems: 'center',
+        marginBottom: 24,
     },
     imageContainer: {
         position: 'relative',
@@ -381,12 +506,6 @@ const styles = StyleSheet.create({
         fontSize: 16,
         color: '#333',
         lineHeight: 22,
-    },
-    hint: {
-        fontSize: 12,
-        color: '#666',
-        marginTop: 4,
-        fontStyle: 'italic',
     },
     saveButton: {
         backgroundColor: '#007AFF',

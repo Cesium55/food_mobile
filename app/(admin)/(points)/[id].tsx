@@ -1,4 +1,5 @@
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import { useShopPoint } from "@/hooks/useShopPoints";
 import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
 import {
@@ -6,45 +7,60 @@ import {
     ScrollView,
     StyleSheet,
     Text,
-    TextInput,
     TouchableOpacity,
     View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-interface ShopPoint {
-    id: number;
-    shortName: string;
-    fullName: string;
-    address: string;
-    latitude: number;
-    longitude: number;
-    phone: string;
-    workingHours: string;
-    images: string[];
-}
-
 export default function PointDetailScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
     const pointId = Number(id);
+    const { shopPoint, loading, error } = useShopPoint(pointId);
 
     // Режим редактирования
     const [isEditing, setIsEditing] = useState(false);
 
-    // Демо-данные (в реальном приложении берутся из хука по id)
-    const [point, setPoint] = useState<ShopPoint>({
-        id: pointId,
-        shortName: "Свежесть",
-        fullName: "Свежесть на Ленина",
-        address: "ул. Ленина, 45",
-        latitude: 55.755819,
-        longitude: 37.617644,
-        phone: "+7 (495) 123-45-67",
-        workingHours: "08:00 - 22:00",
-        images: ['', '', '', ''], // 4 фото - цвета назначаются автоматически
-    });
-
     const [hasChanges, setHasChanges] = useState(false);
+
+    if (loading) {
+        return (
+            <SafeAreaView style={styles.safeArea} edges={['top']}>
+                <View style={styles.header}>
+                    <TouchableOpacity 
+                        style={styles.headerBackButton}
+                        onPress={() => router.back()}
+                    >
+                        <IconSymbol name="arrow.left" color="#333" size={24} />
+                    </TouchableOpacity>
+                    <Text style={styles.headerTitle}>Загрузка...</Text>
+                    <View style={styles.headerSpacer} />
+                </View>
+                <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+                    <Text style={{ fontSize: 16, color: '#666' }}>Загрузка данных...</Text>
+                </View>
+            </SafeAreaView>
+        );
+    }
+
+    if (error || !shopPoint) {
+        return (
+            <SafeAreaView style={styles.safeArea} edges={['top']}>
+                <View style={styles.header}>
+                    <TouchableOpacity 
+                        style={styles.headerBackButton}
+                        onPress={() => router.back()}
+                    >
+                        <IconSymbol name="arrow.left" color="#333" size={24} />
+                    </TouchableOpacity>
+                    <Text style={styles.headerTitle}>Ошибка</Text>
+                    <View style={styles.headerSpacer} />
+                </View>
+                <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+                    <Text style={{ fontSize: 16, color: '#ff3b30' }}>{error || 'Торговая точка не найдена'}</Text>
+                </View>
+            </SafeAreaView>
+        );
+    }
 
     const handleEdit = () => {
         setIsEditing(true);
@@ -85,15 +101,14 @@ export default function PointDetailScreen() {
     const handleDelete = () => {
         Alert.alert(
             "Удаление торговой точки",
-            `Вы уверены, что хотите удалить "${point.fullName}"?\n\nЭто действие нельзя отменить.`,
+            `Вы уверены, что хотите удалить эту торговую точку?\n\nЭто действие нельзя отменить.`,
             [
                 { text: "Отмена", style: "cancel" },
                 {
                     text: "Удалить",
                     style: "destructive",
                     onPress: () => {
-                        // Удаляем точку (в реальном приложении - API запрос)
-                        // Используем setTimeout чтобы избежать конфликта алертов
+                        // TODO: реализовать удаление через API
                         setTimeout(() => {
                             Alert.alert("Успех", "Торговая точка удалена");
                             router.back();
@@ -115,11 +130,7 @@ export default function PointDetailScreen() {
                 {
                     text: "Добавить фото",
                     onPress: () => {
-                        // Просто добавляем пустую строку - цвет будет назначен автоматически
-                        setPoint({
-                            ...point,
-                            images: [...point.images, '']
-                        });
+                        // TODO: реализовать загрузку фото
                         setHasChanges(true);
                     }
                 }
@@ -139,20 +150,12 @@ export default function PointDetailScreen() {
                     text: "Удалить",
                     style: "destructive",
                     onPress: () => {
-                        setPoint({
-                            ...point,
-                            images: point.images.filter((_, i) => i !== index)
-                        });
+                        // TODO: реализовать удаление фото через API
                         setHasChanges(true);
                     }
                 }
             ]
         );
-    };
-
-    const handleFieldChange = <K extends keyof ShopPoint>(field: K, value: ShopPoint[K]) => {
-        setPoint({ ...point, [field]: value });
-        setHasChanges(true);
     };
 
     return (
@@ -166,7 +169,7 @@ export default function PointDetailScreen() {
                     <IconSymbol name="arrow.left" color="#333" size={24} />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle} numberOfLines={1}>
-                    {point.fullName}
+                    Торговая точка #{shopPoint.id}
                 </Text>
                 {!isEditing ? (
                     <TouchableOpacity 
@@ -200,7 +203,7 @@ export default function PointDetailScreen() {
                         showsHorizontalScrollIndicator={false}
                         contentContainerStyle={styles.galleryScroll}
                     >
-                        {point.images.map((imageUrl, index) => {
+                        {(shopPoint.images || []).map((imageUrl, index) => {
                             // Массив приятных пастельных цветов
                             const colors = ['#81C784', '#64B5F6', '#FFB74D', '#BA68C8', '#F06292', '#4DD0E1', '#AED581', '#FFD54F'];
                             const backgroundColor = colors[index % colors.length];
@@ -239,125 +242,32 @@ export default function PointDetailScreen() {
 
                 {/* Информация о точке */}
                 <View style={styles.infoSection}>
-                    {/* Полное название */}
-                    <View style={styles.fieldContainer}>
-                        <Text style={styles.label}>Полное название</Text>
-                        {isEditing ? (
-                            <TextInput
-                                style={styles.input}
-                                value={point.fullName}
-                                onChangeText={(text) => handleFieldChange('fullName', text)}
-                                placeholder="Введите полное название"
-                            />
-                        ) : (
-                            <View style={styles.valueContainer}>
-                                <Text style={styles.valueText}>{point.fullName}</Text>
-                            </View>
-                        )}
-                    </View>
-
-                    {/* Короткое название */}
-                    <View style={styles.fieldContainer}>
-                        <Text style={styles.label}>Короткое название</Text>
-                        {isEditing ? (
-                            <TextInput
-                                style={styles.input}
-                                value={point.shortName}
-                                onChangeText={(text) => handleFieldChange('shortName', text)}
-                                placeholder="Введите короткое название"
-                            />
-                        ) : (
-                            <View style={styles.valueContainer}>
-                                <Text style={styles.valueText}>{point.shortName}</Text>
-                            </View>
-                        )}
-                    </View>
-
                     {/* Адрес */}
                     <View style={styles.fieldContainer}>
                         <Text style={styles.label}>Адрес</Text>
-                        {isEditing ? (
-                            <TextInput
-                                style={styles.input}
-                                value={point.address}
-                                onChangeText={(text) => handleFieldChange('address', text)}
-                                placeholder="Введите адрес"
-                            />
-                        ) : (
-                            <View style={styles.valueContainer}>
-                                <Text style={styles.valueText}>📍 {point.address}</Text>
-                            </View>
-                        )}
+                        <View style={styles.valueContainer}>
+                            <Text style={styles.valueText}>📍 {shopPoint.address_formated || shopPoint.address_raw}</Text>
+                        </View>
                     </View>
 
-                    {/* Телефон */}
-                    <View style={styles.fieldContainer}>
-                        <Text style={styles.label}>Телефон</Text>
-                        {isEditing ? (
-                            <TextInput
-                                style={styles.input}
-                                value={point.phone}
-                                onChangeText={(text) => handleFieldChange('phone', text)}
-                                placeholder="Введите телефон"
-                                keyboardType="phone-pad"
-                            />
-                        ) : (
+                    {/* Город */}
+                    {shopPoint.city && (
+                        <View style={styles.fieldContainer}>
+                            <Text style={styles.label}>Город</Text>
                             <View style={styles.valueContainer}>
-                                <Text style={styles.valueText}>📞 {point.phone}</Text>
+                                <Text style={styles.valueText}>🏙️ {shopPoint.city}</Text>
                             </View>
-                        )}
-                    </View>
-
-                    {/* Часы работы */}
-                    <View style={styles.fieldContainer}>
-                        <Text style={styles.label}>Часы работы</Text>
-                        {isEditing ? (
-                            <TextInput
-                                style={styles.input}
-                                value={point.workingHours}
-                                onChangeText={(text) => handleFieldChange('workingHours', text)}
-                                placeholder="Введите часы работы"
-                            />
-                        ) : (
-                            <View style={styles.valueContainer}>
-                                <Text style={styles.valueText}>🕒 {point.workingHours}</Text>
-                            </View>
-                        )}
-                    </View>
+                        </View>
+                    )}
 
                     {/* Координаты */}
                     <View style={styles.coordinatesSection}>
                         <Text style={styles.label}>Координаты</Text>
-                        {isEditing ? (
-                            <View style={styles.coordinatesRow}>
-                                <View style={styles.coordinateField}>
-                                    <Text style={styles.coordinateLabel}>Широта</Text>
-                                    <TextInput
-                                        style={styles.input}
-                                        value={point.latitude.toString()}
-                                        onChangeText={(text) => handleFieldChange('latitude', parseFloat(text) || 0)}
-                                        placeholder="Широта"
-                                        keyboardType="decimal-pad"
-                                    />
-                                </View>
-                                <View style={styles.coordinateField}>
-                                    <Text style={styles.coordinateLabel}>Долгота</Text>
-                                    <TextInput
-                                        style={styles.input}
-                                        value={point.longitude.toString()}
-                                        onChangeText={(text) => handleFieldChange('longitude', parseFloat(text) || 0)}
-                                        placeholder="Долгота"
-                                        keyboardType="decimal-pad"
-                                    />
-                                </View>
-                            </View>
-                        ) : (
-                            <View style={styles.valueContainer}>
-                                <Text style={styles.valueText}>
-                                    🌍 {point.latitude.toFixed(6)}, {point.longitude.toFixed(6)}
-                                </Text>
-                            </View>
-                        )}
+                        <View style={styles.valueContainer}>
+                            <Text style={styles.valueText}>
+                                🌍 {shopPoint.latitude.toFixed(6)}, {shopPoint.longitude.toFixed(6)}
+                            </Text>
+                        </View>
                     </View>
                 </View>
 

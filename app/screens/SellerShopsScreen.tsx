@@ -1,7 +1,6 @@
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useOffers } from "@/hooks/useOffers";
-import { useSellers } from "@/hooks/useSellers";
-import { useShops } from "@/hooks/useShops";
+import { useSellerWithShops } from "@/hooks/usePublicSeller";
 import { useLocalSearchParams, useRouter, useSegments } from "expo-router";
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -10,16 +9,35 @@ export default function SellerShopsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const segments = useSegments();
-  const { getSellerById } = useSellers();
-  const { getShopsBySeller } = useShops();
+  const sellerId = Number(id);
+  const { seller, loading: sellerLoading, error: sellerError } = useSellerWithShops(sellerId);
   const { getOffersBySeller } = useOffers();
 
-  const sellerId = Number(id);
-  const seller = getSellerById(sellerId);
-  const shops = getShopsBySeller(sellerId);
   const sellerOffers = getOffersBySeller(sellerId);
+  const shops = seller?.shop_points || [];
 
-  if (!seller) {
+  if (sellerLoading) {
+    return (
+      <SafeAreaView style={styles.safeArea} edges={['top']}>
+        <View style={styles.header}>
+          <TouchableOpacity 
+            style={styles.headerBackButton}
+            onPress={() => router.back()}
+          >
+            <IconSymbol name="arrow.left" color="#333" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Загрузка...</Text>
+          <View style={styles.headerSpacer} />
+        </View>
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorIcon}>⏳</Text>
+          <Text style={styles.errorText}>Загрузка данных продавца...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (sellerError || !seller) {
     return (
       <SafeAreaView style={styles.safeArea} edges={['top']}>
         <View style={styles.header}>
@@ -34,7 +52,7 @@ export default function SellerShopsScreen() {
         </View>
         <View style={styles.errorContainer}>
           <Text style={styles.errorIcon}>🔍</Text>
-          <Text style={styles.errorText}>Продавец не найден</Text>
+          <Text style={styles.errorText}>{sellerError || 'Продавец не найден'}</Text>
         </View>
       </SafeAreaView>
     );
@@ -71,7 +89,6 @@ export default function SellerShopsScreen() {
           </View>
           <View style={styles.sellerDetails}>
             <Text style={styles.sellerName}>{seller.full_name}</Text>
-            <Text style={styles.sellerInn}>ИНН: {seller.inn}</Text>
             <View style={styles.statsRow}>
               <View style={styles.stat}>
                 <Text style={styles.statValue}>{shops.length}</Text>
@@ -105,14 +122,8 @@ export default function SellerShopsScreen() {
                   <Text style={styles.shopIconText}>🏪</Text>
                 </View>
                 <View style={styles.shopInfo}>
-                  <Text style={styles.shopName}>{shop.fullName}</Text>
-                  <Text style={styles.shopAddress}>📍 {shop.address}</Text>
-                  {shop.phone && (
-                    <Text style={styles.shopPhone}>📞 {shop.phone}</Text>
-                  )}
-                  {shop.workingHours && (
-                    <Text style={styles.shopHours}>🕒 {shop.workingHours}</Text>
-                  )}
+                  <Text style={styles.shopName}>Магазин №{shop.id}</Text>
+                  <Text style={styles.shopAddress}>{shop.address_formated || shop.address_raw}</Text>
                 </View>
                 <IconSymbol name="chevron.right" color="#999" size={20} />
               </TouchableOpacity>

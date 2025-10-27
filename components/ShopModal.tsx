@@ -14,12 +14,6 @@ interface Shop {
   id: number;
   name: string;
   address: string;
-  phone: string;
-  rating: number;
-  image: string;
-  description: string;
-  workingHours: string;
-  distance: string;
 }
 
 interface ShopModalProps {
@@ -39,7 +33,7 @@ export default function ShopModal({ visible, shop, onClose }: ShopModalProps) {
       productName: 'Молоко пастеризованное 3.2%',
       productDescription: 'Натуральное коровье молоко высшего качества',
       categoryId: 11,
-      shopId: 1,
+      shopId: shop.id,
       shopShortName: shop.name,
       sellerId: 1,
       expiresDate: new Date('2025-10-25'),
@@ -55,7 +49,7 @@ export default function ShopModal({ visible, shop, onClose }: ShopModalProps) {
       productName: 'Хлеб Бородинский',
       productDescription: 'Ржаной хлеб с кориандром',
       categoryId: 42,
-      shopId: 1,
+      shopId: shop.id,
       shopShortName: shop.name,
       sellerId: 1,
       expiresDate: new Date('2025-10-23'),
@@ -71,7 +65,7 @@ export default function ShopModal({ visible, shop, onClose }: ShopModalProps) {
       productName: 'Яблоки Гренни Смит',
       productDescription: 'Сочные зеленые яблоки',
       categoryId: 1,
-      shopId: 1,
+      shopId: shop.id,
       shopShortName: shop.name,
       sellerId: 1,
       expiresDate: new Date('2025-10-28'),
@@ -116,34 +110,24 @@ export default function ShopModal({ visible, shop, onClose }: ShopModalProps) {
               <View style={styles.shopDetails}>
                 <Text style={styles.shopName}>{shop.name}</Text>
                 <Text style={styles.shopAddress}>📍 {shop.address}</Text>
-                {shop.phone && (
-                  <TouchableOpacity>
-                    <Text style={styles.shopPhone}>📞 {shop.phone}</Text>
-                  </TouchableOpacity>
-                )}
-                {shop.workingHours && (
-                  <Text style={styles.shopHours}>🕒 {shop.workingHours}</Text>
-                )}
               </View>
-            </View>
+                         </View>
 
+             {/* Товары со скидкой */}
+             <View style={styles.offersSection}>
+               <Text style={styles.sectionTitle}>
+                 Предложения ({demoOffers.length})
+               </Text>
+               
+               <View style={styles.offersList}>
+                 {demoOffers.map((offer) => (
+                   <HorizontalOfferBlock key={offer.id} offer={offer} />
+                 ))}
+               </View>
+             </View>
 
-
-            {/* Товары со скидкой */}
-            <View style={styles.offersSection}>
-              <Text style={styles.sectionTitle}>
-                Предложения ({demoOffers.length})
-              </Text>
-              
-              <View style={styles.offersList}>
-                {demoOffers.map((offer) => (
-                  <HorizontalOfferBlock key={offer.id} offer={offer} />
-                ))}
-              </View>
-            </View>
-
-            {/* Отступ снизу */}
-            <View style={styles.bottomSpacer} />
+             {/* Отступ снизу */}
+             <View style={styles.bottomSpacer} />
           </ScrollView>
       </View>
     </Modal>
@@ -224,56 +208,6 @@ const styles = StyleSheet.create({
     color: '#666',
     marginBottom: 4,
   },
-  shopPhone: {
-    fontSize: 14,
-    color: '#2196F3',
-    marginBottom: 4,
-  },
-  shopHours: {
-    fontSize: 14,
-    color: '#4CAF50',
-    fontWeight: '600',
-  },
-  statsCard: {
-    backgroundColor: '#fff',
-    padding: 20,
-    marginTop: 8,
-    flexDirection: 'row',
-    justifyContent: 'center',
-  },
-  stat: {
-    alignItems: 'center',
-  },
-  statValue: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#4CAF50',
-  },
-  statLabel: {
-    fontSize: 14,
-    color: '#666',
-  },
-  mapCard: {
-    backgroundColor: '#fff',
-    marginTop: 8,
-    padding: 16,
-  },
-  mapPlaceholder: {
-    height: 150,
-    backgroundColor: '#E8F5E9',
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  mapIcon: {
-    fontSize: 48,
-    marginBottom: 8,
-  },
-  mapText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#4CAF50',
-  },
   offersSection: {
     padding: 16,
     backgroundColor: '#fff',
@@ -285,18 +219,8 @@ const styles = StyleSheet.create({
     color: '#333',
     marginBottom: 16,
   },
-  emptyContainer: {
-    padding: 40,
-    alignItems: 'center',
-  },
-  emptyIcon: {
-    fontSize: 48,
-    marginBottom: 12,
-  },
-  emptyText: {
-    fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
+  offersList: {
+    gap: 12,
   },
   bottomSpacer: {
     height: 20,
