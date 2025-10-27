@@ -1,0 +1,154 @@
+@startuml FoodLink Mobile App Structure
+!theme plain
+skinparam componentStyle rectangle
+skinparam defaultTextAlignment center
+skinparam backgroundColor white
+skinparam packageBackgroundColor #FAFAFA
+skinparam packageBorderColor #CCCCCC
+
+package "Корневой уровень" #E3F2FD {
+    component "Проверка авторизации" as root
+    component "Регистрация" as register
+    component "Вход" as login
+}
+
+package "Пользовательское приложение" #E8F5E9 {
+    component "Навигация по вкладкам" as tabs
+    
+    package "Вкладка: Главная" {
+        component "Главная страница" as home_index
+        component "Информация о продавце" as home_seller
+        component "Детали продукта" as home_product
+    }
+    
+    package "Вкладка: Каталог" {
+        component "Список категорий" as catalog_index
+        component "Категория" as catalog_category
+        component "Детали продукта " as catalog_product
+    }
+    
+    package "Вкладка: Карта" {
+        component "Карта точек продаж" as map
+    }
+    
+    package "Вкладка: Корзина" {
+        component "Корзина" as cart_index
+        component "Оплата заказа" as cart_payment
+        component "Данные заказа" as cart_order_data
+    }
+    
+    package "Вкладка: Профиль" {
+        component "Профиль пользователя" as profile_index
+        component "Настройки" as profile_settings
+        component "История заказов" as profile_history
+    }
+}
+
+package "Админ панель" #FCE4EC {
+    component "Навигация админа" as admin
+    
+    package "Вкладка: Магазин" {
+        component "Информация о магазине" as admin_shop
+    }
+    
+    package "Вкладка: Точки продаж" {
+        component "Список точек" as admin_points_index
+        component "Редактирование точки" as admin_points_edit
+        component "Создание точки" as admin_points_new
+    }
+    
+    package "Вкладка: Товары" {
+        component "Список товаров" as admin_products_index
+        component "Редактирование товара" as admin_products_edit
+        component "Создание товара" as admin_products_new
+    }
+    
+    package "Вкладка: Предложения" {
+        component "Список предложений" as admin_offers_index
+        component "Редактирование предложения" as admin_offers_edit
+        component "Создание предложения" as admin_offers_new
+    }
+    
+    package "Вкладка: Заказы" {
+        component "Список заказов" as admin_orders_index
+        component "Детали заказа" as admin_orders_detail
+    }
+    
+    package "Вкладка: Профиль администратора" {
+        component "Профиль администратора" as admin_profile
+        component "Сканирование QR заказа" as admin_scan_order
+        component "Обработка заказа" as admin_process_order
+    }
+}
+
+' Корневая навигация
+root --> register : Нет авторизации
+root --> login : Есть аккаунт
+root --> tabs : Пользователь
+
+' Авторизация
+register <--> login
+
+' Пользовательские вкладки
+tabs --> home_index
+tabs --> catalog_index
+tabs --> map
+tabs --> cart_index
+tabs --> profile_index
+
+' Навигация Главная
+home_index --> home_seller
+home_index --> home_product
+
+' Навигация Каталог
+catalog_index --> catalog_category
+catalog_category --> catalog_category : Подкатегории
+catalog_category --> catalog_product
+
+' Навигация Корзина
+cart_index --> cart_payment
+cart_payment --> cart_order_data
+
+' Навигация Профиль
+profile_index --> profile_settings
+profile_index --> profile_history
+profile_index --> cart_order_data : Активные заказы
+
+' Переключение между режимами
+profile_index <--> admin_profile : Переключение между продавцом и покупателем
+
+' Админские вкладки
+admin --> admin_shop
+admin --> admin_points_index
+admin --> admin_products_index
+admin --> admin_offers_index
+admin --> admin_orders_index
+admin --> admin_profile
+
+' Навигация Точки продаж
+admin_points_index --> admin_points_edit
+admin_points_index --> admin_points_new
+
+' Навигация Товары
+admin_products_index --> admin_products_edit
+admin_products_index --> admin_products_new
+
+' Навигация Предложения
+admin_offers_index --> admin_offers_edit
+admin_offers_index --> admin_offers_new
+
+' Навигация Заказы
+admin_orders_index --> admin_orders_detail
+
+' Навигация Профиль администратора
+admin_profile --> admin_scan_order
+admin_scan_order --> admin_process_order : Принятие заказа
+
+note right of root
+  <b>Точка входа</b>
+  Проверяет авторизацию
+  и перенаправляет в нужный
+  раздел приложения
+end note
+
+@enduml

@@ -6,10 +6,11 @@
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "mobile",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.makenti22.food"
     },
     "android": {
       "adaptiveIcon": {
@@ -18,9 +19,15 @@
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
+      "usesCleartextTraffic": true,
+      "permissions": [
+        "INTERNET",
+        "ACCESS_NETWORK_STATE"
+      ],
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.makenti22.food"
+      "package": "com.makenti22.food",
+      "networkSecurityConfig": "./network_security_config.xml"
     },
     "web": {
       "output": "static",
@@ -34,10 +41,7 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#ffffff",
-          "dark": {
-            "backgroundColor": "#000000"
-          }
+          "backgroundColor": "#ffffff"
         }
       ]
     ],
@@ -49,6 +53,20 @@
       "router": {},
       "eas": {
         "projectId": "ee563766-ca8e-45e3-9cd7-1933d5f2813b"
+      },
+      "env": {
+        "API_BASE_URL": "https://gembos.ru",
+        "API_TIMEOUT": "10000",
+        "AUTH_TOKEN_KEY": "auth_token",
+        "REFRESH_TOKEN_KEY": "refresh_token",
+        "APP_NAME": "Food Link",
+        "APP_VERSION": "0.0.1",
+        "ENABLE_LOGGING": "true",
+        "LOG_LEVEL": "debug",
+        "CACHE_TIMEOUT": "300000",
+        "ENABLE_ANIMATIONS": "true",
+        "ANIMATION_DURATION": "300",
+        "NODE_ENV": "development"
       }
     }
   }

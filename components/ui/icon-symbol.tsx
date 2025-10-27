@@ -19,13 +19,29 @@ const MAPPING = {
   'chevron.left.forwardslash.chevron.right': 'code',
   'chevron.right': 'chevron-right',
   'chevron.left': 'chevron-left',
+  'chevron.down': 'expand-more',
   'arrow.left': 'arrow-back',
   'person.fill': 'person',
   'person.circle.fill': 'account-circle',
   'gear': 'settings',
-  'shopping-cart.fill': 'add-shopping-cart',
+  'shopping-cart.fill': 'shopping-cart',
   'list.bullet': 'list',
-  'map.fill': 'map'
+  'map.fill': 'place',
+  'history': 'history',
+  'settings': 'settings',
+  'bag.fill': 'shopping-bag',
+  'map.pin.fill': 'location-on',
+  'cube.box.fill': 'inventory',
+  'star.fill': 'star',
+  'pencil': 'edit',
+  'camera': 'photo-camera',
+  'trash': 'delete',
+  'plus': 'add',
+  'search': 'search',
+  'xmark': 'close',
+  'checkmark': 'check',
+  'filter': 'filter-list',
+  'qrcode': 'qr-code-2'
 } as any;
 
 /**

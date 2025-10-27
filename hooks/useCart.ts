@@ -42,7 +42,7 @@ export const useCart = () => {
       currentCost: 69.90,
       discount: 22,
       quantity: 2,
-      expiresDate: new Date('2025-10-15'),
+      expiresDate: new Date('2025-10-25'),
     },
     {
       id: 2,
@@ -54,7 +54,7 @@ export const useCart = () => {
       currentCost: 59.00,
       discount: 21,
       quantity: 1,
-      expiresDate: new Date('2025-10-16'),
+      expiresDate: new Date('2025-10-26'),
     },
     {
       id: 3,
@@ -80,7 +80,7 @@ export const useCart = () => {
       currentCost: 45.00,
       discount: 31,
       quantity: 2,
-      expiresDate: new Date('2025-10-13'),
+      expiresDate: new Date('2025-10-23'),
     },
     {
       id: 5,
@@ -92,7 +92,7 @@ export const useCart = () => {
       currentCost: 55.00,
       discount: 35,
       quantity: 3,
-      expiresDate: new Date('2025-10-12'),
+      expiresDate: new Date('2025-10-22'),
     },
     {
       id: 9,
@@ -104,7 +104,7 @@ export const useCart = () => {
       currentCost: 20.00,
       discount: 56,
       quantity: 2,
-      expiresDate: new Date('2025-10-10'), // Просрочен
+      expiresDate: new Date('2025-10-20'), // Просрочен вчера
     },
     
     // Магазин 3: Мясная лавка
@@ -118,7 +118,7 @@ export const useCart = () => {
       currentCost: 380.00,
       discount: 16,
       quantity: 1,
-      expiresDate: new Date('2025-10-14'),
+      expiresDate: new Date('2025-10-24'),
     },
     
     // Магазин 4: Молочка
@@ -132,7 +132,7 @@ export const useCart = () => {
       currentCost: 95.00,
       discount: 21,
       quantity: 4,
-      expiresDate: new Date('2025-10-18'),
+      expiresDate: new Date('2025-10-28'),
     },
     {
       id: 8,

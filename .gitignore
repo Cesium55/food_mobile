@@ -38,6 +38,14 @@ yarn-error.*
 
 app-example
 
+.vscode/
+.cursor/
+
 # generated native folders
 /ios
 /android
+
+*.localinfo
+.env
+*.apk
+*.aab
