@@ -43,6 +43,7 @@ export default function YandexMapsWebView() {
         incognito={true}
         sharedCookiesEnabled={false}
         style={styles.webview}
+        geolocationEnabled={true}
         onMessage={(event) => {
           console.log("WebView message received:", event.nativeEvent.data);
           try {
