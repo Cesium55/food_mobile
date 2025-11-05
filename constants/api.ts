@@ -65,8 +65,8 @@ export const API_ENDPOINTS = {
   
   // Категории
   CATEGORIES: {
-    BASE: '/categories',
-    TREE: '/categories/tree',
+    BASE: '/product-categories',
+    TREE: '/product-categories/tree',
   },
   
   // Поиск
@@ -80,6 +80,12 @@ export const API_ENDPOINTS = {
   SHOP_POINTS: {
     BASE: '/shop-points',
     CREATE_BY_ADDRESS: '/shop-points/by-address',
+  },
+  
+  // Предложения (офферы)
+  OFFERS: {
+    BASE: '/offers',
+    WITH_PRODUCTS: '/offers/with-products',
   },
 } as const;
 

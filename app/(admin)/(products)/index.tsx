@@ -1,9 +1,11 @@
 import { TabScreen } from "@/components/TabScreen";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useCategories } from "@/hooks/useCategories";
+import { useProducts, Product } from "@/hooks/useProducts";
 import { router } from "expo-router";
 import { useState } from "react";
 import {
+    ActivityIndicator,
     ScrollView,
     StyleSheet,
     Text,
@@ -12,48 +14,11 @@ import {
     View
 } from "react-native";
 
-interface Product {
-    id: number;
-    name: string;
-    description: string;
-    categoryId: number;
-}
-
 export default function ProductsScreen() {
     const { categories, getCategoryById } = useCategories();
+    const { products, loading: productsLoading, error: productsError } = useProducts();
     const [searchQuery, setSearchQuery] = useState("");
     const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
-
-    // Демо-данные товаров
-    const [products] = useState<Product[]>([
-        // Молочные продукты
-        { id: 1, name: "Молоко пастеризованное 3.2%", description: "Натуральное коровье молоко", categoryId: 11 },
-        { id: 2, name: "Молоко ультрапастеризованное 2.5%", description: "Длительного хранения", categoryId: 11 },
-        { id: 3, name: "Кефир 2.5%", description: "Традиционный кисломолочный напиток", categoryId: 12 },
-        { id: 4, name: "Йогурт натуральный", description: "Без добавок и сахара", categoryId: 12 },
-        { id: 5, name: "Творог 5%", description: "Зерненый творог", categoryId: 13 },
-        { id: 6, name: "Сырки глазированные", description: "Творожная масса в шоколаде", categoryId: 13 },
-        { id: 7, name: "Сыр Российский", description: "Твердый сыр", categoryId: 14 },
-        { id: 8, name: "Сыр Пармезан", description: "Итальянский твердый сыр", categoryId: 14 },
-        { id: 9, name: "Сметана 20%", description: "Классическая сметана", categoryId: 15 },
-        { id: 10, name: "Масло сливочное 82.5%", description: "Традиционное сливочное масло", categoryId: 16 },
-        
-        // Хлеб и выпечка
-        { id: 11, name: "Хлеб Бородинский", description: "Ржаной хлеб", categoryId: 41 },
-        { id: 12, name: "Хлеб белый", description: "Пшеничный хлеб", categoryId: 41 },
-        { id: 13, name: "Круассан с шоколадом", description: "Свежая выпечка", categoryId: 42 },
-        { id: 14, name: "Булочка с маком", description: "Сдобная булочка", categoryId: 42 },
-        
-        // Мясо и птица
-        { id: 15, name: "Куриное филе", description: "Охлажденное", categoryId: 23 },
-        { id: 16, name: "Фарш говяжий", description: "Свежий фарш", categoryId: 24 },
-        { id: 17, name: "Колбаса Докторская", description: "Вареная колбаса", categoryId: 25 },
-        
-        // Овощи и фрукты
-        { id: 18, name: "Помидоры", description: "Свежие томаты", categoryId: 31 },
-        { id: 19, name: "Огурцы", description: "Свежие огурцы", categoryId: 31 },
-        { id: 20, name: "Яблоки Голден", description: "Импортные яблоки", categoryId: 32 },
-    ]);
 
     // Группировка товаров по категориям
     const getCategoryIcon = (categoryId: number): string => {
@@ -71,16 +36,18 @@ export default function ProductsScreen() {
     const filteredProducts = products.filter(product => {
         const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                             product.description.toLowerCase().includes(searchQuery.toLowerCase());
-        const matchesCategory = selectedCategoryId === null || product.categoryId === selectedCategoryId;
+        const matchesCategory = selectedCategoryId === null || product.category_ids.includes(selectedCategoryId);
         return matchesSearch && matchesCategory;
     });
 
-    // Группировка по категориям
+    // Группировка по категориям (берем первую категорию товара для группировки)
     const groupedProducts = filteredProducts.reduce((acc, product) => {
-        if (!acc[product.categoryId]) {
-            acc[product.categoryId] = [];
+        // Используем первую категорию товара для группировки
+        const mainCategoryId = product.category_ids.length > 0 ? product.category_ids[0] : 0;
+        if (!acc[mainCategoryId]) {
+            acc[mainCategoryId] = [];
         }
-        acc[product.categoryId].push(product);
+        acc[mainCategoryId].push(product);
         return acc;
     }, {} as { [key: number]: Product[] });
 
@@ -133,61 +100,113 @@ export default function ProductsScreen() {
                     contentContainerStyle={styles.scrollContent}
                     showsVerticalScrollIndicator={false}
                 >
-                    <Text style={styles.countText}>
-                        Всего товаров: {filteredProducts.length}
-                    </Text>
-
-                    {categoriesWithProducts.length === 0 ? (
+                    {productsLoading ? (
+                        <View style={styles.loadingContainer}>
+                            <ActivityIndicator size="large" color="#34C759" />
+                            <Text style={styles.loadingText}>Загрузка товаров...</Text>
+                        </View>
+                    ) : productsError ? (
                         <View style={styles.emptyContainer}>
-                            <Text style={styles.emptyIcon}>📦</Text>
-                            <Text style={styles.emptyText}>
-                                {searchQuery ? "Товары не найдены" : "Нет товаров"}
-                            </Text>
-                            <Text style={styles.emptySubtext}>
-                                {searchQuery ? "Попробуйте изменить поисковый запрос" : "Нажмите 'Добавить' чтобы создать первый товар"}
-                            </Text>
+                            <Text style={styles.emptyIcon}>⚠️</Text>
+                            <Text style={styles.emptyText}>Ошибка загрузки</Text>
+                            <Text style={styles.emptySubtext}>{productsError}</Text>
                         </View>
                     ) : (
-                        categoriesWithProducts.map(categoryId => {
-                            const category = getCategoryById(categoryId);
-                            if (!category) return null;
+                        <>
+                            <Text style={styles.countText}>
+                                Всего товаров: {filteredProducts.length}
+                            </Text>
 
-                            return (
-                                <View key={categoryId} style={styles.categorySection}>
-                                    <View style={styles.categoryHeader}>
-                                        <Text style={styles.categoryIcon}>{getCategoryIcon(categoryId)}</Text>
-                                        <Text style={styles.categoryName}>{category.name}</Text>
-                                        <Text style={styles.categoryCount}>
-                                            {groupedProducts[categoryId].length}
-                                        </Text>
-                                    </View>
-
-                                    {groupedProducts[categoryId].map(product => (
-                                        <TouchableOpacity
-                                            key={product.id}
-                                            style={styles.productCard}
-                                            activeOpacity={0.7}
-                                            onPress={() => handleProductPress(product.id)}
-                                        >
-                                            <View style={styles.productIcon}>
-                                                <Text style={styles.productIconText}>
-                                                    {getCategoryIcon(categoryId)}
-                                                </Text>
-                                            </View>
-                                            
-                                            <View style={styles.productInfo}>
-                                                <Text style={styles.productName}>{product.name}</Text>
-                                                <Text style={styles.productDescription} numberOfLines={1}>
-                                                    {product.description}
-                                                </Text>
-                                            </View>
-
-                                            <IconSymbol name="chevron.right" color="#999" size={20} />
-                                        </TouchableOpacity>
-                                    ))}
+                            {categoriesWithProducts.length === 0 ? (
+                                <View style={styles.emptyContainer}>
+                                    <Text style={styles.emptyIcon}>📦</Text>
+                                    <Text style={styles.emptyText}>
+                                        {searchQuery ? "Товары не найдены" : "Нет товаров"}
+                                    </Text>
+                                    <Text style={styles.emptySubtext}>
+                                        {searchQuery ? "Попробуйте изменить поисковый запрос" : "Нажмите 'Добавить' чтобы создать первый товар"}
+                                    </Text>
                                 </View>
-                            );
-                        })
+                            ) : (
+                                categoriesWithProducts.map(categoryId => {
+                                    // Обработка товаров без категорий (categoryId = 0)
+                                    if (categoryId === 0) {
+                                        return (
+                                            <View key="no-category" style={styles.categorySection}>
+                                                <View style={styles.categoryHeader}>
+                                                    <Text style={styles.categoryIcon}>📦</Text>
+                                                    <Text style={styles.categoryName}>Без категории</Text>
+                                                    <Text style={styles.categoryCount}>
+                                                        {groupedProducts[categoryId].length}
+                                                    </Text>
+                                                </View>
+
+                                                {groupedProducts[categoryId].map(product => (
+                                                    <TouchableOpacity
+                                                        key={product.id}
+                                                        style={styles.productCard}
+                                                        activeOpacity={0.7}
+                                                        onPress={() => handleProductPress(product.id)}
+                                                    >
+                                                        <View style={styles.productIcon}>
+                                                            <Text style={styles.productIconText}>📦</Text>
+                                                        </View>
+                                                        
+                                                        <View style={styles.productInfo}>
+                                                            <Text style={styles.productName}>{product.name}</Text>
+                                                            <Text style={styles.productDescription} numberOfLines={1}>
+                                                                {product.description}
+                                                            </Text>
+                                                        </View>
+
+                                                        <IconSymbol name="chevron.right" color="#999" size={20} />
+                                                    </TouchableOpacity>
+                                                ))}
+                                            </View>
+                                        );
+                                    }
+
+                                    const category = getCategoryById(categoryId);
+                                    if (!category) return null;
+
+                                    return (
+                                        <View key={categoryId} style={styles.categorySection}>
+                                            <View style={styles.categoryHeader}>
+                                                <Text style={styles.categoryIcon}>{getCategoryIcon(categoryId)}</Text>
+                                                <Text style={styles.categoryName}>{category.name}</Text>
+                                                <Text style={styles.categoryCount}>
+                                                    {groupedProducts[categoryId].length}
+                                                </Text>
+                                            </View>
+
+                                            {groupedProducts[categoryId].map(product => (
+                                                <TouchableOpacity
+                                                    key={product.id}
+                                                    style={styles.productCard}
+                                                    activeOpacity={0.7}
+                                                    onPress={() => handleProductPress(product.id)}
+                                                >
+                                                    <View style={styles.productIcon}>
+                                                        <Text style={styles.productIconText}>
+                                                            {getCategoryIcon(categoryId)}
+                                                        </Text>
+                                                    </View>
+                                                    
+                                                    <View style={styles.productInfo}>
+                                                        <Text style={styles.productName}>{product.name}</Text>
+                                                        <Text style={styles.productDescription} numberOfLines={1}>
+                                                            {product.description}
+                                                        </Text>
+                                                    </View>
+
+                                                    <IconSymbol name="chevron.right" color="#999" size={20} />
+                                                </TouchableOpacity>
+                                            ))}
+                                        </View>
+                                    );
+                                })
+                            )}
+                        </>
                     )}
                 </ScrollView>
             </View>
@@ -343,5 +362,14 @@ const styles = StyleSheet.create({
         color: '#999',
         textAlign: 'center',
         paddingHorizontal: 40,
+    },
+    loadingContainer: {
+        alignItems: 'center',
+        paddingVertical: 60,
+    },
+    loadingText: {
+        marginTop: 16,
+        fontSize: 16,
+        color: '#666',
     },
 });

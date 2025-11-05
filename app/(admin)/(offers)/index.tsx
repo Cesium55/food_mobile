@@ -1,55 +1,46 @@
 import { TabScreen } from "@/components/TabScreen";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useCategories } from "@/hooks/useCategories";
+import { Offer, useOffers } from "@/hooks/useOffers";
 import { useShops } from "@/hooks/useShops";
 import { router } from "expo-router";
 import { useState } from "react";
-import { Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
-
-// Интерфейс предложения
-interface Offer {
-    id: number;
-    productId: number;
-    productName: string;
-    productCategoryId: number;
-    shopId: number;
-    price: number;
-    discount: number;
-    expiryDate: string;
-    quantity: number;
-}
+import { ActivityIndicator, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 type GroupBy = 'shop' | 'category';
 
 export default function OffersScreen() {
-    const { shops } = useShops();
-    const { categories, getCategoryById } = useCategories();
+    const { shops, loading: shopsLoading, error: shopsError, refetch: refetchShops } = useShops();
+    const { categories, getCategoryById, loading: categoriesLoading, refetch: refetchCategories } = useCategories();
+    const { offers, loading: offersLoading, error: offersError, refetch: refetchOffers } = useOffers();
     const [expandedItems, setExpandedItems] = useState<number[]>([]);
     const [groupBy, setGroupBy] = useState<GroupBy>('shop');
     const [showFilters, setShowFilters] = useState(false);
     const [selectedShopIds, setSelectedShopIds] = useState<number[]>([]);
     const [selectedCategoryIds, setSelectedCategoryIds] = useState<number[]>([]);
 
-    // Демо-данные предложений (в реальном приложении - из API)
-    const demoOffers: Offer[] = [
-        { id: 1, productId: 1, productName: 'Молоко пастеризованное 3.2%', productCategoryId: 11, shopId: 1, price: 89.90, discount: 10, expiryDate: '2025-10-25', quantity: 50 },
-        { id: 2, productId: 2, productName: 'Хлеб "Бородинский"', productCategoryId: 5, shopId: 1, price: 55.00, discount: 0, expiryDate: '2025-10-22', quantity: 30 },
-        { id: 3, productId: 3, productName: 'Яйца куриные С1', productCategoryId: 12, shopId: 1, price: 119.00, discount: 15, expiryDate: '2025-10-28', quantity: 100 },
-        { id: 4, productId: 1, productName: 'Молоко пастеризованное 3.2%', productCategoryId: 11, shopId: 2, price: 92.00, discount: 5, expiryDate: '2025-10-26', quantity: 40 },
-        { id: 5, productId: 4, productName: 'Сыр "Российский"', productCategoryId: 13, shopId: 2, price: 450.00, discount: 20, expiryDate: '2025-11-01', quantity: 25 },
-        { id: 6, productId: 5, productName: 'Кофе молотый "Жокей"', productCategoryId: 10, shopId: 3, price: 320.00, discount: 0, expiryDate: '2026-02-01', quantity: 15 },
-        { id: 7, productId: 6, productName: 'Йогурт "Активия"', productCategoryId: 11, shopId: 3, price: 75.00, discount: 10, expiryDate: '2025-10-30', quantity: 60 },
-        { id: 8, productId: 7, productName: 'Масло сливочное 82.5%', productCategoryId: 13, shopId: 1, price: 180.00, discount: 0, expiryDate: '2025-11-15', quantity: 35 },
-        { id: 9, productId: 8, productName: 'Вода минеральная', productCategoryId: 10, shopId: 2, price: 45.00, discount: 5, expiryDate: '2026-06-01', quantity: 120 },
-    ];
+    // Функция для обновления всех данных
+    const handleRefresh = async () => {
+        await Promise.all([
+            refetchShops(),
+            refetchCategories(),
+            refetchOffers(),
+        ]);
+    };
 
     // Фильтрация предложений
-    const filteredOffers = demoOffers.filter(offer => {
+    const filteredOffers = offers.filter(offer => {
         if (selectedShopIds.length > 0 && !selectedShopIds.includes(offer.shopId)) {
             return false;
         }
-        if (selectedCategoryIds.length > 0 && !selectedCategoryIds.includes(offer.productCategoryId)) {
-            return false;
+        if (selectedCategoryIds.length > 0) {
+            // Проверяем, пересекается ли хотя бы одна категория товара с выбранными
+            const hasMatchingCategory = offer.productCategoryIds.some(catId => 
+                selectedCategoryIds.includes(catId)
+            );
+            if (!hasMatchingCategory) {
+                return false;
+            }
         }
         return true;
     });
@@ -74,13 +65,11 @@ export default function OffersScreen() {
         if (groupBy === 'shop') {
             return filteredOffers.filter(offer => offer.shopId === groupId);
         } else {
-            return filteredOffers.filter(offer => offer.productCategoryId === groupId);
+            // Для категорий проверяем, содержит ли оффер эту категорию
+            return filteredOffers.filter(offer => offer.productCategoryIds.includes(groupId));
         }
     };
 
-    const getFinalPrice = (price: number, discount: number) => {
-        return price - (price * discount / 100);
-    };
 
     const handleToggleShopFilter = (shopId: number) => {
         setSelectedShopIds(prev =>
@@ -110,12 +99,16 @@ export default function OffersScreen() {
         if (groupBy === 'shop') {
             return shops.map(shop => ({
                 id: shop.id,
-                name: shop.name,
+                name: shop.fullName || shop.name,
                 subtitle: shop.address,
             }));
         } else {
             // Получаем только категории, которые есть в предложениях
-            const categoryIds = new Set(filteredOffers.map(o => o.productCategoryId));
+            const categoryIds = new Set<number>();
+            filteredOffers.forEach(offer => {
+                offer.productCategoryIds.forEach(catId => categoryIds.add(catId));
+            });
+            
             return Array.from(categoryIds)
                 .map(catId => {
                     const category = getCategoryById(catId);
@@ -132,7 +125,11 @@ export default function OffersScreen() {
     const groups = getGroups();
 
     return (
-        <TabScreen title="Предложения">
+        <TabScreen 
+            title="Предложения"
+            onRefresh={handleRefresh}
+            refreshing={offersLoading || shopsLoading}
+        >
             <View style={styles.container}>
                 {/* Заголовок с кнопками */}
                 <View style={styles.header}>
@@ -193,7 +190,28 @@ export default function OffersScreen() {
 
                 {/* Список групп с предложениями */}
                 <ScrollView style={styles.scrollView}>
-                    {groups.map(group => {
+                    {shopsLoading || categoriesLoading || offersLoading ? (
+                        <View style={styles.loadingContainer}>
+                            <ActivityIndicator size="large" color="#007AFF" />
+                            <Text style={styles.loadingText}>Загрузка данных...</Text>
+                        </View>
+                    ) : shopsError || offersError ? (
+                        <View style={styles.errorContainer}>
+                            <Text style={styles.errorIcon}>⚠️</Text>
+                            <Text style={styles.errorText}>
+                                {shopsError || offersError || 'Ошибка загрузки данных'}
+                            </Text>
+                            <Text style={styles.errorSubtext}>
+                                {shopsError || offersError}
+                            </Text>
+                        </View>
+                    ) : groups.length === 0 ? (
+                        <View style={styles.emptyContainer}>
+                            <Text style={styles.emptyIcon}>📦</Text>
+                            <Text style={styles.emptyStateText}>Нет данных для отображения</Text>
+                        </View>
+                    ) : (
+                        groups.map(group => {
                         const offers = getOffersForGroup(group.id);
                         const isExpanded = expandedItems.includes(group.id);
 
@@ -238,10 +256,11 @@ export default function OffersScreen() {
                                                 Нет предложений
                                             </Text>
                                         ) : (
-                                            offers.map(offer => {
-                                                const finalPrice = getFinalPrice(offer.price, offer.discount);
+                                            offers.map((offer: Offer) => {
                                                 const shop = shops.find(s => s.id === offer.shopId);
-                                                const category = getCategoryById(offer.productCategoryId);
+                                                // Берем первую категорию для отображения
+                                                const firstCategoryId = offer.productCategoryIds[0];
+                                                const category = firstCategoryId ? getCategoryById(firstCategoryId) : null;
 
                                                 return (
                                                     <TouchableOpacity
@@ -255,7 +274,7 @@ export default function OffersScreen() {
                                                             </Text>
                                                             {groupBy === 'category' && shop && (
                                                                 <Text style={styles.offerShopName}>
-                                                                    📍 {shop.name}
+                                                                    📍 {shop.fullName || shop.name}
                                                                 </Text>
                                                             )}
                                                             {groupBy === 'shop' && category && (
@@ -265,10 +284,10 @@ export default function OffersScreen() {
                                                             )}
                                                             <View style={styles.offerDetails}>
                                                                 <Text style={styles.offerDetailText}>
-                                                                    Количество: {offer.quantity} шт
+                                                                    Количество: {offer.count} шт
                                                                 </Text>
                                                                 <Text style={styles.offerDetailText}>
-                                                                    Годен до: {new Date(offer.expiryDate).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                                                                    Годен до: {new Date(offer.expiresDate).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' })}
                                                                 </Text>
                                                             </View>
                                                         </View>
@@ -276,10 +295,10 @@ export default function OffersScreen() {
                                                             {offer.discount > 0 ? (
                                                                 <>
                                                                     <Text style={styles.oldPrice}>
-                                                                        {offer.price.toFixed(2)} ₽
+                                                                        {offer.originalCost.toFixed(2)} ₽
                                                                     </Text>
                                                                     <Text style={styles.newPrice}>
-                                                                        {finalPrice.toFixed(2)} ₽
+                                                                        {offer.currentCost.toFixed(2)} ₽
                                                                     </Text>
                                                                     <View style={styles.discountBadge}>
                                                                         <Text style={styles.discountText}>
@@ -289,7 +308,7 @@ export default function OffersScreen() {
                                                                 </>
                                                             ) : (
                                                                 <Text style={styles.price}>
-                                                                    {offer.price.toFixed(2)} ₽
+                                                                    {offer.currentCost.toFixed(2)} ₽
                                                                 </Text>
                                                             )}
                                                         </View>
@@ -301,7 +320,8 @@ export default function OffersScreen() {
                                 )}
                             </View>
                         );
-                    })}
+                    })
+                    )}
                 </ScrollView>
             </View>
 
@@ -731,5 +751,48 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: '600',
         color: '#fff',
+    },
+    loadingContainer: {
+        alignItems: 'center',
+        paddingVertical: 60,
+    },
+    loadingText: {
+        marginTop: 16,
+        fontSize: 16,
+        color: '#666',
+    },
+    errorContainer: {
+        alignItems: 'center',
+        paddingVertical: 60,
+        paddingHorizontal: 20,
+    },
+    errorIcon: {
+        fontSize: 64,
+        marginBottom: 16,
+    },
+    errorText: {
+        fontSize: 18,
+        fontWeight: '600',
+        color: '#666',
+        marginBottom: 8,
+        textAlign: 'center',
+    },
+    errorSubtext: {
+        fontSize: 14,
+        color: '#999',
+        textAlign: 'center',
+    },
+    emptyContainer: {
+        alignItems: 'center',
+        paddingVertical: 60,
+    },
+    emptyIcon: {
+        fontSize: 64,
+        marginBottom: 16,
+    },
+    emptyStateText: {
+        fontSize: 18,
+        fontWeight: '600',
+        color: '#666',
     },
 });

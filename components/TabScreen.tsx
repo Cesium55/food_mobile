@@ -2,18 +2,39 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { router } from "expo-router";
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { useState } from "react";
+import { RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 interface TabScreenProps {
   title: string;
   children?: React.ReactNode;
   showBackButton?: boolean;
+  onRefresh?: () => Promise<void> | void;
+  refreshing?: boolean;
 }
 
-export function TabScreen({ title, children, showBackButton = false }: TabScreenProps) {
+export function TabScreen({ 
+  title, 
+  children, 
+  showBackButton = false,
+  onRefresh,
+  refreshing = false,
+}: TabScreenProps) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleRefresh = async () => {
+    if (!onRefresh) return;
+    
+    setIsRefreshing(true);
+    try {
+      await onRefresh();
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
@@ -38,6 +59,16 @@ export function TabScreen({ title, children, showBackButton = false }: TabScreen
         style={styles.content} 
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          onRefresh ? (
+            <RefreshControl
+              refreshing={refreshing || isRefreshing}
+              onRefresh={handleRefresh}
+              tintColor={colors.text}
+              colors={['#007AFF']}
+            />
+          ) : undefined
+        }
       >
         {children}
       </ScrollView>

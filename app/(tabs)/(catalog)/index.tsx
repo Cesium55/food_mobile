@@ -1,13 +1,11 @@
 import { TabScreen } from "@/components/TabScreen";
 import { useCategories } from "@/hooks/useCategories";
 import { useRouter } from "expo-router";
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
-
-const ROW_HEIGHT = 70;
+import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 export default function Catalog() {
   const router = useRouter();
-  const { getTopLevelCategories } = useCategories();
+  const { getTopLevelCategories, getSubCategories, loading, error } = useCategories();
   const topCategories = getTopLevelCategories();
 
   const getCategoryIcon = (categoryId: number): string => {
@@ -24,53 +22,163 @@ export default function Catalog() {
     return icons[categoryId] || '📦';
   };
 
+  if (loading) {
+    return (
+      <TabScreen title="Каталог">
+        <View style={styles.centerContainer}>
+          <ActivityIndicator size="large" color="#007AFF" />
+          <Text style={styles.loadingText}>Загрузка категорий...</Text>
+        </View>
+      </TabScreen>
+    );
+  }
+
+  if (error) {
+    return (
+      <TabScreen title="Каталог">
+        <View style={styles.centerContainer}>
+          <Text style={styles.errorText}>Ошибка: {error}</Text>
+        </View>
+      </TabScreen>
+    );
+  }
+
+  if (topCategories.length === 0) {
+    return (
+      <TabScreen title="Каталог">
+        <View style={styles.centerContainer}>
+          <Text style={styles.errorText}>Категории не найдены</Text>
+        </View>
+      </TabScreen>
+    );
+  }
+
   return (
     <TabScreen title="Каталог">
-      <View style={styles.container}>
-        <Text style={styles.title}>Категории товаров</Text>
-        
-        <View style={styles.list}>
-          {topCategories.map((category) => (
-            <TouchableOpacity
-              key={category.id}
-              style={styles.categoryRow}
-              activeOpacity={0.7}
-              onPress={() => router.push(`/(tabs)/(catalog)/${category.id}`)}
-            >
-              <View style={styles.iconContainer}>
-                <Text style={styles.icon}>{getCategoryIcon(category.id)}</Text>
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+        <View style={styles.container}>
+          <Text style={styles.title}>Категории товаров</Text>
+          
+          {topCategories.map((category) => {
+            const subCategories = getSubCategories(category.id);
+            
+            return (
+              <View key={category.id} style={styles.categoryGroup}>
+                {/* Заголовок категории верхнего уровня - просто текст, не кнопка */}
+                <View style={styles.categoryHeader}>
+                  <View style={styles.iconContainer}>
+                    <Text style={styles.icon}>{getCategoryIcon(category.id)}</Text>
+                  </View>
+                  <Text style={styles.categoryTitle}>{category.name}</Text>
+                </View>
+                
+                {/* Подкатегории как кнопки под заголовком */}
+                {subCategories.length > 0 ? (
+                  <View style={styles.subCategoriesContainer}>
+                    {subCategories.map((subCategory) => (
+                      <TouchableOpacity
+                        key={subCategory.id}
+                        style={styles.subCategoryButton}
+                        activeOpacity={0.7}
+                        onPress={() => router.push(`/(tabs)/(catalog)/${subCategory.id}`)}
+                      >
+                        <View style={styles.subCategoryIconContainer}>
+                          <Text style={styles.subCategoryIcon}>📦</Text>
+                        </View>
+                        <Text style={styles.subCategoryText}>{subCategory.name}</Text>
+                        <Text style={styles.arrow}>›</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                ) : (
+                  // Если подкатегорий нет, показываем кнопку для перехода к товарам категории
+                  <TouchableOpacity
+                    style={styles.subCategoryButton}
+                    activeOpacity={0.7}
+                    onPress={() => router.push(`/(tabs)/(catalog)/${category.id}`)}
+                  >
+                    <Text style={styles.subCategoryText}>Показать товары</Text>
+                    <Text style={styles.arrow}>›</Text>
+                  </TouchableOpacity>
+                )}
               </View>
-              <Text style={styles.categoryName}>{category.name}</Text>
-              <Text style={styles.arrow}>›</Text>
-            </TouchableOpacity>
-          ))}
+            );
+          })}
         </View>
-      </View>
+      </ScrollView>
     </TabScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  scrollView: {
     flex: 1,
+  },
+  scrollContent: {
+    paddingBottom: 20,
+  },
+  container: {
     padding: 16,
   },
   title: {
     fontSize: 28,
     fontWeight: 'bold',
-    marginBottom: 20,
+    marginBottom: 24,
     color: '#333',
   },
-  list: {
-    gap: 12,
+  centerContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
   },
-  categoryRow: {
+  loadingText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: '#666',
+  },
+  errorText: {
+    fontSize: 16,
+    color: '#FF3B30',
+    textAlign: 'center',
+  },
+  categoryGroup: {
+    marginBottom: 32,
+  },
+  categoryHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    height: ROW_HEIGHT,
+    marginBottom: 12,
+  },
+  iconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#F5F5F5',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  icon: {
+    fontSize: 24,
+  },
+  categoryTitle: {
+    flex: 1,
+    fontSize: 22,
+    fontWeight: '600',
+    color: '#333',
+  },
+  subCategoriesContainer: {
+    gap: 10,
+  },
+  subCategoryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 56,
     backgroundColor: '#fff',
-    borderRadius: ROW_HEIGHT * 0.14,
-    paddingHorizontal: ROW_HEIGHT * 0.2,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    marginBottom: 8,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -80,26 +188,26 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
   },
-  iconContainer: {
-    width: ROW_HEIGHT * 0.6,
-    height: ROW_HEIGHT * 0.6,
-    borderRadius: ROW_HEIGHT * 0.3,
+  subCategoryIconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: '#F5F5F5',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: ROW_HEIGHT * 0.2,
+    marginRight: 12,
   },
-  icon: {
-    fontSize: ROW_HEIGHT * 0.4,
+  subCategoryIcon: {
+    fontSize: 20,
   },
-  categoryName: {
+  subCategoryText: {
     flex: 1,
-    fontSize: ROW_HEIGHT * 0.23,
-    fontWeight: '600',
+    fontSize: 16,
+    fontWeight: '500',
     color: '#333',
   },
   arrow: {
-    fontSize: ROW_HEIGHT * 0.5,
+    fontSize: 20,
     color: '#999',
     fontWeight: '300',
   },

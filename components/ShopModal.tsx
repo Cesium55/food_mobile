@@ -1,5 +1,6 @@
 import React from 'react';
 import {
+  ActivityIndicator,
   ScrollView,
   StyleSheet,
   Text,
@@ -7,6 +8,7 @@ import {
   View
 } from 'react-native';
 import Modal from 'react-native-modal';
+import { useOffers } from '@/hooks/useOffers';
 import HorizontalOfferBlock from './offers/horizontalOfferBlock';
 import { IconSymbol } from './ui/icon-symbol';
 
@@ -23,59 +25,12 @@ interface ShopModalProps {
 }
 
 export default function ShopModal({ visible, shop, onClose }: ShopModalProps) {
-  if (!shop) return null;
+  const { getOffersByShop, loading } = useOffers();
+  
+  // Получаем офферы для данного магазина из API
+  const shopOffers = shop ? getOffersByShop(shop.id) : [];
 
-  // Демо-товары для магазина
-  const demoOffers = [
-    {
-      id: 1,
-      productId: 1,
-      productName: 'Молоко пастеризованное 3.2%',
-      productDescription: 'Натуральное коровье молоко высшего качества',
-      categoryId: 11,
-      shopId: shop.id,
-      shopShortName: shop.name,
-      sellerId: 1,
-      expiresDate: new Date('2025-10-25'),
-      originalCost: 89.90,
-      currentCost: 69.90,
-      discount: 22,
-      count: 45,
-      entryDescription: 'Свежее поступление',
-    },
-    {
-      id: 2,
-      productId: 2,
-      productName: 'Хлеб Бородинский',
-      productDescription: 'Ржаной хлеб с кориандром',
-      categoryId: 42,
-      shopId: shop.id,
-      shopShortName: shop.name,
-      sellerId: 1,
-      expiresDate: new Date('2025-10-23'),
-      originalCost: 65.00,
-      currentCost: 45.00,
-      discount: 31,
-      count: 12,
-      entryDescription: 'Свежая выпечка',
-    },
-    {
-      id: 3,
-      productId: 3,
-      productName: 'Яблоки Гренни Смит',
-      productDescription: 'Сочные зеленые яблоки',
-      categoryId: 1,
-      shopId: shop.id,
-      shopShortName: shop.name,
-      sellerId: 1,
-      expiresDate: new Date('2025-10-28'),
-      originalCost: 120.00,
-      currentCost: 89.00,
-      discount: 26,
-      count: 8,
-      entryDescription: 'Свежие фрукты',
-    }
-  ];
+  if (!shop) return null;
 
   return (
     <Modal
@@ -116,14 +71,25 @@ export default function ShopModal({ visible, shop, onClose }: ShopModalProps) {
              {/* Товары со скидкой */}
              <View style={styles.offersSection}>
                <Text style={styles.sectionTitle}>
-                 Предложения ({demoOffers.length})
+                 Предложения ({shopOffers.length})
                </Text>
                
-               <View style={styles.offersList}>
-                 {demoOffers.map((offer) => (
-                   <HorizontalOfferBlock key={offer.id} offer={offer} />
-                 ))}
-               </View>
+               {loading ? (
+                 <View style={styles.loadingContainer}>
+                   <ActivityIndicator size="small" color="#007AFF" />
+                   <Text style={styles.loadingText}>Загрузка предложений...</Text>
+                 </View>
+               ) : shopOffers.length === 0 ? (
+                 <View style={styles.emptyContainer}>
+                   <Text style={styles.emptyText}>Нет доступных предложений</Text>
+                 </View>
+               ) : (
+                 <View style={styles.offersList}>
+                   {shopOffers.map((offer) => (
+                     <HorizontalOfferBlock key={offer.id} offer={offer} />
+                   ))}
+                 </View>
+               )}
              </View>
 
              {/* Отступ снизу */}
@@ -224,5 +190,23 @@ const styles = StyleSheet.create({
   },
   bottomSpacer: {
     height: 20,
+  },
+  loadingContainer: {
+    padding: 40,
+    alignItems: 'center',
+    gap: 12,
+  },
+  loadingText: {
+    fontSize: 14,
+    color: '#666',
+  },
+  emptyContainer: {
+    padding: 40,
+    alignItems: 'center',
+  },
+  emptyText: {
+    fontSize: 14,
+    color: '#999',
+    textAlign: 'center',
   },
 });

@@ -1,4 +1,5 @@
 import { Offer } from '@/hooks/useOffers';
+import { useShops } from '@/hooks/useShops';
 import { useRouter, useSegments } from 'expo-router';
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -13,9 +14,14 @@ interface HorizontalOfferBlockProps {
 export default function HorizontalOfferBlock({ offer, onPress }: HorizontalOfferBlockProps) {
   const router = useRouter();
   const segments = useSegments();
+  const { shops } = useShops();
+  
+  // Получаем название магазина по shopId
+  const shop = shops.find(s => s.id === offer.shopId);
+  const shopShortName = offer.shopShortName || shop?.shortName || shop?.name || 'Магазин';
   
   const daysUntilExpiry = Math.ceil(
-    (offer.expiresDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)
+    (new Date(offer.expiresDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)
   );
 
   const handlePress = () => {
@@ -60,7 +66,7 @@ export default function HorizontalOfferBlock({ offer, onPress }: HorizontalOffer
       <View style={styles.infoContainer}>
         <View style={styles.topInfo}>
           <Text style={styles.shopName} numberOfLines={1}>
-            {offer.shopShortName}
+            {shopShortName}
           </Text>
           
           <Text style={styles.productName} numberOfLines={2}>

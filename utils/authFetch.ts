@@ -203,6 +203,7 @@ export async function authFetch(
         ...fetchOptions,
         headers,
         signal: controller.signal,
+        redirect: 'follow', // Автоматически следовать за редиректами
       });
 
       clearTimeout(timeoutId);
@@ -234,6 +235,7 @@ export async function authFetch(
               ...fetchOptions,
               headers: newHeaders,
               signal: newController.signal,
+              redirect: 'follow', // Автоматически следовать за редиректами
             });
 
             clearTimeout(newTimeoutId);

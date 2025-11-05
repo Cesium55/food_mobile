@@ -1,5 +1,6 @@
 import { useCart } from '@/hooks/useCart';
 import { Offer } from '@/hooks/useOffers';
+import { useShops } from '@/hooks/useShops';
 import { useRouter, useSegments } from 'expo-router';
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -12,6 +13,11 @@ export default function VerticalOfferCard({ offer }: VerticalOfferCardProps) {
   const router = useRouter();
   const segments = useSegments();
   const { cartItems, addToCart, increaseQuantity, decreaseQuantity } = useCart();
+  const { shops } = useShops();
+  
+  // Получаем название магазина по shopId
+  const shop = shops.find(s => s.id === offer.shopId);
+  const shopShortName = offer.shopShortName || shop?.shortName || shop?.name || 'Магазин';
 
   // Проверяем срок годности
   const now = new Date();
@@ -80,7 +86,7 @@ export default function VerticalOfferCard({ offer }: VerticalOfferCardProps) {
         </Text>
         
         <Text style={styles.shopName} numberOfLines={1}>
-          {offer.shopShortName}
+          {shopShortName}
         </Text>
 
         {/* Срок годности */}

@@ -1,817 +1,143 @@
-import { useState } from 'react';
+import { API_ENDPOINTS } from '@/constants/api';
+import { getApiUrl } from '@/constants/env';
+import { authFetch } from '@/utils/authFetch';
+import { useCallback, useEffect, useState } from 'react';
 
-// Объединенные данные из products, product_entries и shop_points
+// Интерфейс оффера с сервера
+export interface OfferApi {
+  id: number;
+  product_id: number;
+  shop_id: number;
+  expires_date: string;
+  original_cost: number;
+  current_cost: number;
+  count: number;
+  description?: string;
+  product?: {
+    id: number;
+    name: string;
+    description: string;
+    article: string | null;
+    code: string | null;
+    seller_id: number;
+    images: string[];
+    attributes: Array<{
+      slug: string;
+      name: string;
+      value: string;
+      id: number;
+      product_id: number;
+    }>;
+    category_ids: number[];
+  };
+}
+
+// Локальный интерфейс оффера
 export interface Offer {
-  id: number; // product_entry.id
-  productId: number; // product.id
-  productName: string; // product.name
-  productDescription: string; // product.description
-  categoryId: number; // product.category_id
-  shopId: number; // shop_point.id
-  shopShortName: string; // shop_point.short_name
-  sellerId: number; // product.seller_id
-  expiresDate: Date; // product_entry.expires_date
-  originalCost: number; // product_entry.original_cost
-  currentCost: number; // product_entry.current_cost
-  discount: number; // вычисляемое поле (процент скидки)
-  count: number; // product_entry.count
-  entryDescription?: string; // product_entry.description
+  id: number;
+  productId: number;
+  productName: string;
+  productDescription: string;
+  productCategoryIds: number[]; // Массив ID категорий товара
+  productAttributes?: Array<{
+    slug: string;
+    name: string;
+    value: string;
+    id: number;
+    product_id: number;
+  }>; // Атрибуты товара из API
+  shopId: number;
+  shopShortName?: string; // Краткое название магазина
+  sellerId: number;
+  expiresDate: string; // ISO строка даты
+  originalCost: number;
+  currentCost: number;
+  discount: number; // Вычисляемое поле (процент скидки)
+  count: number;
+  description?: string;
 }
 
 export const useOffers = () => {
-  const [offers] = useState<Offer[]>([
-    {
-      id: 1,
-      productId: 1,
-      productName: 'Молоко пастеризованное 3.2%',
-      productDescription: 'Натуральное коровье молоко высшего качества',
-      categoryId: 11, // Молоко
-      shopId: 1,
-      shopShortName: 'Продукты',
-      sellerId: 1,
-      expiresDate: new Date('2025-10-25'),
-      originalCost: 89.90,
-      currentCost: 69.90,
-      discount: 22,
-      count: 45,
-      entryDescription: 'Свежее поступление',
-    },
-    {
-      id: 2,
-      productId: 2,
-      productName: 'Хлеб Бородинский',
-      productDescription: 'Ржаной хлеб с кориандром',
-      categoryId: 42, // Хлеб черный
-      shopId: 2,
-      shopShortName: 'Хлебопекарня',
-      sellerId: 7,
-      expiresDate: new Date('2025-10-23'),
-      originalCost: 65.00,
-      currentCost: 45.00,
-      discount: 31,
-      count: 120,
-      entryDescription: 'Скидка на вчерашний хлеб',
-    },
-    {
-      id: 3,
-      productId: 3,
-      productName: 'Куриная грудка охлажденная',
-      productDescription: 'Охлажденное филе куриной грудки',
-      categoryId: 23, // Курица
-      shopId: 3,
-      shopShortName: 'Мясная лавка',
-      sellerId: 5,
-      expiresDate: new Date('2025-10-24'),
-      originalCost: 450.00,
-      currentCost: 380.00,
-      discount: 16,
-      count: 28,
-      entryDescription: 'За кг',
-    },
-    {
-      id: 4,
-      productId: 4,
-      productName: 'Йогурт натуральный',
-      productDescription: 'Йогурт без добавок 2.5% жирности',
-      categoryId: 12, // Кефир и йогурты
-      shopId: 4,
-      shopShortName: 'Молочка',
-      sellerId: 9,
-      expiresDate: new Date('2025-10-28'),
-      originalCost: 120.00,
-      currentCost: 95.00,
-      discount: 21,
-      count: 60,
-    },
-    {
-      id: 5,
-      productId: 5,
-      productName: 'Помидоры черри',
-      productDescription: 'Свежие помидоры черри, 250г',
-      categoryId: 31, // Овощи свежие
-      shopId: 5,
-      shopShortName: 'Овощи',
-      sellerId: 3,
-      expiresDate: new Date('2025-10-26'),
-      originalCost: 180.00,
-      currentCost: 135.00,
-      discount: 25,
-      count: 35,
-    },
-    {
-      id: 6,
-      productId: 6,
-      productName: 'Сыр Российский',
-      productDescription: 'Твердый сыр 50% жирности',
-      categoryId: 14, // Сыры
-      shopId: 4,
-      shopShortName: 'Молочка',
-      sellerId: 9,
-      expiresDate: new Date('2025-11-01'),
-      originalCost: 650.00,
-      currentCost: 550.00,
-      discount: 15,
-      count: 22,
-      entryDescription: 'За кг',
-    },
-    {
-      id: 7,
-      productId: 7,
-      productName: 'Батон нарезной',
-      productDescription: 'Белый хлеб для тостов',
-      categoryId: 43, // Батоны
-      shopId: 2,
-      shopShortName: 'Хлебопекарня',
-      sellerId: 7,
-      expiresDate: new Date('2025-10-24'),
-      originalCost: 55.00,
-      currentCost: 42.00,
-      discount: 24,
-      count: 95,
-    },
-    {
-      id: 8,
-      productId: 8,
-      productName: 'Яблоки Голден',
-      productDescription: 'Свежие яблоки сорта Голден',
-      categoryId: 32, // Фрукты свежие
-      shopId: 5,
-      shopShortName: 'Овощи',
-      sellerId: 3,
-      expiresDate: new Date('2025-10-30'),
-      originalCost: 120.00,
-      currentCost: 89.00,
-      discount: 26,
-      count: 150,
-      entryDescription: 'За кг',
-    },
-    {
-      id: 9,
-      productId: 9,
-      productName: 'Свинина шейка',
-      productDescription: 'Охлажденная свиная шейка',
-      categoryId: 21, // Свинина
-      shopId: 3,
-      shopShortName: 'Мясная лавка',
-      sellerId: 5,
-      expiresDate: new Date('2025-10-23'),
-      originalCost: 580.00,
-      currentCost: 480.00,
-      discount: 17,
-      count: 18,
-      entryDescription: 'За кг',
-    },
-    {
-      id: 10,
-      productId: 10,
-      productName: 'Творог 5%',
-      productDescription: 'Натуральный творог средней жирности',
-      categoryId: 13, // Творог и сырки
-      shopId: 4,
-      shopShortName: 'Молочка',
-      sellerId: 9,
-      expiresDate: new Date('2025-10-27'),
-      originalCost: 160.00,
-      currentCost: 125.00,
-      discount: 22,
-      count: 55,
-      entryDescription: '200г',
-    },
-    {
-      id: 11,
-      productId: 11,
-      productName: 'Огурцы свежие',
-      productDescription: 'Свежие грунтовые огурцы',
-      categoryId: 31, // Овощи свежие
-      shopId: 5,
-      shopShortName: 'Овощи',
-      sellerId: 3,
-      expiresDate: new Date('2025-10-25'),
-      originalCost: 95.00,
-      currentCost: 69.00,
-      discount: 27,
-      count: 80,
-      entryDescription: 'За кг',
-    },
-    {
-      id: 12,
-      productId: 12,
-      productName: 'Кефир 2.5%',
-      productDescription: 'Кефир классический',
-      categoryId: 12, // Кефир и йогурты
-      shopId: 1,
-      shopShortName: 'Продукты',
-      sellerId: 1,
-      expiresDate: new Date('2025-10-26'),
-      originalCost: 75.00,
-      currentCost: 59.00,
-      discount: 21,
-      count: 70,
-      entryDescription: '900мл',
-    },
-    {
-      id: 13,
-      productId: 13,
-      productName: 'Круассан с шоколадом',
-      productDescription: 'Свежая выпечка с шоколадной начинкой',
-      categoryId: 46, // Круассаны
-      shopId: 2,
-      shopShortName: 'Хлебопекарня',
-      sellerId: 7,
-      expiresDate: new Date('2025-10-22'),
-      originalCost: 85.00,
-      currentCost: 55.00,
-      discount: 35,
-      count: 42,
-      entryDescription: 'Акция дня',
-    },
-    {
-      id: 14,
-      productId: 14,
-      productName: 'Фарш говяжий',
-      productDescription: 'Свежий говяжий фарш',
-      categoryId: 24, // Фарш
-      shopId: 3,
-      shopShortName: 'Мясная лавка',
-      sellerId: 5,
-      expiresDate: new Date('2025-10-23'),
-      originalCost: 420.00,
-      currentCost: 350.00,
-      discount: 17,
-      count: 32,
-      entryDescription: 'За кг',
-    },
-    {
-      id: 15,
-      productId: 15,
-      productName: 'Сметана 20%',
-      productDescription: 'Натуральная сметана',
-      categoryId: 15, // Сметана
-      shopId: 4,
-      shopShortName: 'Молочка',
-      sellerId: 9,
-      expiresDate: new Date('2025-10-29'),
-      originalCost: 145.00,
-      currentCost: 115.00,
-      discount: 21,
-      count: 48,
-      entryDescription: '300г',
-    },
-    {
-      id: 16,
-      productId: 16,
-      productName: 'Картофель молодой',
-      productDescription: 'Молодой отечественный картофель',
-      categoryId: 31, // Овощи свежие
-      shopId: 5,
-      shopShortName: 'Овощи',
-      sellerId: 3,
-      expiresDate: new Date('2025-10-25'),
-      originalCost: 65.00,
-      currentCost: 48.00,
-      discount: 26,
-      count: 200,
-      entryDescription: 'За кг',
-    },
-    {
-      id: 17,
-      productId: 17,
-      productName: 'Масло сливочное 82.5%',
-      productDescription: 'Традиционное сливочное масло',
-      categoryId: 16, // Масло сливочное
-      shopId: 1,
-      shopShortName: 'Продукты',
-      sellerId: 1,
-      expiresDate: new Date('2025-11-05'),
-      originalCost: 280.00,
-      currentCost: 240.00,
-      discount: 14,
-      count: 38,
-      entryDescription: '200г',
-    },
-    {
-      id: 18,
-      productId: 18,
-      productName: 'Пирожки с капустой',
-      productDescription: 'Домашние печеные пирожки',
-      categoryId: 45, // Пирожки
-      shopId: 2,
-      shopShortName: 'Хлебопекарня',
-      sellerId: 7,
-      expiresDate: new Date('2025-10-22'),
-      originalCost: 45.00,
-      currentCost: 30.00,
-      discount: 33,
-      count: 65,
-      entryDescription: 'За штуку',
-    },
-    {
-      id: 19,
-      productId: 19,
-      productName: 'Колбаса Докторская',
-      productDescription: 'Вареная колбаса высшего сорта',
-      categoryId: 25, // Колбасы и сосиски
-      shopId: 3,
-      shopShortName: 'Мясная лавка',
-      sellerId: 5,
-      expiresDate: new Date('2025-10-30'),
-      originalCost: 520.00,
-      currentCost: 450.00,
-      discount: 13,
-      count: 25,
-      entryDescription: 'За кг',
-    },
-    {
-      id: 20,
-      productId: 20,
-      productName: 'Ряженка 4%',
-      productDescription: 'Традиционная ряженка',
-      categoryId: 12, // Кефир и йогурты
-      shopId: 4,
-      shopShortName: 'Молочка',
-      sellerId: 9,
-      expiresDate: new Date('2025-10-27'),
-      originalCost: 85.00,
-      currentCost: 68.00,
-      discount: 20,
-      count: 52,
-      entryDescription: '500мл',
-    },
-    // Говядина (22)
-    {
-      id: 21,
-      productId: 21,
-      productName: 'Говядина вырезка',
-      productDescription: 'Премиальная говяжья вырезка',
-      categoryId: 22,
-      shopId: 3,
-      shopShortName: 'Мясная лавка',
-      sellerId: 5,
-      expiresDate: new Date('2025-10-24'),
-      originalCost: 720.00,
-      currentCost: 620.00,
-      discount: 14,
-      count: 12,
-      entryDescription: 'За кг',
-    },
-    // Деликатесы (26)
-    {
-      id: 22,
-      productId: 22,
-      productName: 'Буженина',
-      productDescription: 'Запеченная свинина с пряностями',
-      categoryId: 26,
-      shopId: 3,
-      shopShortName: 'Мясная лавка',
-      sellerId: 5,
-      expiresDate: new Date('2025-10-29'),
-      originalCost: 680.00,
-      currentCost: 580.00,
-      discount: 15,
-      count: 8,
-      entryDescription: 'За кг',
-    },
-    // Зелень (33)
-    {
-      id: 23,
-      productId: 23,
-      productName: 'Укроп свежий',
-      productDescription: 'Свежая зелень укропа',
-      categoryId: 33,
-      shopId: 5,
-      shopShortName: 'Овощи',
-      sellerId: 3,
-      expiresDate: new Date('2025-10-24'),
-      originalCost: 45.00,
-      currentCost: 35.00,
-      discount: 22,
-      count: 60,
-      entryDescription: 'Пучок',
-    },
-    // Ягоды (34)
-    {
-      id: 24,
-      productId: 24,
-      productName: 'Клубника',
-      productDescription: 'Свежая клубника',
-      categoryId: 34,
-      shopId: 5,
-      shopShortName: 'Овощи',
-      sellerId: 3,
-      expiresDate: new Date('2025-10-25'),
-      originalCost: 320.00,
-      currentCost: 250.00,
-      discount: 22,
-      count: 25,
-      entryDescription: '250г',
-    },
-    // Грибы (35)
-    {
-      id: 25,
-      productId: 25,
-      productName: 'Шампиньоны',
-      productDescription: 'Свежие шампиньоны',
-      categoryId: 35,
-      shopId: 5,
-      shopShortName: 'Овощи',
-      sellerId: 3,
-      expiresDate: new Date('2025-10-26'),
-      originalCost: 180.00,
-      currentCost: 145.00,
-      discount: 19,
-      count: 40,
-      entryDescription: '500г',
-    },
-    // Хлеб белый (41)
-    {
-      id: 26,
-      productId: 26,
-      productName: 'Хлеб пшеничный',
-      productDescription: 'Традиционный белый хлеб',
-      categoryId: 41,
-      shopId: 2,
-      shopShortName: 'Хлебопекарня',
-      sellerId: 7,
-      expiresDate: new Date('2025-10-23'),
-      originalCost: 50.00,
-      currentCost: 38.00,
-      discount: 24,
-      count: 85,
-    },
-    // Булочки (44)
-    {
-      id: 27,
-      productId: 27,
-      productName: 'Булочка с маком',
-      productDescription: 'Свежая булочка с маковой начинкой',
-      categoryId: 44,
-      shopId: 2,
-      shopShortName: 'Хлебопекарня',
-      sellerId: 7,
-      expiresDate: new Date('2025-10-23'),
-      originalCost: 35.00,
-      currentCost: 25.00,
-      discount: 29,
-      count: 70,
-    },
-    // Вода (51)
-    {
-      id: 28,
-      productId: 28,
-      productName: 'Вода минеральная "Архыз"',
-      productDescription: 'Негазированная минеральная вода',
-      categoryId: 51,
-      shopId: 1,
-      shopShortName: 'Продукты',
-      sellerId: 1,
-      expiresDate: new Date('2025-12-31'),
-      originalCost: 65.00,
-      currentCost: 49.00,
-      discount: 25,
-      count: 120,
-      entryDescription: '1.5л',
-    },
-    // Соки (52)
-    {
-      id: 29,
-      productId: 29,
-      productName: 'Сок апельсиновый "Добрый"',
-      productDescription: 'Апельсиновый сок 100%',
-      categoryId: 52,
-      shopId: 1,
-      shopShortName: 'Продукты',
-      sellerId: 1,
-      expiresDate: new Date('2025-11-15'),
-      originalCost: 125.00,
-      currentCost: 99.00,
-      discount: 21,
-      count: 85,
-      entryDescription: '1л',
-    },
-    // Газированные напитки (53)
-    {
-      id: 30,
-      productId: 30,
-      productName: 'Coca-Cola',
-      productDescription: 'Газированный напиток',
-      categoryId: 53,
-      shopId: 1,
-      shopShortName: 'Продукты',
-      sellerId: 1,
-      expiresDate: new Date('2026-03-20'),
-      originalCost: 95.00,
-      currentCost: 75.00,
-      discount: 21,
-      count: 150,
-      entryDescription: '1л',
-    },
-    // Чай (54)
-    {
-      id: 31,
-      productId: 31,
-      productName: 'Чай черный "Принцесса Нури"',
-      productDescription: 'Черный листовой чай',
-      categoryId: 54,
-      shopId: 1,
-      shopShortName: 'Продукты',
-      sellerId: 1,
-      expiresDate: new Date('2026-06-30'),
-      originalCost: 180.00,
-      currentCost: 145.00,
-      discount: 19,
-      count: 45,
-      entryDescription: '100г',
-    },
-    // Кофе (55)
-    {
-      id: 32,
-      productId: 32,
-      productName: 'Кофе "Жокей"',
-      productDescription: 'Натуральный молотый кофе',
-      categoryId: 55,
-      shopId: 1,
-      shopShortName: 'Продукты',
-      sellerId: 1,
-      expiresDate: new Date('2026-08-15'),
-      originalCost: 320.00,
-      currentCost: 270.00,
-      discount: 16,
-      count: 38,
-      entryDescription: '250г',
-    },
-    // Крупы (61)
-    {
-      id: 33,
-      productId: 33,
-      productName: 'Гречка ядрица',
-      productDescription: 'Гречневая крупа высшего сорта',
-      categoryId: 61,
-      shopId: 1,
-      shopShortName: 'Продукты',
-      sellerId: 1,
-      expiresDate: new Date('2026-05-20'),
-      originalCost: 120.00,
-      currentCost: 95.00,
-      discount: 21,
-      count: 95,
-      entryDescription: '1кг',
-    },
-    // Макароны (62)
-    {
-      id: 34,
-      productId: 34,
-      productName: 'Макароны "Макфа"',
-      productDescription: 'Спагетти из твердых сортов пшеницы',
-      categoryId: 62,
-      shopId: 1,
-      shopShortName: 'Продукты',
-      sellerId: 1,
-      expiresDate: new Date('2026-07-10'),
-      originalCost: 85.00,
-      currentCost: 68.00,
-      discount: 20,
-      count: 110,
-      entryDescription: '450г',
-    },
-    // Мука (63)
-    {
-      id: 35,
-      productId: 35,
-      productName: 'Мука пшеничная высший сорт',
-      productDescription: 'Мука для выпечки',
-      categoryId: 63,
-      shopId: 1,
-      shopShortName: 'Продукты',
-      sellerId: 1,
-      expiresDate: new Date('2026-04-30'),
-      originalCost: 65.00,
-      currentCost: 52.00,
-      discount: 20,
-      count: 80,
-      entryDescription: '1кг',
-    },
-    // Сахар (64)
-    {
-      id: 36,
-      productId: 36,
-      productName: 'Сахар-песок',
-      productDescription: 'Сахарный песок',
-      categoryId: 64,
-      shopId: 1,
-      shopShortName: 'Продукты',
-      sellerId: 1,
-      expiresDate: new Date('2027-01-01'),
-      originalCost: 75.00,
-      currentCost: 62.00,
-      discount: 17,
-      count: 100,
-      entryDescription: '1кг',
-    },
-    // Масло растительное (65)
-    {
-      id: 37,
-      productId: 37,
-      productName: 'Масло подсолнечное "Золотая семечка"',
-      productDescription: 'Рафинированное подсолнечное масло',
-      categoryId: 65,
-      shopId: 1,
-      shopShortName: 'Продукты',
-      sellerId: 1,
-      expiresDate: new Date('2026-09-15'),
-      originalCost: 165.00,
-      currentCost: 135.00,
-      discount: 18,
-      count: 65,
-      entryDescription: '1л',
-    },
-    // Консервы (66)
-    {
-      id: 38,
-      productId: 38,
-      productName: 'Горошек зеленый консервированный',
-      productDescription: 'Зеленый горошек в жестяной банке',
-      categoryId: 66,
-      shopId: 1,
-      shopShortName: 'Продукты',
-      sellerId: 1,
-      expiresDate: new Date('2026-12-31'),
-      originalCost: 95.00,
-      currentCost: 75.00,
-      discount: 21,
-      count: 90,
-      entryDescription: '400г',
-    },
-    // Овощи замороженные (71)
-    {
-      id: 39,
-      productId: 39,
-      productName: 'Овощная смесь "4 сезона"',
-      productDescription: 'Замороженная овощная смесь',
-      categoryId: 71,
-      shopId: 1,
-      shopShortName: 'Продукты',
-      sellerId: 1,
-      expiresDate: new Date('2026-10-20'),
-      originalCost: 145.00,
-      currentCost: 115.00,
-      discount: 21,
-      count: 55,
-      entryDescription: '400г',
-    },
-    // Ягоды замороженные (72)
-    {
-      id: 40,
-      productId: 40,
-      productName: 'Вишня замороженная',
-      productDescription: 'Замороженная вишня без косточек',
-      categoryId: 72,
-      shopId: 1,
-      shopShortName: 'Продукты',
-      sellerId: 1,
-      expiresDate: new Date('2026-08-30'),
-      originalCost: 195.00,
-      currentCost: 155.00,
-      discount: 21,
-      count: 42,
-      entryDescription: '300г',
-    },
-    // Мясо замороженное (73)
-    {
-      id: 41,
-      productId: 41,
-      productName: 'Куриные крылышки замороженные',
-      productDescription: 'Замороженные куриные крылья',
-      categoryId: 73,
-      shopId: 3,
-      shopShortName: 'Мясная лавка',
-      sellerId: 5,
-      expiresDate: new Date('2026-06-15'),
-      originalCost: 280.00,
-      currentCost: 230.00,
-      discount: 18,
-      count: 50,
-      entryDescription: 'За кг',
-    },
-    // Полуфабрикаты (74)
-    {
-      id: 42,
-      productId: 42,
-      productName: 'Пельмени "Сибирская коллекция"',
-      productDescription: 'Замороженные пельмени',
-      categoryId: 74,
-      shopId: 1,
-      shopShortName: 'Продукты',
-      sellerId: 1,
-      expiresDate: new Date('2026-05-25'),
-      originalCost: 285.00,
-      currentCost: 235.00,
-      discount: 18,
-      count: 70,
-      entryDescription: '800г',
-    },
-    // Мороженое (75)
-    {
-      id: 43,
-      productId: 43,
-      productName: 'Мороженое "Пломбир"',
-      productDescription: 'Классическое пломбир в вафельном стаканчике',
-      categoryId: 75,
-      shopId: 1,
-      shopShortName: 'Продукты',
-      sellerId: 1,
-      expiresDate: new Date('2026-07-30'),
-      originalCost: 65.00,
-      currentCost: 49.00,
-      discount: 25,
-      count: 120,
-      entryDescription: '80г',
-    },
-    // Конфеты (81)
-    {
-      id: 44,
-      productId: 44,
-      productName: 'Конфеты "Коровка"',
-      productDescription: 'Молочные конфеты с ирисом',
-      categoryId: 81,
-      shopId: 1,
-      shopShortName: 'Продукты',
-      sellerId: 1,
-      expiresDate: new Date('2026-03-15'),
-      originalCost: 380.00,
-      currentCost: 315.00,
-      discount: 17,
-      count: 48,
-      entryDescription: '1кг',
-    },
-    // Шоколад (82)
-    {
-      id: 45,
-      productId: 45,
-      productName: 'Шоколад "Аленка"',
-      productDescription: 'Молочный шоколад',
-      categoryId: 82,
-      shopId: 1,
-      shopShortName: 'Продукты',
-      sellerId: 1,
-      expiresDate: new Date('2026-02-28'),
-      originalCost: 95.00,
-      currentCost: 75.00,
-      discount: 21,
-      count: 85,
-      entryDescription: '100г',
-    },
-    // Печенье (83)
-    {
-      id: 46,
-      productId: 46,
-      productName: 'Печенье "Юбилейное"',
-      productDescription: 'Сахарное печенье с молочным шоколадом',
-      categoryId: 83,
-      shopId: 1,
-      shopShortName: 'Продукты',
-      sellerId: 1,
-      expiresDate: new Date('2026-04-20'),
-      originalCost: 125.00,
-      currentCost: 99.00,
-      discount: 21,
-      count: 92,
-      entryDescription: '250г',
-    },
-    // Торты (84)
-    {
-      id: 47,
-      productId: 47,
-      productName: 'Торт "Наполеон"',
-      productDescription: 'Классический торт Наполеон',
-      categoryId: 84,
-      shopId: 2,
-      shopShortName: 'Хлебопекарня',
-      sellerId: 7,
-      expiresDate: new Date('2025-10-24'),
-      originalCost: 650.00,
-      currentCost: 520.00,
-      discount: 20,
-      count: 6,
-      entryDescription: '1кг',
-    },
-    // Пирожные (85)
-    {
-      id: 48,
-      productId: 48,
-      productName: 'Пирожное "Картошка"',
-      productDescription: 'Традиционное пирожное картошка',
-      categoryId: 85,
-      shopId: 2,
-      shopShortName: 'Хлебопекарня',
-      sellerId: 7,
-      expiresDate: new Date('2025-10-24'),
-      originalCost: 55.00,
-      currentCost: 42.00,
-      discount: 24,
-      count: 35,
-      entryDescription: 'За штуку',
-    },
-  ]);
+  const [offers, setOffers] = useState<Offer[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Преобразование данных с сервера в локальный формат
+  const transformOffer = useCallback((apiOffer: OfferApi): Offer => {
+    // Вычисляем процент скидки
+    const discount = apiOffer.original_cost > 0
+      ? Math.round(((apiOffer.original_cost - apiOffer.current_cost) / apiOffer.original_cost) * 100)
+      : 0;
+
+    return {
+      id: apiOffer.id,
+      productId: apiOffer.product_id,
+      productName: apiOffer.product?.name || 'Товар',
+      productDescription: apiOffer.product?.description || '',
+      productCategoryIds: apiOffer.product?.category_ids || [],
+      productAttributes: apiOffer.product?.attributes || [],
+      shopId: apiOffer.shop_id,
+      sellerId: apiOffer.product?.seller_id || 0,
+      expiresDate: apiOffer.expires_date,
+      originalCost: apiOffer.original_cost,
+      currentCost: apiOffer.current_cost,
+      discount,
+      count: apiOffer.count,
+      description: apiOffer.description,
+    };
+  }, []);
+
+  // Функция для загрузки офферов с сервера
+  const fetchOffers = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      // Загружаем все офферы для текущего продавца (в админке)
+      const response = await authFetch(getApiUrl(API_ENDPOINTS.OFFERS.WITH_PRODUCTS), {
+        method: 'GET',
+        requireAuth: true,
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('📦 Получены данные офферов:', data);
+        
+        // Ожидаем структуру ответа: { data: OfferApi[] }
+        const offersData = data.data || data;
+        
+        if (Array.isArray(offersData)) {
+          console.log(`✅ Найдено ${offersData.length} офферов`);
+          // Преобразуем данные с сервера в локальный формат
+          const transformedOffers = offersData.map(transformOffer);
+          console.log('✅ Преобразованные офферы:', transformedOffers);
+          setOffers(transformedOffers);
+        } else {
+          console.error('❌ Неверный формат данных офферов:', offersData);
+          setError('Неверный формат данных офферов');
+          setOffers([]);
+        }
+      } else if (response.status === 404) {
+        setError('Офферы не найдены');
+        setOffers([]);
+      } else {
+        const errorText = await response.text();
+        console.error('❌ Ошибка загрузки офферов:', response.status, errorText);
+        setError('Ошибка загрузки офферов');
+        setOffers([]);
+      }
+    } catch (err) {
+      console.error('❌ Ошибка подключения к серверу при загрузке офферов:', err);
+      setError('Ошибка подключения к серверу');
+      setOffers([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [transformOffer]);
+
+  useEffect(() => {
+    fetchOffers();
+  }, [fetchOffers]);
 
   const getOfferById = (id: number): Offer | undefined => {
     return offers.find((offer) => offer.id === id);
@@ -825,28 +151,85 @@ export const useOffers = () => {
     return offers.filter((offer) => offer.sellerId === sellerId);
   };
 
-  const getOffersByDiscount = (minDiscount: number): Offer[] => {
-    return offers.filter((offer) => offer.discount >= minDiscount);
-  };
-
-  const getExpiringOffers = (daysUntilExpiry: number): Offer[] => {
-    const targetDate = new Date();
-    targetDate.setDate(targetDate.getDate() + daysUntilExpiry);
-    return offers.filter((offer) => offer.expiresDate <= targetDate);
-  };
-
   const getOffersByCategory = (categoryId: number): Offer[] => {
-    return offers.filter((offer) => offer.categoryId === categoryId);
+    return offers.filter((offer) => offer.productCategoryIds.includes(categoryId));
   };
+
+  // Функция для повторной загрузки офферов
+  const refetch = useCallback(async () => {
+    await fetchOffers();
+  }, [fetchOffers]);
+
+  // Функция для создания нового оффера
+  const createOffer = useCallback(async (offerData: {
+    product_id: number;
+    shop_id: number;
+    expires_date: string;
+    original_cost: number;
+    current_cost: number;
+    count: number;
+    description?: string;
+  }): Promise<Offer | null> => {
+    try {
+      const url = getApiUrl(API_ENDPOINTS.OFFERS.BASE);
+      const requestBody = JSON.stringify(offerData);
+      
+      console.log('📤 Создание оффера:', {
+        url,
+        method: 'POST',
+        data: offerData,
+      });
+
+      const response = await authFetch(url, {
+        method: 'POST',
+        requireAuth: true,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: requestBody,
+      });
+
+      console.log('📥 Ответ сервера:', {
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok,
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('✅ Данные созданного оффера:', data);
+        const createdOfferData = data.data || data;
+        const newOffer = transformOffer(createdOfferData as OfferApi);
+        console.log('✅ Преобразованный оффер:', newOffer);
+        
+        // Обновляем локальный список офферов
+        setOffers(prev => [...prev, newOffer]);
+        
+        return newOffer;
+      } else {
+        const errorText = await response.text();
+        console.error('❌ Ошибка создания оффера:', {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorText,
+        });
+        throw new Error(errorText || 'Ошибка создания оффера');
+      }
+    } catch (err) {
+      console.error('❌ Ошибка подключения к серверу при создании оффера:', err);
+      throw err;
+    }
+  }, [transformOffer]);
 
   return {
     offers,
+    loading,
+    error,
+    refetch,
     getOfferById,
     getOffersByShop,
     getOffersBySeller,
-    getOffersByDiscount,
-    getExpiringOffers,
     getOffersByCategory,
+    createOffer,
   };
 };
-

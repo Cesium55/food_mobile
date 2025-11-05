@@ -1,4 +1,7 @@
-import { useState } from 'react';
+import { API_ENDPOINTS } from '@/constants/api';
+import { getApiUrl } from '@/constants/env';
+import { authFetch } from '@/utils/authFetch';
+import { useCallback, useEffect, useState } from 'react';
 
 export interface Category {
   id: number;
@@ -7,77 +10,55 @@ export interface Category {
 }
 
 export const useCategories = () => {
-  const [categories] = useState<Category[]>([
-    // Категории верхнего уровня
-    { id: 1, name: 'Молочные продукты', parent_category_id: null },
-    { id: 2, name: 'Мясо и птица', parent_category_id: null },
-    { id: 3, name: 'Овощи и фрукты', parent_category_id: null },
-    { id: 4, name: 'Хлеб и выпечка', parent_category_id: null },
-    { id: 5, name: 'Напитки', parent_category_id: null },
-    { id: 6, name: 'Бакалея', parent_category_id: null },
-    { id: 7, name: 'Замороженные продукты', parent_category_id: null },
-    { id: 8, name: 'Кондитерские изделия', parent_category_id: null },
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
 
-    // Подкатегории: Молочные продукты (1)
-    { id: 11, name: 'Молоко', parent_category_id: 1 },
-    { id: 12, name: 'Кефир и йогурты', parent_category_id: 1 },
-    { id: 13, name: 'Творог и сырки', parent_category_id: 1 },
-    { id: 14, name: 'Сыры', parent_category_id: 1 },
-    { id: 15, name: 'Сметана', parent_category_id: 1 },
-    { id: 16, name: 'Масло сливочное', parent_category_id: 1 },
+  // Функция для загрузки категорий с сервера
+  const fetchCategories = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      // Используем endpoint для получения всех категорий (плоский список)
+      const response = await authFetch(getApiUrl(API_ENDPOINTS.CATEGORIES.BASE), {
+        method: 'GET',
+        requireAuth: false, // Категории - публичные данные
+      });
 
-    // Подкатегории: Мясо и птица (2)
-    { id: 21, name: 'Свинина', parent_category_id: 2 },
-    { id: 22, name: 'Говядина', parent_category_id: 2 },
-    { id: 23, name: 'Курица', parent_category_id: 2 },
-    { id: 24, name: 'Фарш', parent_category_id: 2 },
-    { id: 25, name: 'Колбасы и сосиски', parent_category_id: 2 },
-    { id: 26, name: 'Деликатесы', parent_category_id: 2 },
+      if (response.ok) {
+        const data = await response.json();
+        // Ожидаем структуру ответа: { data: Category[] } или просто Category[]
+        const categoriesData = data.data || data;
+        
+        if (Array.isArray(categoriesData)) {
+          setCategories(categoriesData);
+        } else {
+          console.error('❌ Неверный формат данных категорий:', categoriesData);
+          setError('Неверный формат данных категорий');
+          setCategories([]);
+        }
+      } else if (response.status === 404) {
+        setError('Категории не найдены');
+        setCategories([]);
+      } else {
+        const errorText = await response.text();
+        console.error('❌ Ошибка загрузки категорий:', response.status, errorText);
+        setError('Ошибка загрузки категорий');
+        setCategories([]);
+      }
+    } catch (err) {
+      console.error('❌ Ошибка подключения к серверу при загрузке категорий:', err);
+      setError('Ошибка подключения к серверу');
+      setCategories([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []); // Зависимости пустые, так как функция не зависит от внешних переменных
 
-    // Подкатегории: Овощи и фрукты (3)
-    { id: 31, name: 'Овощи свежие', parent_category_id: 3 },
-    { id: 32, name: 'Фрукты свежие', parent_category_id: 3 },
-    { id: 33, name: 'Зелень', parent_category_id: 3 },
-    { id: 34, name: 'Ягоды', parent_category_id: 3 },
-    { id: 35, name: 'Грибы', parent_category_id: 3 },
-
-    // Подкатегории: Хлеб и выпечка (4)
-    { id: 41, name: 'Хлеб белый', parent_category_id: 4 },
-    { id: 42, name: 'Хлеб черный', parent_category_id: 4 },
-    { id: 43, name: 'Батоны', parent_category_id: 4 },
-    { id: 44, name: 'Булочки', parent_category_id: 4 },
-    { id: 45, name: 'Пирожки', parent_category_id: 4 },
-    { id: 46, name: 'Круассаны', parent_category_id: 4 },
-
-    // Подкатегории: Напитки (5)
-    { id: 51, name: 'Вода', parent_category_id: 5 },
-    { id: 52, name: 'Соки', parent_category_id: 5 },
-    { id: 53, name: 'Газированные напитки', parent_category_id: 5 },
-    { id: 54, name: 'Чай', parent_category_id: 5 },
-    { id: 55, name: 'Кофе', parent_category_id: 5 },
-
-    // Подкатегории: Бакалея (6)
-    { id: 61, name: 'Крупы', parent_category_id: 6 },
-    { id: 62, name: 'Макароны', parent_category_id: 6 },
-    { id: 63, name: 'Мука', parent_category_id: 6 },
-    { id: 64, name: 'Сахар', parent_category_id: 6 },
-    { id: 65, name: 'Масло растительное', parent_category_id: 6 },
-    { id: 66, name: 'Консервы', parent_category_id: 6 },
-
-    // Подкатегории: Замороженные продукты (7)
-    { id: 71, name: 'Овощи замороженные', parent_category_id: 7 },
-    { id: 72, name: 'Ягоды замороженные', parent_category_id: 7 },
-    { id: 73, name: 'Мясо замороженное', parent_category_id: 7 },
-    { id: 74, name: 'Полуфабрикаты', parent_category_id: 7 },
-    { id: 75, name: 'Мороженое', parent_category_id: 7 },
-
-    // Подкатегории: Кондитерские изделия (8)
-    { id: 81, name: 'Конфеты', parent_category_id: 8 },
-    { id: 82, name: 'Шоколад', parent_category_id: 8 },
-    { id: 83, name: 'Печенье', parent_category_id: 8 },
-    { id: 84, name: 'Торты', parent_category_id: 8 },
-    { id: 85, name: 'Пирожные', parent_category_id: 8 },
-  ]);
+  useEffect(() => {
+    fetchCategories();
+  }, [fetchCategories]);
 
   // Получить категорию по ID
   const getCategoryById = (id: number): Category | undefined => {
@@ -128,8 +109,16 @@ export const useCategories = () => {
     return branch;
   };
 
+  // Функция для повторной загрузки категорий
+  const refetch = useCallback(async () => {
+    await fetchCategories();
+  }, [fetchCategories]);
+
   return {
     categories,
+    loading,
+    error,
+    refetch,
     getCategoryById,
     getTopLevelCategories,
     getSubCategories,

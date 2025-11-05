@@ -1,7 +1,10 @@
 import { CharacteristicItem, ProductCharacteristics } from "@/components/product/ProductCharacteristics";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useCart } from "@/hooks/useCart";
+import { useCategories } from "@/hooks/useCategories";
 import { useOffers } from "@/hooks/useOffers";
+import { usePublicSeller } from "@/hooks/usePublicSeller";
+import { useShops } from "@/hooks/useShops";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -10,9 +13,25 @@ export default function ProductDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { getOfferById } = useOffers();
+  const { shops } = useShops();
+  const { categories, getCategoryById } = useCategories();
   const { cartItems, increaseQuantity, decreaseQuantity } = useCart();
   
   const offer = getOfferById(Number(id));
+  
+  // Получаем данные продавца
+  const { seller } = usePublicSeller(offer?.sellerId || null);
+  
+  // Получаем название магазина по shopId
+  const shop = offer ? shops.find(s => s.id === offer.shopId) : null;
+  const shopName = seller?.short_name || offer?.shopShortName || shop?.shortName || shop?.name || 'Магазин';
+  
+  // Получаем категории товара
+  const productCategories = offer?.productCategoryIds
+    ? offer.productCategoryIds
+        .map(id => getCategoryById(id))
+        .filter((cat): cat is NonNullable<typeof cat> => cat !== undefined)
+    : [];
 
   if (!offer) {
     return (
@@ -42,7 +61,7 @@ export default function ProductDetail() {
   }
 
   const daysUntilExpiry = Math.ceil(
-    (offer.expiresDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)
+    (new Date(offer.expiresDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)
   );
 
   const getExpiryColor = () => {
@@ -87,14 +106,13 @@ export default function ProductDetail() {
     }
   };
 
-  // Характеристики товара (пример данных)
-  const characteristics: CharacteristicItem[] = [
-    { key: 'Вес', value: '500 г' },
-    { key: 'Производитель', value: 'ООО "Молочный завод"' },
-    { key: 'Страна', value: 'Россия' },
-    { key: 'Срок хранения', value: '7 дней' },
-    { key: 'Условия хранения', value: 'При температуре +2...+6°C' },
-  ];
+  // Преобразуем атрибуты из API в формат характеристик
+  const characteristics: CharacteristicItem[] = offer.productAttributes
+    ? offer.productAttributes.map(attr => ({
+        key: attr.name,
+        value: attr.value,
+      }))
+    : [];
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
@@ -108,7 +126,7 @@ export default function ProductDetail() {
         {/* <Text style={styles.headerTitle}>Карточка товара</Text>
         <View style={styles.headerSpacer} /> */}
       </View>
-      <ScrollView style={styles.container}>
+      <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
         {/* Изображение товара */}
         <View style={styles.imageSection}>
           <View style={styles.imagePlaceholder}>
@@ -127,11 +145,37 @@ export default function ProductDetail() {
 
         {/* Основная информация */}
         <View style={styles.infoSection}>
+          {/* Цены - теперь сверху */}
+          <View style={styles.priceSectionTop}>
+            <View style={styles.priceRow}>
+              {offer.discount > 0 && (
+                <Text style={styles.originalPriceTop}>{offer.originalCost.toFixed(2)} ₽</Text>
+              )}
+              <Text style={styles.currentPriceTop}>{offer.currentCost.toFixed(2)} ₽</Text>
+            </View>
+            {offer.discount > 0 && (
+              <Text style={styles.discountText}>Экономия {((offer.originalCost - offer.currentCost).toFixed(2))} ₽</Text>
+            )}
+          </View>
+
           {/* Название товара */}
           <Text style={styles.productName}>{offer.productName}</Text>
 
+          {/* Теги категорий */}
+          {productCategories.length > 0 && (
+            <View style={styles.categoriesContainer}>
+              {productCategories.map((category) => (
+                <View key={category.id} style={styles.categoryTag}>
+                  <Text style={styles.categoryTagText}>{category.name}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+
           {/* Описание */}
-          <Text style={styles.description}>{offer.productDescription}</Text>
+          {offer.productDescription && (
+            <Text style={styles.description}>{offer.productDescription}</Text>
+          )}
 
           {isExpired && (
             <View style={styles.expiredWarning}>
@@ -141,42 +185,73 @@ export default function ProductDetail() {
 
           {/* Важная информация */}
           <View style={styles.importantInfo}>
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>🏪 Магазин:</Text>
-              <Text style={styles.infoValue}>{offer.shopShortName}</Text>
-            </View>
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>📅 Срок годности:</Text>
-              <View style={[styles.expiryBadge, { backgroundColor: expiryColors.bg }]}>
-                <Text style={[styles.expiryText, { color: expiryColors.text }]}>
-                  {isExpired ? 'Просрочен' : `${daysUntilExpiry} ${getDaysWord(daysUntilExpiry)}`}
-                </Text>
+            <View style={styles.infoCard}>
+              <View style={styles.infoRow}>
+                <View style={styles.infoIconContainer}>
+                  <IconSymbol name="storefront" size={20} color="#4CAF50" />
+                </View>
+                <View style={styles.infoContent}>
+                  <Text style={styles.infoLabel}>Магазин</Text>
+                  <Text style={styles.infoValue}>{shopName}</Text>
+                </View>
               </View>
             </View>
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>📦 В наличии:</Text>
-              <Text style={styles.infoValue}>{offer.count} шт.</Text>
-            </View>
-            {offer.entryDescription && (
-              <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>💡 Примечание:</Text>
-                <Text style={styles.infoValue}>{offer.entryDescription}</Text>
+
+            {shop?.address && (
+              <View style={styles.infoCard}>
+                <View style={styles.infoRow}>
+                  <View style={styles.infoIconContainer}>
+                    <IconSymbol name="location" size={20} color="#2196F3" />
+                  </View>
+                  <View style={styles.infoContent}>
+                    <Text style={styles.infoLabel}>Адрес</Text>
+                    <Text style={styles.infoValue}>{shop.address}</Text>
+                  </View>
+                </View>
               </View>
             )}
-          </View>
-        </View>
 
-        {/* Цены */}
-        <View style={styles.priceSection}>
-          <View style={styles.priceHeader}>
-            <View style={styles.priceColumn}>
-              <Text style={styles.priceLabel}>Старая цена</Text>
-              <Text style={styles.originalPrice}>{offer.originalCost.toFixed(2)} ₽</Text>
+            <View style={styles.infoCard}>
+              <View style={styles.infoRow}>
+                <View style={styles.infoIconContainer}>
+                  <IconSymbol name="calendar" size={20} color={expiryColors.text} />
+                </View>
+                <View style={styles.infoContent}>
+                  <Text style={styles.infoLabel}>Срок годности</Text>
+                  <View style={[styles.expiryBadge, { backgroundColor: expiryColors.bg }]}>
+                    <Text style={[styles.expiryText, { color: expiryColors.text }]}>
+                      {isExpired ? 'Просрочен' : `${daysUntilExpiry} ${getDaysWord(daysUntilExpiry)}`}
+                    </Text>
+                  </View>
+                </View>
+              </View>
             </View>
-            <View style={styles.priceColumn}>
-              <Text style={styles.priceLabel}>Цена со скидкой</Text>
-              <Text style={styles.currentPrice}>{offer.currentCost.toFixed(2)} ₽</Text>
+
+            <View style={styles.infoCard}>
+              <View style={styles.infoRow}>
+                <View style={styles.infoIconContainer}>
+                  <IconSymbol name="cube" size={20} color="#FF9800" />
+                </View>
+                <View style={styles.infoContent}>
+                  <Text style={styles.infoLabel}>В наличии</Text>
+                  <Text style={styles.infoValue}>{offer.count} шт.</Text>
+                </View>
+              </View>
             </View>
+
+            {offer.description && (
+              <View style={styles.infoCard}>
+                <View style={styles.infoRow}>
+                  <View style={styles.infoIconContainer}>
+                    <IconSymbol name="info.circle" size={20} color="#9C27B0" />
+                  </View>
+                  <View style={styles.infoContent}>
+                    <Text style={styles.infoLabel}>Примечание</Text>
+                    <Text style={styles.infoValue}>{offer.description}</Text>
+                  </View>
+                </View>
+              </View>
+            )}
           </View>
         </View>
 
@@ -265,7 +340,7 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
+    backgroundColor: '#FAFAFA',
   },
   errorContainer: {
     flex: 1,
@@ -297,30 +372,45 @@ const styles = StyleSheet.create({
   imageSection: {
     backgroundColor: '#fff',
     alignItems: 'center',
-    paddingVertical: 32,
+    paddingVertical: 40,
     position: 'relative',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 3,
   },
   imagePlaceholder: {
-    width: 200,
-    height: 200,
-    borderRadius: 16,
+    width: 240,
+    height: 240,
+    borderRadius: 20,
     backgroundColor: '#E8F5E9',
     justifyContent: 'center',
     alignItems: 'center',
+    shadowColor: '#4CAF50',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 5,
   },
   imagePlaceholderText: {
-    fontSize: 80,
+    fontSize: 96,
     fontWeight: 'bold',
     color: '#4CAF50',
   },
   discountBadge: {
     position: 'absolute',
-    top: 20,
-    right: 20,
+    top: 24,
+    right: 24,
     backgroundColor: '#FF5252',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    shadowColor: '#FF5252',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
   },
   discountBadgeText: {
     color: '#fff',
@@ -329,19 +419,74 @@ const styles = StyleSheet.create({
   },
   infoSection: {
     backgroundColor: '#fff',
-    padding: 16,
+    padding: 20,
+    marginTop: 8,
+    borderRadius: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  priceSectionTop: {
+    marginBottom: 16,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  priceRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 12,
+    marginBottom: 4,
+  },
+  currentPriceTop: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: '#4CAF50',
+  },
+  originalPriceTop: {
+    fontSize: 20,
+    color: '#999',
+    textDecorationLine: 'line-through',
+    fontWeight: '500',
+  },
+  discountText: {
+    fontSize: 14,
+    color: '#4CAF50',
+    fontWeight: '600',
   },
   productName: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333',
+    fontSize: 26,
+    fontWeight: '700',
+    color: '#1A1A1A',
     marginBottom: 12,
+    lineHeight: 34,
+  },
+  categoriesContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 16,
+  },
+  categoryTag: {
+    backgroundColor: '#F0F7FF',
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E3F2FD',
+  },
+  categoryTagText: {
+    fontSize: 13,
+    color: '#1976D2',
+    fontWeight: '600',
   },
   description: {
     fontSize: 16,
     color: '#666',
     lineHeight: 24,
-    marginBottom: 16,
+    marginBottom: 20,
   },
   expiredWarning: {
     backgroundColor: '#FFE0B2',
@@ -356,63 +501,56 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   importantInfo: {
-    marginTop: 16,
     gap: 12,
+  },
+  infoCard: {
+    backgroundColor: '#FAFAFA',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#F0F0F0',
   },
   infoRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: 12,
+  },
+  infoIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: '#fff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  infoContent: {
+    flex: 1,
   },
   infoLabel: {
-    fontSize: 15,
-    color: '#666',
-    flex: 1,
+    fontSize: 13,
+    color: '#999',
+    marginBottom: 4,
+    fontWeight: '500',
   },
   infoValue: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#333',
-    flex: 1,
-    textAlign: 'right',
+    color: '#1A1A1A',
   },
   expiryBadge: {
-    borderRadius: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    alignSelf: 'flex-start',
   },
   expiryText: {
     fontSize: 13,
     fontWeight: '600',
-  },
-  priceSection: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    marginTop: 8,
-  },
-  priceHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-  },
-  priceColumn: {
-    alignItems: 'center',
-  },
-  priceLabel: {
-    fontSize: 13,
-    color: '#666',
-    marginBottom: 8,
-  },
-  originalPrice: {
-    fontSize: 18,
-    color: '#999',
-    textDecorationLine: 'line-through',
-    fontWeight: '600',
-  },
-  currentPrice: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#4CAF50',
   },
   bottomSpacer: {
     height: 120,
@@ -424,24 +562,32 @@ const styles = StyleSheet.create({
     right: 0,
     backgroundColor: '#fff',
     borderTopWidth: 1,
-    borderTopColor: '#E0E0E0',
-    padding: 16,
+    borderTopColor: '#E8E8E8',
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 20,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
+    shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 8,
+    shadowRadius: 12,
+    elevation: 12,
   },
   addToCartButton: {
     backgroundColor: '#4CAF50',
-    borderRadius: 12,
-    padding: 16,
+    borderRadius: 16,
+    padding: 18,
     alignItems: 'center',
+    shadowColor: '#4CAF50',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
   },
   addToCartButtonText: {
     color: '#fff',
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: '700',
+    letterSpacing: 0.5,
   },
   cartControls: {
     flexDirection: 'row',
@@ -457,16 +603,22 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#F5F5F5',
-    borderRadius: 12,
-    padding: 4,
+    borderRadius: 14,
+    padding: 6,
+    gap: 8,
   },
   quantityButton: {
-    width: 40,
-    height: 40,
+    width: 44,
+    height: 44,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#fff',
-    borderRadius: 10,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
   quantityButtonDisabled: {
     backgroundColor: '#F0F0F0',

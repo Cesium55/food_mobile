@@ -1,8 +1,11 @@
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import { useOffers } from "@/hooks/useOffers";
+import { useProducts } from "@/hooks/useProducts";
 import { useShops } from "@/hooks/useShops";
 import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
 import {
+    ActivityIndicator,
     Alert,
     ScrollView,
     StyleSheet,
@@ -13,34 +16,32 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-// Демо список товаров (в реальном приложении - из API или useProducts hook)
-const demoProducts = [
-    { id: 1, name: 'Молоко пастеризованное 3.2%' },
-    { id: 2, name: 'Хлеб "Бородинский"' },
-    { id: 3, name: 'Яйца куриные С1' },
-    { id: 4, name: 'Сыр "Российский"' },
-    { id: 5, name: 'Кофе молотый "Жокей"' },
-    { id: 6, name: 'Йогурт "Активия"' },
-    { id: 7, name: 'Масло сливочное 82.5%' },
-    { id: 8, name: 'Сметана 20%' },
-    { id: 9, name: 'Творог 9%' },
-    { id: 10, name: 'Кефир 3.2%' },
-];
-
 export default function NewOfferScreen() {
     const { shopId } = useLocalSearchParams();
     const selectedShopId = typeof shopId === 'string' ? parseInt(shopId) : 0;
     const { shops } = useShops();
+    const { products, loading: productsLoading } = useProducts();
+    const { createOffer, refetch } = useOffers();
 
     const [selectedProductId, setSelectedProductId] = useState<number | null>(null);
     const [price, setPrice] = useState('');
     const [discount, setDiscount] = useState('0');
     const [quantity, setQuantity] = useState('');
     const [expiryDate, setExpiryDate] = useState('');
+    const [description, setDescription] = useState('');
     const [showProductSelector, setShowProductSelector] = useState(false);
+    const [isCreating, setIsCreating] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
 
     const selectedShop = shops.find(s => s.id === selectedShopId);
-    const selectedProduct = demoProducts.find(p => p.id === selectedProductId);
+    const selectedProduct = products.find(p => p.id === selectedProductId);
+
+    // Фильтрация товаров по поисковому запросу
+    const filteredProducts = searchQuery.trim()
+        ? products.filter(p => 
+            p.name.toLowerCase().includes(searchQuery.toLowerCase())
+        )
+        : products;
 
     const handleCancel = () => {
         Alert.alert(
@@ -57,7 +58,7 @@ export default function NewOfferScreen() {
         );
     };
 
-    const handleCreate = () => {
+    const handleCreate = async () => {
         // Валидация
         if (!selectedProductId) {
             Alert.alert("Ошибка", "Выберите товар");
@@ -81,17 +82,52 @@ export default function NewOfferScreen() {
             return;
         }
 
+        // Валидация даты
+        const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+        if (!dateRegex.test(expiryDate)) {
+            Alert.alert("Ошибка", "Неверный формат даты. Используйте ГГГГ-ММ-ДД");
+            return;
+        }
+
+        const priceNum = parseFloat(price);
+        const discountNumFinal = parseFloat(discount) || 0;
+        const currentCost = priceNum - (priceNum * discountNumFinal / 100);
+
         Alert.alert(
             "Создать предложение?",
-            "Предложение будет добавлено в торговую точку",
+            `Товар: ${selectedProduct?.name}\nЦена: ${priceNum.toFixed(2)} ₽\nСкидка: ${discountNumFinal}%\nЦена со скидкой: ${currentCost.toFixed(2)} ₽\nКоличество: ${quantity} шт.\nСрок годности: ${expiryDate}`,
             [
                 { text: "Отмена", style: "cancel" },
                 {
                     text: "Создать",
-                    onPress: () => {
-                        // В реальном приложении - API запрос
-                        Alert.alert("Успех", "Предложение создано");
-                        router.back();
+                    onPress: async () => {
+                        try {
+                            setIsCreating(true);
+                            
+                            await createOffer({
+                                product_id: selectedProductId,
+                                shop_id: selectedShopId,
+                                expires_date: expiryDate,
+                                original_cost: priceNum,
+                                current_cost: currentCost,
+                                count: parseInt(quantity),
+                                description: description.trim() || undefined,
+                            });
+
+                            // Обновляем список офферов
+                            await refetch();
+
+                            Alert.alert("Успех", "Предложение успешно создано");
+                            router.back();
+                        } catch (error: any) {
+                            console.error('Ошибка создания оффера:', error);
+                            Alert.alert(
+                                "Ошибка",
+                                error.message || "Не удалось создать предложение. Попробуйте еще раз."
+                            );
+                        } finally {
+                            setIsCreating(false);
+                        }
                     }
                 }
             ]
@@ -173,31 +209,65 @@ export default function NewOfferScreen() {
                                         <IconSymbol name="xmark" size={20} color="#666" />
                                     </TouchableOpacity>
                                 </View>
-                                <ScrollView style={styles.productsList}>
-                                    {demoProducts.map(product => (
-                                        <TouchableOpacity
-                                            key={product.id}
-                                            style={[
-                                                styles.productItem,
-                                                selectedProductId === product.id && styles.productItemSelected
-                                            ]}
-                                            onPress={() => {
-                                                setSelectedProductId(product.id);
-                                                setShowProductSelector(false);
-                                            }}
-                                        >
-                                            <Text style={[
-                                                styles.productItemText,
-                                                selectedProductId === product.id && styles.productItemTextSelected
-                                            ]}>
-                                                {product.name}
-                                            </Text>
-                                            {selectedProductId === product.id && (
-                                                <IconSymbol name="checkmark" size={20} color="#007AFF" />
-                                            )}
-                                        </TouchableOpacity>
-                                    ))}
-                                </ScrollView>
+                                
+                                {/* Поиск товаров */}
+                                <View style={styles.searchContainer}>
+                                    <TextInput
+                                        style={styles.searchInput}
+                                        placeholder="Поиск товара..."
+                                        value={searchQuery}
+                                        onChangeText={setSearchQuery}
+                                        placeholderTextColor="#999"
+                                    />
+                                    <IconSymbol name="magnifyingglass" size={20} color="#999" />
+                                </View>
+
+                                {productsLoading ? (
+                                    <View style={styles.loadingContainer}>
+                                        <ActivityIndicator size="small" color="#007AFF" />
+                                        <Text style={styles.loadingText}>Загрузка товаров...</Text>
+                                    </View>
+                                ) : filteredProducts.length === 0 ? (
+                                    <View style={styles.emptyContainer}>
+                                        <Text style={styles.emptyText}>
+                                            {searchQuery ? 'Товары не найдены' : 'Нет доступных товаров'}
+                                        </Text>
+                                    </View>
+                                ) : (
+                                    <ScrollView style={styles.productsList}>
+                                        {filteredProducts.map(product => (
+                                            <TouchableOpacity
+                                                key={product.id}
+                                                style={[
+                                                    styles.productItem,
+                                                    selectedProductId === product.id && styles.productItemSelected
+                                                ]}
+                                                onPress={() => {
+                                                    setSelectedProductId(product.id);
+                                                    setShowProductSelector(false);
+                                                    setSearchQuery('');
+                                                }}
+                                            >
+                                                <View style={styles.productItemContent}>
+                                                    <Text style={[
+                                                        styles.productItemText,
+                                                        selectedProductId === product.id && styles.productItemTextSelected
+                                                    ]}>
+                                                        {product.name}
+                                                    </Text>
+                                                    {product.description && (
+                                                        <Text style={styles.productItemDescription} numberOfLines={1}>
+                                                            {product.description}
+                                                        </Text>
+                                                    )}
+                                                </View>
+                                                {selectedProductId === product.id && (
+                                                    <IconSymbol name="checkmark.circle.fill" size={24} color="#007AFF" />
+                                                )}
+                                            </TouchableOpacity>
+                                        ))}
+                                    </ScrollView>
+                                )}
                             </View>
                         )}
                     </View>
@@ -270,15 +340,37 @@ export default function NewOfferScreen() {
                             />
                             <Text style={styles.hint}>Формат: ГГГГ-ММ-ДД (например, 2025-12-31)</Text>
                         </View>
+
+                        {/* Описание */}
+                        <View style={styles.fieldContainer}>
+                            <Text style={styles.label}>Описание (необязательно)</Text>
+                            <TextInput
+                                style={[styles.input, styles.textArea]}
+                                value={description}
+                                onChangeText={setDescription}
+                                placeholder="Дополнительная информация о предложении"
+                                multiline
+                                numberOfLines={3}
+                                textAlignVertical="top"
+                            />
+                        </View>
                     </View>
 
                     {/* Кнопка создания */}
                     <View style={styles.actionsSection}>
                         <TouchableOpacity
-                            style={styles.createButton}
+                            style={[styles.createButton, isCreating && styles.createButtonDisabled]}
                             onPress={handleCreate}
+                            disabled={isCreating}
                         >
-                            <Text style={styles.createButtonText}>Создать предложение</Text>
+                            {isCreating ? (
+                                <View style={styles.buttonLoading}>
+                                    <ActivityIndicator size="small" color="#fff" />
+                                    <Text style={styles.createButtonText}>Создание...</Text>
+                                </View>
+                            ) : (
+                                <Text style={styles.createButtonText}>Создать предложение</Text>
+                            )}
                         </TouchableOpacity>
                     </View>
 
@@ -407,7 +499,39 @@ const styles = StyleSheet.create({
         borderColor: '#e0e0e0',
         borderRadius: 12,
         backgroundColor: '#fff',
-        maxHeight: 300,
+        maxHeight: 400,
+    },
+    searchContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: '#e0e0e0',
+        gap: 8,
+    },
+    searchInput: {
+        flex: 1,
+        fontSize: 15,
+        color: '#333',
+    },
+    loadingContainer: {
+        padding: 40,
+        alignItems: 'center',
+        gap: 12,
+    },
+    loadingText: {
+        fontSize: 14,
+        color: '#666',
+    },
+    emptyContainer: {
+        padding: 40,
+        alignItems: 'center',
+    },
+    emptyText: {
+        fontSize: 14,
+        color: '#999',
+        textAlign: 'center',
     },
     selectorHeader: {
         flexDirection: 'row',
@@ -436,6 +560,15 @@ const styles = StyleSheet.create({
         borderBottomWidth: 1,
         borderBottomColor: '#f0f0f0',
     },
+    productItemContent: {
+        flex: 1,
+        marginRight: 12,
+    },
+    productItemDescription: {
+        fontSize: 12,
+        color: '#999',
+        marginTop: 4,
+    },
     productItemSelected: {
         backgroundColor: '#F0F8FF',
     },
@@ -463,6 +596,10 @@ const styles = StyleSheet.create({
         padding: 12,
         fontSize: 16,
         backgroundColor: '#fff',
+    },
+    textArea: {
+        minHeight: 80,
+        paddingTop: 12,
     },
     hint: {
         fontSize: 12,
@@ -494,6 +631,14 @@ const styles = StyleSheet.create({
         padding: 16,
         borderRadius: 12,
         alignItems: 'center',
+    },
+    createButtonDisabled: {
+        opacity: 0.6,
+    },
+    buttonLoading: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
     },
     createButtonText: {
         color: '#fff',

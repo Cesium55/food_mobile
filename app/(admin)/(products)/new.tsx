@@ -1,5 +1,8 @@
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import { API_ENDPOINTS } from "@/constants/api";
+import { getApiUrl } from "@/constants/env";
 import { useCategories } from "@/hooks/useCategories";
+import { authFetch } from "@/utils/authFetch";
 import { router } from "expo-router";
 import { useState } from "react";
 import {
@@ -14,27 +17,22 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-// Стандартные характеристики (всегда есть) - вынесены за компонент для оптимизации
-const STANDARD_CHARACTERISTICS = {
-    'Вес/Объем': '',
-    'Производитель': '',
-    'Страна': '',
-    'Срок хранения': '',
-    'Условия хранения': '',
-};
-
 export default function NewProductScreen() {
-    const { categories, getCategoryById } = useCategories();
+    const { categories, getCategoryById, getCategoryPath } = useCategories();
 
-    // Дополнительные характеристики (могут добавляться пользователем)
-    const [customCharacteristics, setCustomCharacteristics] = useState<{ [key: string]: string }>({});
-    
     const [name, setName] = useState("");
     const [description, setDescription] = useState("");
     const [categoryIds, setCategoryIds] = useState<number[]>([]); // Массив ID категорий
     const [images, setImages] = useState<string[]>([]);
-    const [characteristics, setCharacteristics] = useState<{ [key: string]: string }>(STANDARD_CHARACTERISTICS);
-    const [expandedCategories, setExpandedCategories] = useState<number[]>([]);
+    // Характеристики (можно удалять любые)
+    const [characteristics, setCharacteristics] = useState<{ [key: string]: string }>({
+        'Вес/Объем': '',
+        'Производитель': '',
+        'Страна': '',
+        'Срок хранения': '',
+        'Условия хранения': '',
+    });
+    const [expandedCategories, setExpandedCategories] = useState<number[]>([]); // Раскрытые категории (для подкатегорий)
     
     // Модальное окно для добавления характеристики
     const [showAddCharModal, setShowAddCharModal] = useState(false);
@@ -73,7 +71,26 @@ export default function NewProductScreen() {
         );
     };
 
-    const handleSave = () => {
+    // Маппинг русских названий характеристик на английские slug'и
+    const getCharacteristicSlug = (name: string): string => {
+        const slugMap: { [key: string]: string } = {
+            'Вес/Объем': 'weight-volume',
+            'Производитель': 'manufacturer',
+            'Страна': 'country',
+            'Срок хранения': 'shelf-life',
+            'Условия хранения': 'storage-conditions',
+        };
+
+        // Если есть маппинг, используем его
+        if (slugMap[name]) {
+            return slugMap[name];
+        }
+
+        // Иначе генерируем slug из названия (транслитерация не требуется, просто приводим к нижнему регистру и заменяем пробелы)
+        return name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+    };
+
+    const handleSave = async () => {
         if (!name || !description) {
             Alert.alert("Ошибка", "Заполните обязательные поля: Название и Описание");
             return;
@@ -84,14 +101,91 @@ export default function NewProductScreen() {
             return;
         }
 
-        Alert.alert(
-            "Создание товара",
-            `Товар "${name}" успешно создан!\n(Демонстрационный режим)`,
-            [{ 
-                text: "OK",
-                onPress: () => router.back()
-            }]
-        );
+        // Преобразуем characteristics в формат attributes для API
+        const attributes = Object.entries(characteristics)
+            .filter(([key, value]) => value.trim() !== '') // Убираем пустые характеристики
+            .map(([key, value]) => ({
+                slug: getCharacteristicSlug(key),
+                name: key,
+                value: value,
+            }));
+
+        // Формируем данные товара для отправки на сервер (согласно схеме API)
+        const productData = {
+            name: name.trim(),
+            description: description.trim(),
+            category_ids: categoryIds,
+            attributes: attributes,
+        };
+
+        // Логируем все данные товара
+        console.log('📦 ===== ДАННЫЕ ТОВАРА ДЛЯ СОЗДАНИЯ =====');
+        console.log('Название:', productData.name);
+        console.log('Описание:', productData.description);
+        console.log('Категории (ID):', productData.category_ids);
+        console.log('Характеристики (attributes):', productData.attributes);
+        console.log('📦 ===== ПОЛНЫЙ ОБЪЕКТ ДАННЫХ =====');
+        console.log(JSON.stringify(productData, null, 2));
+        console.log('📦 ====================================');
+
+        try {
+            // Отправляем данные на сервер
+            const response = await authFetch(getApiUrl(API_ENDPOINTS.PRODUCTS.BASE), {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(productData),
+                requireAuth: true,
+            });
+
+            // Проверяем успешный ответ (authFetch автоматически следует за редиректами)
+            if (response.ok) {
+                let data;
+                try {
+                    data = await response.json();
+                } catch (e) {
+                    // Если ответ не JSON, это нормально
+                    data = null;
+                }
+                
+                console.log('✅ Товар успешно создан:', data || 'Ответ получен');
+                
+                Alert.alert(
+                    "Успех",
+                    `Товар "${name}" успешно создан!`,
+                    [{ 
+                        text: "OK",
+                        onPress: () => router.back()
+                    }]
+                );
+            } else {
+                const errorText = await response.text();
+                console.error('❌ Ошибка создания товара:', response.status, errorText);
+                
+                let errorMessage = 'Ошибка создания товара';
+                try {
+                    const errorData = JSON.parse(errorText);
+                    errorMessage = errorData.message || errorData.error || errorMessage;
+                } catch (e) {
+                    // Если не удалось распарсить JSON, используем текст ошибки
+                    errorMessage = errorText || errorMessage;
+                }
+
+                Alert.alert(
+                    "Ошибка",
+                    errorMessage,
+                    [{ text: "OK" }]
+                );
+            }
+        } catch (err) {
+            console.error('❌ Ошибка подключения к серверу при создании товара:', err);
+            Alert.alert(
+                "Ошибка",
+                "Ошибка подключения к серверу. Проверьте подключение к интернету.",
+                [{ text: "OK" }]
+            );
+        }
     };
 
     const handleCancel = () => {
@@ -110,26 +204,10 @@ export default function NewProductScreen() {
     };
 
     const handleCharacteristicChange = (key: string, value: string) => {
-        if (STANDARD_CHARACTERISTICS.hasOwnProperty(key)) {
-            // Изменяем стандартную характеристику
-            setCharacteristics({ ...characteristics, [key]: value });
-        } else {
-            // Изменяем пользовательскую характеристику
-            const newCustom = { ...customCharacteristics, [key]: value };
-            setCustomCharacteristics(newCustom);
-            setCharacteristics({ ...STANDARD_CHARACTERISTICS, ...newCustom });
-        }
+        setCharacteristics({ ...characteristics, [key]: value });
     };
 
     const handleDeleteCharacteristic = (key: string) => {
-        // Нельзя удалить стандартные характеристики
-        if (STANDARD_CHARACTERISTICS.hasOwnProperty(key)) {
-            setTimeout(() => {
-                Alert.alert("Ошибка", "Стандартные характеристики нельзя удалить");
-            }, 100);
-            return;
-        }
-        
         setTimeout(() => {
             Alert.alert(
                 "Удалить характеристику",
@@ -140,10 +218,9 @@ export default function NewProductScreen() {
                         text: "Удалить",
                         style: "destructive",
                         onPress: () => {
-                            const newCustom = { ...customCharacteristics };
-                            delete newCustom[key];
-                            setCustomCharacteristics(newCustom);
-                            setCharacteristics({ ...STANDARD_CHARACTERISTICS, ...newCustom });
+                            const newCharacteristics = { ...characteristics };
+                            delete newCharacteristics[key];
+                            setCharacteristics(newCharacteristics);
                         }
                     }
                 ]
@@ -157,9 +234,7 @@ export default function NewProductScreen() {
 
     const handleConfirmAddCharacteristic = () => {
         if (newCharName.trim()) {
-            const newCustom = { ...customCharacteristics, [newCharName.trim()]: '' };
-            setCustomCharacteristics(newCustom);
-            setCharacteristics({ ...STANDARD_CHARACTERISTICS, ...newCustom });
+            setCharacteristics({ ...characteristics, [newCharName.trim()]: '' });
             setNewCharName('');
             setShowAddCharModal(false);
         }
@@ -170,6 +245,19 @@ export default function NewProductScreen() {
         setShowAddCharModal(false);
     };
 
+    const handleToggleCategory = (categoryId: number) => {
+        if (categoryIds.includes(categoryId)) {
+            // Снимаем выбор - удаляем категорию из списка
+            setCategoryIds(categoryIds.filter(id => id !== categoryId));
+        } else {
+            // Добавляем выбор - добавляем категорию и всех её родителей
+            const categoryPath = getCategoryPath(categoryId);
+            const parentIds = categoryPath.map(cat => cat.id);
+            const newCategoryIds = [...new Set([...categoryIds, ...parentIds])]; // Убираем дубликаты
+            setCategoryIds(newCategoryIds);
+        }
+    };
+
     const handleToggleExpand = (categoryId: number) => {
         setExpandedCategories(prev => 
             prev.includes(categoryId) 
@@ -178,12 +266,89 @@ export default function NewProductScreen() {
         );
     };
 
-    const handleToggleCategory = (categoryId: number) => {
-        const newCategoryIds = categoryIds.includes(categoryId)
-            ? categoryIds.filter(id => id !== categoryId)
-            : [...categoryIds, categoryId];
-        
-        setCategoryIds(newCategoryIds);
+    // Рекурсивный компонент для отображения категории
+    const renderCategoryItem = (category: typeof categories[0], level: number = 0) => {
+        const subCategories = categories.filter(c => c.parent_category_id === category.id);
+        const isExpanded = expandedCategories.includes(category.id);
+        const isSelected = categoryIds.includes(category.id);
+        const hasChildren = subCategories.length > 0;
+
+        return (
+            <View key={category.id} style={level === 0 ? styles.categoryGroup : {}}>
+                {level === 0 ? (
+                    // Заголовок категории верхнего уровня - с возможностью сворачивания
+                    <View style={styles.categoryHeaderRow}>
+                        {hasChildren && (
+                            <TouchableOpacity
+                                onPress={() => handleToggleExpand(category.id)}
+                                style={styles.expandButton}
+                            >
+                                <IconSymbol 
+                                    name={isExpanded ? "chevron.down" : "chevron.right"} 
+                                    size={18} 
+                                    color="#666" 
+                                />
+                            </TouchableOpacity>
+                        )}
+                        {!hasChildren && <View style={styles.expandButtonSpacer} />}
+                        <TouchableOpacity
+                            style={styles.categoryHeader}
+                            onPress={() => handleToggleCategory(category.id)}
+                            activeOpacity={0.7}
+                        >
+                            <Text style={styles.categoryTitle}>{category.name}</Text>
+                            {isSelected && (
+                                <View style={styles.categoryHeaderBadge}>
+                                    <Text style={styles.categoryHeaderBadgeText}>Выбрано</Text>
+                                </View>
+                            )}
+                        </TouchableOpacity>
+                    </View>
+                ) : (
+                    // Подкатегории - кликабельные кнопки с возможностью раскрытия
+                    <View style={styles.subCategoryRow}>
+                        {hasChildren && (
+                            <TouchableOpacity
+                                onPress={() => handleToggleExpand(category.id)}
+                                style={styles.expandButton}
+                            >
+                                <IconSymbol 
+                                    name={isExpanded ? "chevron.down" : "chevron.right"} 
+                                    size={16} 
+                                    color="#666" 
+                                />
+                            </TouchableOpacity>
+                        )}
+                        {!hasChildren && <View style={styles.expandButtonSpacer} />}
+                        <TouchableOpacity
+                            style={[
+                                styles.subCategoryButton,
+                                { paddingLeft: 12 + (level - 1) * 16, flex: 1 }, // Отступ по уровню вложенности
+                                isSelected && styles.subCategoryButtonSelected
+                            ]}
+                            onPress={() => handleToggleCategory(category.id)}
+                        >
+                            <Text style={[
+                                styles.subCategoryText,
+                                isSelected && styles.subCategoryTextSelected
+                            ]}>
+                                {category.name}
+                            </Text>
+                            {isSelected && (
+                                <IconSymbol name="checkmark.circle.fill" size={20} color="#007AFF" />
+                            )}
+                        </TouchableOpacity>
+                    </View>
+                )}
+                
+                {/* Рекурсивно отображаем подкатегории */}
+                {isExpanded && hasChildren && (
+                    <View style={styles.subCategoriesContainer}>
+                        {subCategories.map(subCat => renderCategoryItem(subCat, level + 1))}
+                    </View>
+                )}
+            </View>
+        );
     };
 
     return (
@@ -267,67 +432,52 @@ export default function NewProductScreen() {
                     {/* Категории */}
                     <View style={styles.fieldContainer}>
                         <Text style={styles.label}>Категории *</Text>
-                        <Text style={styles.hint}>Выберите одну или несколько категорий (с подкатегориями)</Text>
+                        <Text style={styles.hint}>Выберите одну или несколько категорий</Text>
                         <View style={styles.categoryTree}>
                             {categories.filter(c => c.parent_category_id === null).map(parentCat => {
                                 const subCategories = categories.filter(c => c.parent_category_id === parentCat.id);
-                                const isExpanded = expandedCategories.includes(parentCat.id);
                                 const isParentSelected = categoryIds.includes(parentCat.id);
                                 
-                                return (
-                                    <View key={parentCat.id} style={styles.categoryTreeItem}>
-                                        {/* Родительская категория */}
-                                        <View style={styles.categoryRow}>
-                                            {subCategories.length > 0 && (
-                                                <TouchableOpacity 
-                                                    onPress={() => handleToggleExpand(parentCat.id)}
-                                                    style={styles.expandButton}
-                                                >
-                                                    <Text style={styles.expandIcon}>
-                                                        {isExpanded ? '▼' : '▶'}
-                                                    </Text>
-                                                </TouchableOpacity>
-                                            )}
+                                // Если у категории нет подкатегорий, делаем её кликабельной
+                                if (subCategories.length === 0) {
+                                    return (
+                                        <View key={parentCat.id} style={styles.categoryGroup}>
+                                            <TouchableOpacity
+                                                style={styles.categoryHeader}
+                                                onPress={() => handleToggleCategory(parentCat.id)}
+                                                activeOpacity={0.7}
+                                            >
+                                                <Text style={styles.categoryTitle}>{parentCat.name}</Text>
+                                                {isParentSelected && (
+                                                    <View style={styles.categoryHeaderBadge}>
+                                                        <Text style={styles.categoryHeaderBadgeText}>Выбрано</Text>
+                                                    </View>
+                                                )}
+                                            </TouchableOpacity>
                                             <TouchableOpacity
                                                 style={[
-                                                    styles.categoryItemButton,
-                                                    isParentSelected && styles.categoryItemSelected,
-                                                    subCategories.length === 0 && styles.categoryItemNoChildren
+                                                    styles.subCategoryButton,
+                                                    isParentSelected && styles.subCategoryButtonSelected
                                                 ]}
                                                 onPress={() => handleToggleCategory(parentCat.id)}
                                             >
+                                                <View style={styles.expandButtonSpacer} />
                                                 <Text style={[
-                                                    styles.categoryItemText,
-                                                    isParentSelected && styles.categoryItemTextSelected
+                                                    styles.subCategoryText,
+                                                    isParentSelected && styles.subCategoryTextSelected
                                                 ]}>
-                                                    {parentCat.name}
+                                                    Выбрать категорию
                                                 </Text>
+                                                {isParentSelected && (
+                                                    <IconSymbol name="checkmark.circle.fill" size={20} color="#007AFF" />
+                                                )}
                                             </TouchableOpacity>
                                         </View>
-                                        
-                                        {/* Подкатегории */}
-                                        {isExpanded && subCategories.map(subCat => {
-                                            const isSelected = categoryIds.includes(subCat.id);
-                                            return (
-                                                <TouchableOpacity
-                                                    key={subCat.id}
-                                                    style={[
-                                                        styles.subCategoryItem,
-                                                        isSelected && styles.subCategoryItemSelected
-                                                    ]}
-                                                    onPress={() => handleToggleCategory(subCat.id)}
-                                                >
-                                                    <Text style={[
-                                                        styles.subCategoryText,
-                                                        isSelected && styles.subCategoryTextSelected
-                                                    ]}>
-                                                        {subCat.name}
-                                                    </Text>
-                                                </TouchableOpacity>
-                                            );
-                                        })}
-                                    </View>
-                                );
+                                    );
+                                }
+                                
+                                // Рекурсивно отображаем категорию с подкатегориями
+                                return renderCategoryItem(parentCat, 0);
                             })}
                         </View>
                     </View>
@@ -361,14 +511,10 @@ export default function NewProductScreen() {
                     </View>
 
                     {Object.entries(characteristics).map(([key, value]) => {
-                        const isStandard = STANDARD_CHARACTERISTICS.hasOwnProperty(key);
                         return (
                             <View key={key} style={styles.characteristicRow}>
                                 <View style={styles.characteristicLeft}>
                                     <Text style={styles.characteristicKey}>{key}</Text>
-                                    {isStandard && (
-                                        <Text style={styles.standardBadge}>●</Text>
-                                    )}
                                 </View>
                                 <View style={styles.characteristicRight}>
                                     <TextInput
@@ -377,14 +523,12 @@ export default function NewProductScreen() {
                                         onChangeText={(text) => handleCharacteristicChange(key, text)}
                                         placeholder="..."
                                     />
-                                    {!isStandard && (
-                                        <TouchableOpacity
-                                            style={styles.deleteCharButton}
-                                            onPress={() => handleDeleteCharacteristic(key)}
-                                        >
-                                            <IconSymbol name="trash" size={16} color="#ff3b30" />
-                                        </TouchableOpacity>
-                                    )}
+                                    <TouchableOpacity
+                                        style={styles.deleteCharButton}
+                                        onPress={() => handleDeleteCharacteristic(key)}
+                                    >
+                                        <IconSymbol name="trash" size={16} color="#ff3b30" />
+                                    </TouchableOpacity>
                                 </View>
                             </View>
                         );
@@ -605,68 +749,85 @@ const styles = StyleSheet.create({
     },
     categoryTree: {
         marginTop: 8,
+    },
+    categoryGroup: {
+        marginBottom: 24,
+        backgroundColor: '#fff',
+        borderRadius: 12,
+        padding: 16,
         borderWidth: 1,
         borderColor: '#e0e0e0',
-        borderRadius: 8,
-        backgroundColor: '#fafafa',
     },
-    categoryTreeItem: {
-        borderBottomWidth: 1,
-        borderBottomColor: '#e0e0e0',
-    },
-    categoryRow: {
+    categoryHeaderRow: {
         flexDirection: 'row',
         alignItems: 'center',
+        marginBottom: 12,
+    },
+    categoryHeader: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingBottom: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: '#f0f0f0',
+    },
+    categoryTitle: {
+        fontSize: 18,
+        fontWeight: '600',
+        color: '#333',
+    },
+    categoryHeaderBadge: {
+        backgroundColor: '#007AFF',
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 12,
+    },
+    categoryHeaderBadgeText: {
+        color: '#fff',
+        fontSize: 12,
+        fontWeight: '600',
+    },
+    subCategoriesContainer: {
+        gap: 4,
+        marginTop: 4,
+    },
+    subCategoryRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 4,
     },
     expandButton: {
-        width: 40,
+        width: 32,
         height: 44,
         justifyContent: 'center',
         alignItems: 'center',
     },
-    expandIcon: {
-        fontSize: 12,
-        color: '#666',
+    expandButtonSpacer: {
+        width: 32,
     },
-    categoryItemButton: {
-        flex: 1,
+    subCategoryButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
         padding: 12,
-        paddingVertical: 14,
-        backgroundColor: '#fff',
+        borderRadius: 8,
+        backgroundColor: '#f9f9f9',
+        borderWidth: 1,
+        borderColor: '#e0e0e0',
     },
-    categoryItemNoChildren: {
-        marginLeft: 40,
-    },
-    categoryItemSelected: {
+    subCategoryButtonSelected: {
         backgroundColor: '#E3F2FD',
+        borderColor: '#007AFF',
     },
-    categoryItemText: {
+    subCategoryText: {
         fontSize: 15,
         color: '#333',
         fontWeight: '500',
     },
-    categoryItemTextSelected: {
-        color: '#007AFF',
-        fontWeight: '600',
-    },
-    subCategoryItem: {
-        paddingLeft: 56,
-        paddingRight: 12,
-        paddingVertical: 12,
-        backgroundColor: '#f5f5f5',
-        borderTopWidth: 1,
-        borderTopColor: '#e0e0e0',
-    },
-    subCategoryItemSelected: {
-        backgroundColor: '#E3F2FD',
-    },
-    subCategoryText: {
-        fontSize: 14,
-        color: '#666',
-    },
     subCategoryTextSelected: {
         color: '#007AFF',
-        fontWeight: '500',
+        fontWeight: '600',
     },
     sectionHeader: {
         flexDirection: 'row',
