@@ -54,6 +54,17 @@ export const API_ENDPOINTS = {
     CANCEL: '/orders/cancel',
   },
   
+  // Покупки (Purchases)
+  PURCHASES: {
+    BASE: '/purchases',
+    CREATE_WITH_PARTIAL_SUCCESS: '/purchases/with-partial-success',
+    CURRENT_PENDING: '/purchases/current-pending',
+    LIST: '/purchases',
+    TOKEN: (purchaseId: number) => `/purchases/${purchaseId}/token`,
+    VERIFY_TOKEN: '/purchases/verify-token',
+    FULFILL: (purchaseId: number) => `/purchases/${purchaseId}/fulfill`,
+  },
+  
   // Корзина
   CART: {
     BASE: '/cart',
@@ -86,6 +97,16 @@ export const API_ENDPOINTS = {
   OFFERS: {
     BASE: '/offers',
     WITH_PRODUCTS: '/offers/with-products',
+  },
+  
+  // Платежи
+  PAYMENTS: {
+    BASE: '/payments',
+    BY_ID: (id: number) => `/payments/${id}`,
+    BY_PURCHASE_ID: (purchaseId: number) => `/payments/purchase/${purchaseId}`,
+    CHECK: (id: number) => `/payments/${id}/check`,
+    CANCEL: (id: number) => `/payments/${id}/cancel`,
+    STATUS: (id: number) => `/payments/${id}/status`,
   },
 } as const;
 

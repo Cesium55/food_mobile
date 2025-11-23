@@ -1,12 +1,16 @@
+import CartButton from "@/components/cart/CartButton";
 import { CharacteristicItem, ProductCharacteristics } from "@/components/product/ProductCharacteristics";
+import ProductCategories from "@/components/product/ProductCategories";
+import ProductImageSection from "@/components/product/ProductImageSection";
+import ProductInfoCard from "@/components/product/ProductInfoCard";
+import ProductPriceSection from "@/components/product/ProductPriceSection";
 import { IconSymbol } from "@/components/ui/icon-symbol";
-import { useCart } from "@/hooks/useCart";
 import { useCategories } from "@/hooks/useCategories";
 import { useOffers } from "@/hooks/useOffers";
 import { usePublicSeller } from "@/hooks/usePublicSeller";
 import { useShops } from "@/hooks/useShops";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function ProductDetail() {
@@ -15,7 +19,6 @@ export default function ProductDetail() {
   const { getOfferById } = useOffers();
   const { shops } = useShops();
   const { categories, getCategoryById } = useCategories();
-  const { cartItems, increaseQuantity, decreaseQuantity } = useCart();
   
   const offer = getOfferById(Number(id));
   
@@ -81,31 +84,6 @@ export default function ProductDetail() {
   const expiryColors = getExpiryColor();
   const isExpired = daysUntilExpiry < 0;
 
-  // Проверяем, есть ли товар в корзине
-  const cartItem = cartItems.find((item) => item.offerId === offer.id);
-  const isInCart = !!cartItem;
-
-  const handleAddToCart = () => {
-    // TODO: реализовать добавление в корзину
-    Alert.alert(
-      'Добавлено в корзину',
-      `${offer.productName} добавлен в корзину`,
-      [{ text: 'OK' }]
-    );
-  };
-
-  const handleIncreaseInCart = () => {
-    if (cartItem) {
-      increaseQuantity(cartItem.id);
-    }
-  };
-
-  const handleDecreaseInCart = () => {
-    if (cartItem) {
-      decreaseQuantity(cartItem.id);
-    }
-  };
-
   // Преобразуем атрибуты из API в формат характеристик
   const characteristics: CharacteristicItem[] = offer.productAttributes
     ? offer.productAttributes.map(attr => ({
@@ -128,49 +106,18 @@ export default function ProductDetail() {
       </View>
       <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
         {/* Изображение товара */}
-        <View style={styles.imageSection}>
-          <View style={styles.imagePlaceholder}>
-            <Text style={styles.imagePlaceholderText}>
-              {offer.productName.charAt(0)}
-            </Text>
-          </View>
-          
-          {/* Бейдж скидки */}
-          {offer.discount > 0 && (
-            <View style={styles.discountBadge}>
-              <Text style={styles.discountBadgeText}>-{offer.discount}%</Text>
-            </View>
-          )}
-        </View>
+        <ProductImageSection offer={offer} />
 
         {/* Основная информация */}
         <View style={styles.infoSection}>
-          {/* Цены - теперь сверху */}
-          <View style={styles.priceSectionTop}>
-            <View style={styles.priceRow}>
-              {offer.discount > 0 && (
-                <Text style={styles.originalPriceTop}>{offer.originalCost.toFixed(2)} ₽</Text>
-              )}
-              <Text style={styles.currentPriceTop}>{offer.currentCost.toFixed(2)} ₽</Text>
-            </View>
-            {offer.discount > 0 && (
-              <Text style={styles.discountText}>Экономия {((offer.originalCost - offer.currentCost).toFixed(2))} ₽</Text>
-            )}
-          </View>
+          {/* Цены */}
+          <ProductPriceSection offer={offer} />
 
           {/* Название товара */}
           <Text style={styles.productName}>{offer.productName}</Text>
 
           {/* Теги категорий */}
-          {productCategories.length > 0 && (
-            <View style={styles.categoriesContainer}>
-              {productCategories.map((category) => (
-                <View key={category.id} style={styles.categoryTag}>
-                  <Text style={styles.categoryTagText}>{category.name}</Text>
-                </View>
-              ))}
-            </View>
-          )}
+          <ProductCategories categories={productCategories} />
 
           {/* Описание */}
           {offer.productDescription && (
@@ -185,72 +132,49 @@ export default function ProductDetail() {
 
           {/* Важная информация */}
           <View style={styles.importantInfo}>
-            <View style={styles.infoCard}>
-              <View style={styles.infoRow}>
-                <View style={styles.infoIconContainer}>
-                  <IconSymbol name="storefront" size={20} color="#4CAF50" />
-                </View>
-                <View style={styles.infoContent}>
-                  <Text style={styles.infoLabel}>Магазин</Text>
-                  <Text style={styles.infoValue}>{shopName}</Text>
-                </View>
-              </View>
-            </View>
+            <ProductInfoCard
+              icon="storefront"
+              iconColor="#4CAF50"
+              label="Магазин"
+              value={shopName}
+            />
 
             {shop?.address && (
-              <View style={styles.infoCard}>
-                <View style={styles.infoRow}>
-                  <View style={styles.infoIconContainer}>
-                    <IconSymbol name="location" size={20} color="#2196F3" />
-                  </View>
-                  <View style={styles.infoContent}>
-                    <Text style={styles.infoLabel}>Адрес</Text>
-                    <Text style={styles.infoValue}>{shop.address}</Text>
-                  </View>
-                </View>
-              </View>
+              <ProductInfoCard
+                icon="location"
+                iconColor="#2196F3"
+                label="Адрес"
+                value={shop.address}
+              />
             )}
 
-            <View style={styles.infoCard}>
-              <View style={styles.infoRow}>
-                <View style={styles.infoIconContainer}>
-                  <IconSymbol name="calendar" size={20} color={expiryColors.text} />
+            <ProductInfoCard
+              icon="calendar"
+              iconColor={expiryColors.text}
+              label="Срок годности"
+              value={
+                <View style={[styles.expiryBadge, { backgroundColor: expiryColors.bg }]}>
+                  <Text style={[styles.expiryText, { color: expiryColors.text }]}>
+                    {isExpired ? 'Просрочен' : `${daysUntilExpiry} ${getDaysWord(daysUntilExpiry)}`}
+                  </Text>
                 </View>
-                <View style={styles.infoContent}>
-                  <Text style={styles.infoLabel}>Срок годности</Text>
-                  <View style={[styles.expiryBadge, { backgroundColor: expiryColors.bg }]}>
-                    <Text style={[styles.expiryText, { color: expiryColors.text }]}>
-                      {isExpired ? 'Просрочен' : `${daysUntilExpiry} ${getDaysWord(daysUntilExpiry)}`}
-                    </Text>
-                  </View>
-                </View>
-              </View>
-            </View>
+              }
+            />
 
-            <View style={styles.infoCard}>
-              <View style={styles.infoRow}>
-                <View style={styles.infoIconContainer}>
-                  <IconSymbol name="cube" size={20} color="#FF9800" />
-                </View>
-                <View style={styles.infoContent}>
-                  <Text style={styles.infoLabel}>В наличии</Text>
-                  <Text style={styles.infoValue}>{offer.count} шт.</Text>
-                </View>
-              </View>
-            </View>
+            <ProductInfoCard
+              icon="cube"
+              iconColor="#FF9800"
+              label="В наличии"
+              value={`${offer.count} шт.`}
+            />
 
             {offer.description && (
-              <View style={styles.infoCard}>
-                <View style={styles.infoRow}>
-                  <View style={styles.infoIconContainer}>
-                    <IconSymbol name="info.circle" size={20} color="#9C27B0" />
-                  </View>
-                  <View style={styles.infoContent}>
-                    <Text style={styles.infoLabel}>Примечание</Text>
-                    <Text style={styles.infoValue}>{offer.description}</Text>
-                  </View>
-                </View>
-              </View>
+              <ProductInfoCard
+                icon="info.circle"
+                iconColor="#9C27B0"
+                label="Примечание"
+                value={offer.description}
+              />
             )}
           </View>
         </View>
@@ -264,46 +188,9 @@ export default function ProductDetail() {
 
       {/* Фиксированная панель внизу */}
       <View style={styles.fixedBottomPanel}>
-        {isExpired ? (
-          <View style={styles.expiredButton}>
-            <Text style={styles.expiredButtonText}>Товар просрочен и недоступен</Text>
-          </View>
-        ) : isInCart && cartItem ? (
-          <View style={styles.cartControls}>
-            <Text style={styles.cartControlsLabel}>В корзине:</Text>
-            <View style={styles.quantityControls}>
-              <TouchableOpacity 
-                style={styles.quantityButton}
-                onPress={handleDecreaseInCart}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.quantityButtonText}>−</Text>
-              </TouchableOpacity>
-              
-              <Text style={styles.quantityText}>{cartItem.quantity}</Text>
-              
-              <TouchableOpacity 
-                style={[styles.quantityButton, cartItem.quantity >= offer.count && styles.quantityButtonDisabled]}
-                onPress={handleIncreaseInCart}
-                disabled={cartItem.quantity >= offer.count}
-                activeOpacity={0.7}
-              >
-                <Text style={[styles.quantityButtonText, cartItem.quantity >= offer.count && styles.quantityButtonTextDisabled]}>+</Text>
-              </TouchableOpacity>
-            </View>
-            <Text style={styles.cartTotalPrice}>
-              {(offer.currentCost * cartItem.quantity).toFixed(2)} ₽
-            </Text>
-          </View>
-        ) : (
-          <TouchableOpacity 
-            style={styles.addToCartButton}
-            onPress={handleAddToCart}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.addToCartButtonText}>🛒 Добавить в корзину</Text>
-          </TouchableOpacity>
-        )}
+        <View style={styles.cartPanel}>
+          <CartButton offer={offer} size="large" variant="full" showTotal={true} />
+        </View>
       </View>
     </SafeAreaView>
   );
@@ -428,59 +315,12 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 3,
   },
-  priceSectionTop: {
-    marginBottom: 16,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
-  },
-  priceRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: 12,
-    marginBottom: 4,
-  },
-  currentPriceTop: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#4CAF50',
-  },
-  originalPriceTop: {
-    fontSize: 20,
-    color: '#999',
-    textDecorationLine: 'line-through',
-    fontWeight: '500',
-  },
-  discountText: {
-    fontSize: 14,
-    color: '#4CAF50',
-    fontWeight: '600',
-  },
   productName: {
     fontSize: 26,
     fontWeight: '700',
     color: '#1A1A1A',
     marginBottom: 12,
     lineHeight: 34,
-  },
-  categoriesContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 16,
-  },
-  categoryTag: {
-    backgroundColor: '#F0F7FF',
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#E3F2FD',
-  },
-  categoryTagText: {
-    fontSize: 13,
-    color: '#1976D2',
-    fontWeight: '600',
   },
   description: {
     fontSize: 16,
@@ -502,45 +342,6 @@ const styles = StyleSheet.create({
   },
   importantInfo: {
     gap: 12,
-  },
-  infoCard: {
-    backgroundColor: '#FAFAFA',
-    borderRadius: 16,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#F0F0F0',
-  },
-  infoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  infoIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: '#fff',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
-  },
-  infoContent: {
-    flex: 1,
-  },
-  infoLabel: {
-    fontSize: 13,
-    color: '#999',
-    marginBottom: 4,
-    fontWeight: '500',
-  },
-  infoValue: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#1A1A1A',
   },
   expiryBadge: {
     borderRadius: 8,
@@ -572,88 +373,8 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 12,
   },
-  addToCartButton: {
-    backgroundColor: '#4CAF50',
-    borderRadius: 16,
-    padding: 18,
-    alignItems: 'center',
-    shadowColor: '#4CAF50',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  addToCartButtonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-  },
-  cartControls: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  cartControlsLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-  },
-  quantityControls: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F5F5F5',
-    borderRadius: 14,
-    padding: 6,
-    gap: 8,
-  },
-  quantityButton: {
-    width: 44,
-    height: 44,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  quantityButtonDisabled: {
-    backgroundColor: '#F0F0F0',
-  },
-  quantityButtonText: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#4CAF50',
-  },
-  quantityButtonTextDisabled: {
-    color: '#CCC',
-  },
-  quantityText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-    paddingHorizontal: 20,
-    minWidth: 60,
-    textAlign: 'center',
-  },
-  cartTotalPrice: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#4CAF50',
-  },
-  expiredButton: {
-    backgroundColor: '#E0E0E0',
-    borderRadius: 12,
-    padding: 16,
-    alignItems: 'center',
-  },
-  expiredButtonText: {
-    color: '#999',
-    fontSize: 16,
-    fontWeight: 'bold',
+  cartPanel: {
+    width: '100%',
   },
 });
 

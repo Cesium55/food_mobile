@@ -7,7 +7,6 @@ export default function CartLayout() {
             <Stack.Screen name="product/[id]" options={{ headerShown: false }} />
             <Stack.Screen name="seller/[id]" options={{ headerShown: false }} />
             <Stack.Screen name="shop/[id]" options={{ headerShown: false }} />
-            <Stack.Screen name="checkout" options={{ headerShown: false }} />
         </Stack>
     )
 }

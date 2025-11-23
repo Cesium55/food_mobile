@@ -10,6 +10,7 @@ interface TabScreenProps {
   title: string;
   children?: React.ReactNode;
   showBackButton?: boolean;
+  onBackPress?: () => void;
   onRefresh?: () => Promise<void> | void;
   refreshing?: boolean;
 }
@@ -18,6 +19,7 @@ export function TabScreen({
   title, 
   children, 
   showBackButton = false,
+  onBackPress,
   onRefresh,
   refreshing = false,
 }: TabScreenProps) {
@@ -42,7 +44,7 @@ export function TabScreen({
         {showBackButton && (
           <TouchableOpacity 
             style={styles.backButton}
-            onPress={() => router.back()}
+            onPress={onBackPress || (() => router.back())}
           >
             <IconSymbol 
               name="arrow.left" 

@@ -14,6 +14,7 @@ import {
     TouchableOpacity,
     View
 } from "react-native";
+import DateTimePickerModal from 'react-native-modal-datetime-picker';
 import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function NewOfferScreen() {
@@ -27,7 +28,8 @@ export default function NewOfferScreen() {
     const [price, setPrice] = useState('');
     const [discount, setDiscount] = useState('0');
     const [quantity, setQuantity] = useState('');
-    const [expiryDate, setExpiryDate] = useState('');
+    const [expiryDate, setExpiryDate] = useState<Date | null>(null);
+    const [showDatePicker, setShowDatePicker] = useState(false);
     const [description, setDescription] = useState('');
     const [showProductSelector, setShowProductSelector] = useState(false);
     const [isCreating, setIsCreating] = useState(false);
@@ -82,20 +84,16 @@ export default function NewOfferScreen() {
             return;
         }
 
-        // Валидация даты
-        const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-        if (!dateRegex.test(expiryDate)) {
-            Alert.alert("Ошибка", "Неверный формат даты. Используйте ГГГГ-ММ-ДД");
-            return;
-        }
-
         const priceNum = parseFloat(price);
         const discountNumFinal = parseFloat(discount) || 0;
         const currentCost = priceNum - (priceNum * discountNumFinal / 100);
 
+        // Форматируем дату для отображения
+        const formattedDate = expiryDate.toISOString().split('T')[0];
+        
         Alert.alert(
             "Создать предложение?",
-            `Товар: ${selectedProduct?.name}\nЦена: ${priceNum.toFixed(2)} ₽\nСкидка: ${discountNumFinal}%\nЦена со скидкой: ${currentCost.toFixed(2)} ₽\nКоличество: ${quantity} шт.\nСрок годности: ${expiryDate}`,
+            `Товар: ${selectedProduct?.name}\nЦена: ${priceNum.toFixed(2)} ₽\nСкидка: ${discountNumFinal}%\nЦена со скидкой: ${currentCost.toFixed(2)} ₽\nКоличество: ${quantity} шт.\nСрок годности: ${formattedDate}`,
             [
                 { text: "Отмена", style: "cancel" },
                 {
@@ -107,7 +105,7 @@ export default function NewOfferScreen() {
                             await createOffer({
                                 product_id: selectedProductId,
                                 shop_id: selectedShopId,
-                                expires_date: expiryDate,
+                                expires_date: expiryDate.toISOString().split('T')[0],
                                 original_cost: priceNum,
                                 current_cost: currentCost,
                                 count: parseInt(quantity),
@@ -332,13 +330,36 @@ export default function NewOfferScreen() {
                         {/* Срок годности */}
                         <View style={styles.fieldContainer}>
                             <Text style={styles.label}>Срок годности *</Text>
-                            <TextInput
+                            <TouchableOpacity
                                 style={styles.input}
-                                value={expiryDate}
-                                onChangeText={setExpiryDate}
-                                placeholder="ГГГГ-ММ-ДД"
+                                onPress={() => setShowDatePicker(true)}
+                                activeOpacity={0.7}
+                            >
+                                <Text style={[
+                                    styles.dateInputText,
+                                    !expiryDate && styles.dateInputPlaceholder
+                                ]}>
+                                    {expiryDate 
+                                        ? expiryDate.toLocaleDateString('ru-RU', {
+                                            day: '2-digit',
+                                            month: '2-digit',
+                                            year: 'numeric'
+                                          })
+                                        : 'Выберите дату'
+                                    }
+                                </Text>
+                            </TouchableOpacity>
+                            <DateTimePickerModal
+                                isVisible={showDatePicker}
+                                mode="date"
+                                onConfirm={(date) => {
+                                    setExpiryDate(date);
+                                    setShowDatePicker(false);
+                                }}
+                                onCancel={() => setShowDatePicker(false)}
+                                minimumDate={new Date()}
+                                date={expiryDate || new Date()}
                             />
-                            <Text style={styles.hint}>Формат: ГГГГ-ММ-ДД (например, 2025-12-31)</Text>
                         </View>
 
                         {/* Описание */}
@@ -605,6 +626,13 @@ const styles = StyleSheet.create({
         fontSize: 12,
         color: '#999',
         marginTop: 4,
+    },
+    dateInputText: {
+        fontSize: 16,
+        color: '#333',
+    },
+    dateInputPlaceholder: {
+        color: '#999',
     },
     valueContainer: {
         paddingVertical: 4,

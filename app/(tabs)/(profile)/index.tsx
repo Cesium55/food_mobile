@@ -7,13 +7,21 @@ import { useOrders } from "@/hooks/useOrders";
 import { useUser } from "@/hooks/useUser";
 import { authService } from "@/services/autoAuthService";
 import { clearTokens } from "@/utils/storage";
-import { router } from "expo-router";
-import { Alert, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { router, useFocusEffect } from "expo-router";
+import { useCallback } from "react";
+import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 export default function Profile() {
     const user = useUser();
-    const { getCurrentOrders } = useOrders();
+    const { getCurrentOrders, loading, refetchCurrentPending } = useOrders();
     const currentOrders = getCurrentOrders();
+
+    // Обновляем текущий заказ при фокусе на экране
+    useFocusEffect(
+        useCallback(() => {
+            refetchCurrentPending();
+        }, [refetchCurrentPending])
+    );
 
     const handleSwitchToAdmin = () => {
         router.replace('/(admin)/(admin-profile)');
@@ -56,7 +64,14 @@ export default function Profile() {
                 <UserCard user={user} />
                 
                 {/* Текущие заказы */}
-                <CurrentOrders orders={currentOrders} />
+                {loading ? (
+                    <View style={styles.loadingContainer}>
+                        <ActivityIndicator size="small" color="#4CAF50" />
+                        <Text style={styles.loadingText}>Загрузка заказов...</Text>
+                    </View>
+                ) : (
+                    <CurrentOrders orders={currentOrders} />
+                )}
                 
                 <FullWidthLink 
                     href="/(tabs)/(profile)/settings"
@@ -95,7 +110,7 @@ const styles = StyleSheet.create({
         borderRadius: 8,
         padding: 16,
         marginHorizontal: 16,
-        marginTop: 20,
+        marginTop: 10,
         alignItems: 'center',
     },
     adminButtonText: {
@@ -115,5 +130,15 @@ const styles = StyleSheet.create({
         color: '#fff',
         fontSize: 16,
         fontWeight: '600',
+    },
+    loadingContainer: {
+        padding: 32,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    loadingText: {
+        marginTop: 8,
+        fontSize: 14,
+        color: '#666',
     },
 });

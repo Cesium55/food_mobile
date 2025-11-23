@@ -2,6 +2,8 @@ import { DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
+import { CartProvider } from '@/contexts/CartContext';
+import { ShopsProvider } from '@/contexts/ShopsContext';
 
 
 export const unstable_settings = {
@@ -14,12 +16,14 @@ export default function RootLayout() {
 
   return (
     <ThemeProvider value={DefaultTheme}>
-      <Stack
-        screenOptions={{
-          animation: 'fade',
-          animationDuration: 200,
-        }}
-      >
+      <CartProvider>
+        <ShopsProvider>
+          <Stack
+          screenOptions={{
+            animation: 'fade',
+            animationDuration: 200,
+          }}
+        >
         <Stack.Screen 
           name="index" 
           options={{ 
@@ -69,8 +73,10 @@ export default function RootLayout() {
             animationDuration: 300,
           }} 
         />
-      </Stack>
-      <StatusBar style="auto" />
+        </Stack>
+        <StatusBar style="auto" />
+        </ShopsProvider>
+      </CartProvider>
     </ThemeProvider>
   );
 }

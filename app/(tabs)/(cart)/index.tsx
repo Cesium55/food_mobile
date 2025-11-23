@@ -5,10 +5,16 @@ import { expiredItemValidator } from "@/components/cart/types";
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useCart } from "@/hooks/useCart";
-import { useRouter } from "expo-router";
-import React from "react";
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { useOffers } from "@/hooks/useOffers";
+import { useRouter, useFocusEffect } from "expo-router";
+import React, { useCallback, useEffect, useState } from "react";
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { createOrderFromCart, getCurrentPendingPurchase } from "@/services/orderService";
+import { checkPaymentStatus } from "@/services/paymentService";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
+const PAYMENT_ID_STORAGE_KEY = '@current_payment_id';
 
 export default function Cart() {
   const colorScheme = useColorScheme();
@@ -23,7 +29,30 @@ export default function Cart() {
     increaseQuantity,
     decreaseQuantity,
     removeItem,
+    clearCart,
+    isLoading,
+    cartItems,
   } = useCart();
+  
+  const { getOfferById } = useOffers();
+  
+  // Состояние для проверки pending заказа
+  const [isCheckingPending, setIsCheckingPending] = useState(true);
+  // Состояние для создания заказа
+  const [isCreatingOrder, setIsCreatingOrder] = useState(false);
+  
+  // Функция для увеличения количества с проверкой максимального количества
+  const handleIncrease = (itemId: number) => {
+    const cartItem = cartItems.find(item => item.id === itemId);
+    if (cartItem) {
+      const offer = getOfferById(cartItem.offerId);
+      if (offer) {
+        increaseQuantity(itemId, offer.count);
+      } else {
+        increaseQuantity(itemId);
+      }
+    }
+  };
   
   const cartByShops = getCartByShops();
   const totalAmount = getTotalAmount();
@@ -38,6 +67,129 @@ export default function Cart() {
     // lowStockValidator,
     // unavailableItemValidator,
   ];
+
+  // Проверяем статус платежа при загрузке компонента
+  useEffect(() => {
+    let isMounted = true;
+    
+    const checkPayment = async () => {
+      try {
+        setIsCheckingPending(true);
+        
+        const savedPaymentId = await AsyncStorage.getItem(PAYMENT_ID_STORAGE_KEY);
+        if (!savedPaymentId) {
+          if (isMounted) setIsCheckingPending(false);
+          return;
+        }
+
+        const paymentId = parseInt(savedPaymentId);
+        if (isNaN(paymentId)) {
+          await AsyncStorage.removeItem(PAYMENT_ID_STORAGE_KEY);
+          if (isMounted) setIsCheckingPending(false);
+          return;
+        }
+
+        // Проверяем статус платежа
+        const payment = await checkPaymentStatus(paymentId);
+        
+        if (payment.status === 'succeeded') {
+          // Платеж успешен - очищаем корзину и paymentId
+          await clearCart();
+          await AsyncStorage.removeItem(PAYMENT_ID_STORAGE_KEY);
+          if (isMounted) {
+            Alert.alert(
+              'Оплата успешна!',
+              'Ваш заказ успешно оплачен. Товары удалены из корзины.',
+              [{ text: 'OK' }]
+            );
+          }
+        } else if (payment.status === 'canceled') {
+          // Платеж отменен - очищаем paymentId
+          await AsyncStorage.removeItem(PAYMENT_ID_STORAGE_KEY);
+        }
+      } catch (error) {
+        console.error('Ошибка проверки статуса платежа:', error);
+        // В случае ошибки очищаем сохраненный paymentId
+        await AsyncStorage.removeItem(PAYMENT_ID_STORAGE_KEY).catch(() => {});
+      } finally {
+        if (isMounted) setIsCheckingPending(false);
+      }
+    };
+
+    checkPayment();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []); // Пустой массив зависимостей - выполняется только при монтировании
+
+  // Проверяем статус платежа при фокусе на экране (когда пользователь возвращается)
+  useFocusEffect(
+    useCallback(() => {
+      let isCancelled = false;
+      
+      const checkPayment = async () => {
+        if (isCancelled) return;
+        
+        try {
+          const savedPaymentId = await AsyncStorage.getItem(PAYMENT_ID_STORAGE_KEY);
+          if (!savedPaymentId || isCancelled) {
+            return;
+          }
+
+          const paymentId = parseInt(savedPaymentId);
+          if (isNaN(paymentId)) {
+            await AsyncStorage.removeItem(PAYMENT_ID_STORAGE_KEY);
+            return;
+          }
+
+          // Проверяем статус платежа
+          const payment = await checkPaymentStatus(paymentId);
+          
+          if (isCancelled) return;
+          
+          if (payment.status === 'succeeded') {
+            // Платеж успешен - очищаем корзину и paymentId
+            await clearCart();
+            await AsyncStorage.removeItem(PAYMENT_ID_STORAGE_KEY);
+            if (!isCancelled) {
+              Alert.alert(
+                'Оплата успешна!',
+                'Ваш заказ успешно оплачен. Товары удалены из корзины.',
+                [{ text: 'OK' }]
+              );
+            }
+          } else if (payment.status === 'canceled') {
+            // Платеж отменен - очищаем paymentId
+            await AsyncStorage.removeItem(PAYMENT_ID_STORAGE_KEY);
+          }
+        } catch (error) {
+          if (!isCancelled) {
+            console.error('Ошибка проверки статуса платежа:', error);
+            // В случае ошибки очищаем сохраненный paymentId
+            await AsyncStorage.removeItem(PAYMENT_ID_STORAGE_KEY).catch(() => {});
+          }
+        }
+      };
+
+      checkPayment();
+
+      return () => {
+        isCancelled = true;
+      };
+    }, []) // Пустой массив - функция стабильна
+  );
+
+  // Показываем индикатор загрузки во время проверки статуса платежа или загрузки корзины
+  if (isCheckingPending || isLoading) {
+    return (
+      <TabScreen title="Корзина">
+        <View style={styles.loadingContainer}>
+          <Text style={styles.loadingText}>Загрузка корзины...</Text>
+        </View>
+      </TabScreen>
+    );
+  }
 
   if (cartByShops.length === 0) {
     return (
@@ -58,8 +210,78 @@ export default function Cart() {
   // Итого к оплате
   const finalTotal = totalAmount;
 
-  const handleCheckout = () => {
-    router.push('/(tabs)/(cart)/checkout');
+  const handleCheckout = async () => {
+    if (cartItems.length === 0) {
+      Alert.alert('Ошибка', 'Корзина пуста');
+      return;
+    }
+
+    setIsCreatingOrder(true);
+    try {
+      // Сначала проверяем, есть ли уже pending платеж
+      const existingPending = await getCurrentPendingPurchase();
+      
+      if (existingPending && existingPending.purchase && existingPending.purchase.id) {
+        // Если есть pending платеж, открываем его в профиле вместо создания нового
+        router.push({
+          pathname: '/(tabs)/(profile)/checkout',
+          params: {
+            purchaseId: existingPending.purchase.id.toString(),
+            orderData: JSON.stringify(existingPending),
+          },
+        });
+        setIsCreatingOrder(false);
+        return;
+      }
+
+      // Формируем запрос с оферами из корзины
+      const offers = cartItems.map(item => ({
+        offer_id: item.offerId,
+        quantity: item.quantity,
+      }));
+
+      // Отправляем запрос на сервер
+      const orderData = await createOrderFromCart(offers);
+
+            // Переходим на экран checkout в профиле с данными заказа
+            router.push({
+              pathname: '/(tabs)/(profile)/checkout',
+              params: {
+                purchaseId: orderData.purchase.id.toString(),
+                // Передаем данные через JSON строку (expo-router ограничения)
+                orderData: JSON.stringify(orderData),
+              },
+            });
+    } catch (error: any) {
+      console.error('Ошибка создания заказа:', error);
+      
+      // Если получили 409, значит появился pending платеж - получаем его и открываем
+      if (error.status === 409 || (error instanceof Error && error.message.includes('409'))) {
+        try {
+          const existingPending = await getCurrentPendingPurchase();
+          if (existingPending && existingPending.purchase && existingPending.purchase.id) {
+            router.push({
+              pathname: '/(tabs)/(profile)/checkout',
+              params: {
+                purchaseId: existingPending.purchase.id.toString(),
+                orderData: JSON.stringify(existingPending),
+              },
+            });
+            setIsCreatingOrder(false);
+            return;
+          }
+        } catch (fetchError) {
+          console.error('Ошибка получения текущего платежа:', fetchError);
+        }
+      }
+      
+      Alert.alert(
+        'Ошибка',
+        error instanceof Error ? error.message : 'Не удалось создать заказ. Попробуйте еще раз.'
+      );
+    } finally {
+      setIsCreatingOrder(false);
+    }
   };
 
   return (
@@ -105,7 +327,7 @@ export default function Cart() {
               key={group.shopId}
               group={group}
               statusValidators={statusValidators}
-              onIncrease={increaseQuantity}
+              onIncrease={handleIncrease}
               onDecrease={decreaseQuantity}
               onRemove={removeItem}
             />
@@ -118,13 +340,23 @@ export default function Cart() {
         {/* Закрепленная кнопка оплаты */}
         <View style={styles.fixedBottomPanel}>
           <TouchableOpacity
-            style={styles.checkoutButton}
+            style={[styles.checkoutButton, isCreatingOrder && styles.checkoutButtonDisabled]}
             onPress={handleCheckout}
+            disabled={isCreatingOrder}
             activeOpacity={0.7}
           >
             <View style={styles.checkoutButtonContent}>
-              <Text style={styles.checkoutButtonText}>Оформить заказ</Text>
-              <Text style={styles.checkoutButtonAmount}>{finalTotal.toFixed(2)} ₽</Text>
+              {isCreatingOrder ? (
+                <>
+                  <ActivityIndicator color="#fff" size="small" />
+                  <Text style={styles.checkoutButtonText}>Создание заказа...</Text>
+                </>
+              ) : (
+                <>
+                  <Text style={styles.checkoutButtonText}>Оформить заказ</Text>
+                  <Text style={styles.checkoutButtonAmount}>{finalTotal.toFixed(2)} ₽</Text>
+                </>
+              )}
             </View>
           </TouchableOpacity>
         </View>
@@ -241,6 +473,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     alignItems: 'center',
   },
+  checkoutButtonDisabled: {
+    backgroundColor: '#9E9E9E',
+    opacity: 0.7,
+  },
   checkoutButtonContent: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -256,5 +492,15 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 18,
     fontWeight: '700',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 32,
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#666',
   },
 });

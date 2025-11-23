@@ -1,4 +1,4 @@
-import { useCart } from '@/hooks/useCart';
+import CartButton from '@/components/cart/CartButton';
 import { Offer } from '@/hooks/useOffers';
 import { useShops } from '@/hooks/useShops';
 import { useRouter, useSegments } from 'expo-router';
@@ -12,7 +12,6 @@ interface VerticalOfferCardProps {
 export default function VerticalOfferCard({ offer }: VerticalOfferCardProps) {
   const router = useRouter();
   const segments = useSegments();
-  const { cartItems, addToCart, increaseQuantity, decreaseQuantity } = useCart();
   const { shops } = useShops();
   
   // Получаем название магазина по shopId
@@ -35,34 +34,9 @@ export default function VerticalOfferCard({ offer }: VerticalOfferCardProps) {
     expiryColors = { bg: '#FFF9C4', text: '#FBC02D' }; // Желтый
   }
 
-  // Проверяем, есть ли товар в корзине
-  const cartItem = cartItems.find(item => item.offerId === offer.id);
-  const isInCart = !!cartItem;
-
   const handlePress = () => {
     const currentTab = segments[0] === '(tabs)' ? segments[1] : '(catalog)';
     router.push(`/(tabs)/${currentTab}/product/${offer.id}`);
-  };
-
-  const handleAddToCart = (e: any) => {
-    e.stopPropagation();
-    if (!isExpired) {
-      addToCart(offer);
-    }
-  };
-
-  const handleIncrease = (e: any) => {
-    e.stopPropagation();
-    if (cartItem && cartItem.quantity < offer.count) {
-      increaseQuantity(cartItem.id);
-    }
-  };
-
-  const handleDecrease = (e: any) => {
-    e.stopPropagation();
-    if (cartItem) {
-      decreaseQuantity(cartItem.id);
-    }
   };
 
   return (
@@ -102,47 +76,8 @@ export default function VerticalOfferCard({ offer }: VerticalOfferCardProps) {
           <Text style={styles.currentPrice}>{offer.currentCost.toFixed(0)} ₽</Text>
         </View>
 
-        {/* Кнопка добавления в корзину или управление количеством */}
-        {isExpired ? (
-          <View style={styles.expiredButton}>
-            <Text style={styles.expiredButtonText}>Просрочен</Text>
-          </View>
-        ) : isInCart && cartItem ? (
-          <View style={styles.quantityControls}>
-            <TouchableOpacity
-              style={styles.quantityButton}
-              onPress={handleDecrease}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.quantityButtonText}>−</Text>
-            </TouchableOpacity>
-
-            <Text style={styles.quantityText}>{cartItem.quantity}</Text>
-
-            <TouchableOpacity
-              style={[
-                styles.quantityButton,
-                cartItem.quantity >= offer.count && styles.quantityButtonDisabled
-              ]}
-              onPress={handleIncrease}
-              disabled={cartItem.quantity >= offer.count}
-              activeOpacity={0.7}
-            >
-              <Text style={[
-                styles.quantityButtonText,
-                cartItem.quantity >= offer.count && styles.quantityButtonTextDisabled
-              ]}>+</Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <TouchableOpacity
-            style={styles.addButton}
-            onPress={handleAddToCart}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.addButtonText}>В корзину</Text>
-          </TouchableOpacity>
-        )}
+        {/* Кнопка управления корзиной */}
+        <CartButton offer={offer} size="small" />
       </View>
     </TouchableOpacity>
   );
@@ -231,62 +166,6 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
     color: '#4CAF50',
-  },
-  addButton: {
-    backgroundColor: '#4CAF50',
-    paddingVertical: 10,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  addButtonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  quantityControls: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#F5F5F5',
-    borderRadius: 8,
-    paddingVertical: 6,
-    paddingHorizontal: 8,
-  },
-  quantityButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#4CAF50',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  quantityButtonDisabled: {
-    backgroundColor: '#E0E0E0',
-  },
-  quantityButtonText: {
-    color: '#fff',
-    fontSize: 20,
-    fontWeight: '600',
-    lineHeight: 22,
-  },
-  quantityButtonTextDisabled: {
-    color: '#999',
-  },
-  quantityText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-  },
-  expiredButton: {
-    backgroundColor: '#FFEBEE',
-    paddingVertical: 10,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  expiredButtonText: {
-    color: '#F44336',
-    fontSize: 14,
-    fontWeight: '600',
   },
 });
 

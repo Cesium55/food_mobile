@@ -7,6 +7,7 @@ export default function ProfileLayout() {
       <Stack.Screen name="settings" options={{ headerShown: false }} />
       <Stack.Screen name="history" options={{ headerShown: false }} />
       <Stack.Screen name="checkout" options={{ headerShown: false }} />
+      <Stack.Screen name="order-paid" options={{ headerShown: false }} />
     </Stack>
   );
 }

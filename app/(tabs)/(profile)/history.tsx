@@ -1,56 +1,55 @@
 import { TabScreen } from "@/components/TabScreen";
 import { useOrders } from "@/hooks/useOrders";
-import { useRouter } from "expo-router";
-import React from "react";
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { useFocusEffect, useRouter } from "expo-router";
+import React, { useCallback } from "react";
+import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 export default function History() {
   const router = useRouter();
-  const { orders, getTotalSpent, getTotalSaved } = useOrders();
+  const { orders, getTotalSpent, getTotalSaved, loading, refetchOrders } = useOrders();
 
   const formatDate = (date: Date) => {
-    const d = new Date(date);
-    return d.toLocaleDateString('ru-RU', {
-      day: '2-digit',
-      month: 'long',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+    // Если date - это строка ISO (UTC), создаем Date объект
+    // JavaScript автоматически конвертирует UTC в местное время
+    const d = date instanceof Date ? date : new Date(date);
+    
+    // Используем методы getDate(), getHours() и т.д., которые возвращают значения в местном времени
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+    const hours = String(d.getHours()).padStart(2, '0');
+    const minutes = String(d.getMinutes()).padStart(2, '0');
+    return `${day}.${month}.${year} ${hours}:${minutes}`;
   };
 
-  const getStatusInfo = (status: string) => {
+  const getStatusColor = (status: string) => {
     switch (status) {
       case 'completed':
-        return { text: 'Выполнен', color: '#4CAF50', bg: '#E8F5E9' };
+        return '#4CAF50'; // Зеленый
+      case 'confirmed':
+        return '#2196F3'; // Синий
       case 'cancelled':
-        return { text: 'Отменен', color: '#F44336', bg: '#FFEBEE' };
+        return '#F44336';
       case 'processing':
-        return { text: 'В обработке', color: '#FF9800', bg: '#FFF3E0' };
+        return '#FF9800';
       case 'reserved':
-        return { text: 'Забронирован', color: '#FF9800', bg: '#FFF3E0' };
+        return '#FF9800';
       case 'paid':
-        return { text: 'Оплачен', color: '#2196F3', bg: '#E3F2FD' };
+        return '#2196F3';
       default:
-        return { text: 'Неизвестно', color: '#999', bg: '#F5F5F5' };
-    }
-  };
-
-  const getPaymentMethodText = (method: string) => {
-    switch (method) {
-      case 'card':
-        return '💳 Карта';
-      case 'cash':
-        return '💵 Наличные';
-      case 'online':
-        return '📱 Онлайн';
-      default:
-        return method;
+        return '#999';
     }
   };
 
   const totalSpent = getTotalSpent();
   const totalSaved = getTotalSaved();
+
+  // Обновляем заказы при фокусе на экране
+  useFocusEffect(
+    useCallback(() => {
+      refetchOrders();
+    }, [refetchOrders])
+  );
 
   return (
     <TabScreen title="История заказов" showBackButton={true}>
@@ -70,8 +69,24 @@ export default function History() {
         </View>
 
         {/* Список заказов */}
-        <ScrollView style={styles.ordersList} showsVerticalScrollIndicator={false}>
-          {orders.length === 0 ? (
+        <ScrollView 
+          style={styles.ordersList} 
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={loading}
+              onRefresh={refetchOrders}
+              tintColor="#4CAF50"
+              colors={['#4CAF50']}
+            />
+          }
+        >
+          {loading && orders.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <ActivityIndicator size="large" color="#4CAF50" />
+              <Text style={styles.emptyText}>Загрузка заказов...</Text>
+            </View>
+          ) : orders.length === 0 ? (
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyIcon}>📦</Text>
               <Text style={styles.emptyText}>Заказов пока нет</Text>
@@ -81,74 +96,38 @@ export default function History() {
             </View>
           ) : (
             orders.map((order) => {
-              const statusInfo = getStatusInfo(order.status);
+              const statusColor = getStatusColor(order.status);
               return (
                 <TouchableOpacity
                   key={order.id}
-                  style={styles.orderCard}
+                  style={[styles.orderCard, { borderLeftWidth: 4, borderLeftColor: statusColor }]}
                   activeOpacity={0.7}
-                  onPress={() => router.push(`/(tabs)/(profile)/checkout?orderId=${order.id}`)}
+                        onPress={() => {
+                          // Если заказ оплачен, подтвержден или завершен, переходим на экран оплаченного заказа
+                          if (order.status === 'paid' || order.status === 'confirmed' || order.status === 'completed') {
+                            router.push({
+                              pathname: '/(tabs)/(profile)/order-paid',
+                              params: {
+                                purchaseId: order.id.toString(),
+                              },
+                            });
+                          } else {
+                            // Иначе на экран оплаты
+                            router.push({
+                              pathname: '/(tabs)/(profile)/checkout',
+                              params: {
+                                purchaseId: order.id.toString(),
+                              },
+                            });
+                          }
+                        }}
                 >
-                  {/* Заголовок заказа */}
-                  <View style={styles.orderHeader}>
-                    <View style={styles.orderHeaderLeft}>
-                      <Text style={styles.orderNumber}>Заказ #{order.id}</Text>
-                      <Text style={styles.orderDate}>{formatDate(order.date)}</Text>
-                    </View>
-                    <View
-                      style={[styles.statusBadge, { backgroundColor: statusInfo.bg }]}
-                    >
-                      <Text style={[styles.statusText, { color: statusInfo.color }]}>
-                        {statusInfo.text}
-                      </Text>
-                    </View>
-                  </View>
-
-                  {/* Магазины */}
-                  <View style={styles.shopsRow}>
-                    <Text style={styles.shopsLabel}>🏪 Магазины:</Text>
-                    <Text style={styles.shopsText}>
-                      {order.shops.join(', ')}
+                  {/* Информация о заказе в одну строку */}
+                  <View style={styles.orderRow}>
+                    <Text style={styles.orderDate}>{formatDate(order.date)}</Text>
+                    <Text style={styles.totalAmount}>
+                      {order.totalAmount.toFixed(2)} ₽
                     </Text>
-                  </View>
-
-                  {/* Товары */}
-                  <View style={styles.itemsSection}>
-                    {order.items.slice(0, 3).map((item, index) => (
-                      <View key={item.id} style={styles.itemRow}>
-                        <Text style={styles.itemName} numberOfLines={1}>
-                          {item.productName}
-                        </Text>
-                        <Text style={styles.itemQuantity}>
-                          {item.quantity} шт.
-                        </Text>
-                      </View>
-                    ))}
-                    {order.items.length > 3 && (
-                      <Text style={styles.moreItems}>
-                        и еще {order.items.length - 3} товар(а/ов)
-                      </Text>
-                    )}
-                  </View>
-
-                  {/* Итого */}
-                  <View style={styles.orderFooter}>
-                    <View style={styles.paymentInfo}>
-                      <Text style={styles.paymentMethod}>
-                        {getPaymentMethodText(order.paymentMethod)}
-                      </Text>
-                      {order.discount > 0 && (
-                        <Text style={styles.discount}>
-                          Скидка: {order.discount.toFixed(2)} ₽
-                        </Text>
-                      )}
-                    </View>
-                    <View style={styles.totalSection}>
-                      <Text style={styles.totalLabel}>Итого:</Text>
-                      <Text style={styles.totalAmount}>
-                        {order.totalAmount.toFixed(2)} ₽
-                      </Text>
-                    </View>
                   </View>
                 </TouchableOpacity>
               );
@@ -235,109 +214,19 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
   },
-  orderHeader: {
+  orderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 12,
-  },
-  orderHeaderLeft: {
-    flex: 1,
-  },
-  orderNumber: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#333',
-    marginBottom: 4,
+    alignItems: 'center',
+    gap: 12,
   },
   orderDate: {
-    fontSize: 12,
+    fontSize: 14,
     color: '#666',
-  },
-  statusBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  statusText: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  shopsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-    gap: 6,
-  },
-  shopsLabel: {
-    fontSize: 13,
-    color: '#666',
-  },
-  shopsText: {
-    fontSize: 13,
-    color: '#333',
-    fontWeight: '500',
     flex: 1,
-  },
-  itemsSection: {
-    borderTopWidth: 1,
-    borderTopColor: '#E0E0E0',
-    paddingTop: 12,
-    marginBottom: 12,
-  },
-  itemRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 6,
-  },
-  itemName: {
-    fontSize: 13,
-    color: '#333',
-    flex: 1,
-    marginRight: 8,
-  },
-  itemQuantity: {
-    fontSize: 12,
-    color: '#666',
-  },
-  moreItems: {
-    fontSize: 12,
-    color: '#999',
-    fontStyle: 'italic',
-    marginTop: 4,
-  },
-  orderFooter: {
-    borderTopWidth: 1,
-    borderTopColor: '#E0E0E0',
-    paddingTop: 12,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  paymentInfo: {
-    flex: 1,
-  },
-  paymentMethod: {
-    fontSize: 12,
-    color: '#666',
-    marginBottom: 4,
-  },
-  discount: {
-    fontSize: 11,
-    color: '#4CAF50',
-    fontWeight: '600',
-  },
-  totalSection: {
-    alignItems: 'flex-end',
-  },
-  totalLabel: {
-    fontSize: 12,
-    color: '#666',
-    marginBottom: 2,
   },
   totalAmount: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '700',
     color: '#333',
   },

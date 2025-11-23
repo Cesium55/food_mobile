@@ -13,6 +13,16 @@ export function CurrentOrders({ orders }: CurrentOrdersProps) {
     return `${minutes} мин.`;
   };
 
+  const formatDateTime = (date: Date) => {
+    const day = date.getDate().toString().padStart(2, '0');
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const year = date.getFullYear();
+    const hours = date.getHours().toString().padStart(2, '0');
+    const minutes = date.getMinutes().toString().padStart(2, '0');
+    const seconds = date.getSeconds().toString().padStart(2, '0');
+    return `${day}.${month}.${year} ${hours}:${minutes}:${seconds}`;
+  };
+
   const getStatusInfo = (status: string, timeLeft?: number) => {
     switch (status) {
       case 'reserved':
@@ -54,11 +64,32 @@ export function CurrentOrders({ orders }: CurrentOrdersProps) {
             key={order.id} 
             style={styles.orderCard} 
             activeOpacity={0.7}
-            onPress={() => router.push(`/(tabs)/(profile)/checkout?orderId=${order.id}`)}
+            onPress={() => {
+              // Если заказ оплачен, переходим на экран оплаченного заказа
+              if (order.status === 'paid' || order.status === 'completed') {
+                router.push({
+                  pathname: '/(tabs)/(profile)/order-paid',
+                  params: {
+                    purchaseId: order.id.toString(),
+                  },
+                });
+              } else {
+                // Иначе на экран оплаты
+                router.push({
+                  pathname: '/(tabs)/(profile)/checkout',
+                  params: {
+                    purchaseId: order.id.toString(),
+                  },
+                });
+              }
+            }}
           >
             <View style={styles.orderHeader}>
               <View style={styles.orderInfo}>
                 <Text style={styles.orderNumber}>Заказ #{order.id}</Text>
+                <Text style={styles.dateTime}>
+                  {formatDateTime(order.date)}
+                </Text>
                 <Text style={styles.shopsList}>
                   {order.shops.join(', ')}
                 </Text>
@@ -141,6 +172,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     color: '#333',
+    marginBottom: 4,
+  },
+  dateTime: {
+    fontSize: 12,
+    color: '#999',
     marginBottom: 4,
   },
   shopsList: {

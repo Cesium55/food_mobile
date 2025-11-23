@@ -69,6 +69,7 @@ export const useOffers = () => {
       ? Math.round(((apiOffer.original_cost - apiOffer.current_cost) / apiOffer.original_cost) * 100)
       : 0;
 
+
     return {
       id: apiOffer.id,
       productId: apiOffer.product_id,

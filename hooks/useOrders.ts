@@ -1,4 +1,7 @@
-import { useState } from 'react';
+import { useOffers } from '@/hooks/useOffers';
+import { useShops } from '@/hooks/useShops';
+import { CreateOrderResponse, getCurrentPendingPurchase, getPurchasesList, PurchaseListItem } from '@/services/orderService';
+import { useCallback, useEffect, useState } from 'react';
 
 export interface OrderItem {
   id: number;
@@ -11,7 +14,7 @@ export interface OrderItem {
 export interface Order {
   id: number;
   date: Date;
-  status: 'completed' | 'cancelled' | 'processing' | 'reserved' | 'paid';
+  status: 'completed' | 'confirmed' | 'cancelled' | 'processing' | 'reserved' | 'paid';
   items: OrderItem[];
   totalAmount: number;
   discount: number;
@@ -21,193 +24,120 @@ export interface Order {
 }
 
 export const useOrders = () => {
-  const [orders] = useState<Order[]>([
-    // Текущие заказы
-    {
-      id: 101,
-      date: new Date(),
-      status: 'reserved',
-      items: [
-        {
-          id: 1,
-          productName: 'Молоко пастеризованное 3.2%',
-          quantity: 1,
-          price: 69.90,
-          shopName: 'Продукты',
-        },
-        {
-          id: 2,
-          productName: 'Хлеб Бородинский',
-          quantity: 2,
-          price: 45.00,
-          shopName: 'Хлебопекарня',
-        },
-      ],
-      totalAmount: 159.90,
-      discount: 20.10,
-      paymentMethod: 'card',
-      shops: ['Продукты', 'Хлебопекарня'],
-      timeLeft: 3, // 3 минуты осталось
-    },
-    {
-      id: 102,
-      date: new Date('2025-10-13T09:15:00'),
-      status: 'paid',
-      items: [
-        {
-          id: 3,
-          productName: 'Йогурт натуральный',
-          quantity: 3,
-          price: 95.00,
-          shopName: 'Молочка',
-        },
-        {
-          id: 4,
-          productName: 'Сыр Российский',
-          quantity: 1,
-          price: 550.00,
-          shopName: 'Молочка',
-        },
-      ],
-      totalAmount: 835.00,
-      discount: 115.00,
-      paymentMethod: 'online',
-      shops: ['Молочка'],
-    },
-    // Завершенные заказы
-    {
-      id: 1,
-      date: new Date('2025-10-12T14:30:00'),
-      status: 'completed',
-      items: [
-        {
-          id: 1,
-          productName: 'Молоко пастеризованное 3.2%',
-          quantity: 2,
-          price: 69.90,
-          shopName: 'Продукты',
-        },
-        {
-          id: 2,
-          productName: 'Хлеб Бородинский',
-          quantity: 1,
-          price: 45.00,
-          shopName: 'Хлебопекарня',
-        },
-        {
-          id: 3,
-          productName: 'Кефир 2.5%',
-          quantity: 1,
-          price: 59.00,
-          shopName: 'Продукты',
-        },
-      ],
-      totalAmount: 243.80,
-      discount: 35.20,
-      paymentMethod: 'card',
-      shops: ['Продукты', 'Хлебопекарня'],
-    },
-    {
-      id: 2,
-      date: new Date('2025-10-10T10:15:00'),
-      status: 'completed',
-      items: [
-        {
-          id: 4,
-          productName: 'Куриная грудка охлажденная',
-          quantity: 1,
-          price: 380.00,
-          shopName: 'Мясная лавка',
-        },
-        {
-          id: 5,
-          productName: 'Помидоры черри',
-          quantity: 2,
-          price: 135.00,
-          shopName: 'Овощи',
-        },
-      ],
-      totalAmount: 650.00,
-      discount: 100.00,
-      paymentMethod: 'cash',
-      shops: ['Мясная лавка', 'Овощи'],
-    },
-    {
-      id: 3,
-      date: new Date('2025-10-08T16:45:00'),
-      status: 'cancelled',
-      items: [
-        {
-          id: 6,
-          productName: 'Сыр Российский',
-          quantity: 1,
-          price: 550.00,
-          shopName: 'Молочка',
-        },
-      ],
-      totalAmount: 550.00,
-      discount: 100.00,
-      paymentMethod: 'card',
-      shops: ['Молочка'],
-    },
-    {
-      id: 4,
-      date: new Date('2025-10-05T12:20:00'),
-      status: 'completed',
-      items: [
-        {
-          id: 7,
-          productName: 'Батон нарезной',
-          quantity: 3,
-          price: 42.00,
-          shopName: 'Хлебопекарня',
-        },
-        {
-          id: 8,
-          productName: 'Йогурт натуральный',
-          quantity: 4,
-          price: 95.00,
-          shopName: 'Молочка',
-        },
-        {
-          id: 9,
-          productName: 'Масло сливочное 82.5%',
-          quantity: 1,
-          price: 240.00,
-          shopName: 'Продукты',
-        },
-      ],
-      totalAmount: 746.00,
-      discount: 154.00,
-      paymentMethod: 'online',
-      shops: ['Хлебопекарня', 'Молочка', 'Продукты'],
-    },
-    {
-      id: 5,
-      date: new Date('2025-10-03T09:30:00'),
-      status: 'completed',
-      items: [
-        {
-          id: 10,
-          productName: 'Яблоки Голден',
-          quantity: 2,
-          price: 89.00,
-          shopName: 'Овощи',
-        },
-        {
-          id: 11,
-          productName: 'Огурцы свежие',
-          quantity: 1,
-          price: 69.00,
-          shopName: 'Овощи',
-        },
-      ],
-      totalAmount: 247.00,
-      discount: 53.00,
-      paymentMethod: 'card',
-      shops: ['Овощи'],
-    },
-  ]);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [currentPending, setCurrentPending] = useState<CreateOrderResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const { getOfferById } = useOffers();
+  const { getShopById } = useShops();
+
+  // Преобразуем CreateOrderResponse в Order
+  const convertToOrder = useCallback((orderData: CreateOrderResponse): Order => {
+    const purchase = orderData.purchase;
+    const items: OrderItem[] = [];
+    const shopsSet = new Set<string>();
+
+    // Проходим по purchase_offers для формирования items
+    purchase.purchase_offers.forEach((po, index) => {
+      const offer = getOfferById(po.offer_id);
+      const shop = getShopById(po.offer.shop_id);
+      const shopName = shop?.shortName || shop?.name || offer?.shopShortName || `Магазин #${po.offer.shop_id}`;
+      
+      shopsSet.add(shopName);
+      
+      items.push({
+        id: index + 1,
+        productName: offer?.productName || `Товар #${po.offer.product_id}`,
+        quantity: po.quantity,
+        price: po.cost_at_purchase,
+        shopName,
+      });
+    });
+
+    // Вычисляем скидку
+    const originalTotal = purchase.purchase_offers.reduce((sum, po) => {
+      return sum + (po.offer.original_cost * po.quantity);
+    }, 0);
+    const discount = originalTotal - purchase.total_cost;
+
+    // Определяем статус
+    let status: Order['status'] = 'reserved';
+    if (purchase.status === 'paid') {
+      status = 'paid';
+    } else if (purchase.status === 'pending') {
+      status = 'reserved';
+    }
+
+    return {
+      id: purchase.id,
+      date: new Date(purchase.created_at),
+      status,
+      items,
+      totalAmount: purchase.total_cost,
+      discount,
+      paymentMethod: 'card', // По умолчанию, можно будет получить из API позже
+      shops: Array.from(shopsSet),
+      timeLeft: purchase.ttl ? Math.ceil(purchase.ttl / 60) : undefined, // Конвертируем секунды в минуты
+    };
+  }, [getOfferById, getShopById]);
+
+  // Преобразуем PurchaseListItem в Order
+  const convertPurchaseListItemToOrder = useCallback((purchase: PurchaseListItem): Order => {
+    // Определяем статус
+    let status: Order['status'] = 'processing';
+    if (purchase.status === 'completed') {
+      status = 'completed';
+    } else if (purchase.status === 'confirmed') {
+      status = 'confirmed';
+    } else if (purchase.status === 'cancelled') {
+      status = 'cancelled';
+    } else if (purchase.status === 'pending') {
+      status = 'reserved';
+    } else if (purchase.status === 'paid') {
+      status = 'paid';
+    }
+
+    return {
+      id: purchase.id,
+      date: new Date(purchase.created_at),
+      status,
+      items: [], // В упрощенном ответе нет информации о товарах
+      totalAmount: purchase.total_cost,
+      discount: 0, // Не можем вычислить без информации о товарах
+      paymentMethod: 'card', // По умолчанию
+      shops: [], // Не можем определить без информации о товарах
+    };
+  }, []);
+
+  // Загружаем список покупок
+  const loadPurchases = useCallback(async () => {
+    try {
+      setLoading(true);
+      const purchasesList = await getPurchasesList();
+      const convertedOrders = purchasesList.map(convertPurchaseListItemToOrder);
+      setOrders(convertedOrders);
+    } catch (error) {
+      console.error('Ошибка загрузки списка покупок:', error);
+      setOrders([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [convertPurchaseListItemToOrder]);
+
+  // Загружаем текущий pending заказ
+  const loadCurrentPending = useCallback(async () => {
+    try {
+      const pending = await getCurrentPendingPurchase();
+      setCurrentPending(pending);
+    } catch (error) {
+      console.error('Ошибка загрузки текущего заказа:', error);
+      setCurrentPending(null);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadPurchases();
+    loadCurrentPending();
+  }, [loadPurchases, loadCurrentPending]);
 
   const getOrderById = (id: number): Order | undefined => {
     return orders.find(order => order.id === id);
@@ -230,18 +160,31 @@ export const useOrders = () => {
   };
 
   const getCurrentOrders = (): Order[] => {
-    return orders.filter(order => 
+    const current: Order[] = [];
+    
+    // Добавляем текущий pending заказ, если он есть
+    if (currentPending) {
+      current.push(convertToOrder(currentPending));
+    }
+    
+    // Добавляем другие текущие заказы (reserved, paid)
+    const otherCurrent = orders.filter(order => 
       order.status === 'reserved' || order.status === 'paid'
     );
+    
+    return [...current, ...otherCurrent];
   };
 
   return {
     orders,
+    loading,
     getOrderById,
     getOrdersByStatus,
     getTotalSpent,
     getTotalSaved,
     getCurrentOrders,
+    refetchCurrentPending: loadCurrentPending,
+    refetchOrders: loadPurchases,
   };
 };
 

@@ -6,6 +6,7 @@ export default function AdminProfileLayout() {
             <Stack.Screen name="index" options={{ headerShown: false }} />
             <Stack.Screen name="scan-order" options={{ headerShown: false }} />
             <Stack.Screen name="process-order/[id]" options={{ headerShown: false }} />
+            <Stack.Screen name="fulfill-order" options={{ headerShown: false }} />
         </Stack>
     )
 }

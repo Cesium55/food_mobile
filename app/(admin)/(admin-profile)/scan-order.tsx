@@ -1,136 +1,250 @@
-import { TabScreen } from "@/components/TabScreen";
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import { CameraView, useCameraPermissions } from "expo-camera";
 import { router } from "expo-router";
-import { useState } from "react";
-import { SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { useEffect, useState } from "react";
+import {
+    Modal,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function ScanOrder() {
-    const [isScanning, setIsScanning] = useState(false);
+    const [permission, requestPermission] = useCameraPermissions();
+    const [scanned, setScanned] = useState(false);
+    const [scannedData, setScannedData] = useState<string | null>(null);
+    const [showResult, setShowResult] = useState(false);
 
-    const handleBack = () => {
+    useEffect(() => {
+        if (permission === null) {
+            requestPermission().catch((error) => {
+                console.error('Ошибка при запросе разрешения на камеру:', error);
+            });
+        }
+    }, [permission, requestPermission]);
+
+    const handleBarCodeScanned = ({ data }: { data: string }) => {
+        if (!scanned) {
+            setScanned(true);
+            setScannedData(data);
+            setShowResult(true);
+        }
+    };
+
+    const handleReset = () => {
+        setScanned(false);
+        setScannedData(null);
+        setShowResult(false);
+    };
+
+    const handleClose = () => {
         router.back();
     };
 
-    // Симуляция сканирования QR кода
-    const handleScan = () => {
-        setIsScanning(true);
+    const handleProcessOrder = () => {
+        if (!scannedData) return;
         
-        // Имитируем процесс сканирования
-        setTimeout(() => {
-            setIsScanning(false);
-            // Генерируем случайный ID заказа для демонстрации
-            const demoOrderIds = [1, 2, 3, 4, 5];
-            const randomOrderId = demoOrderIds[Math.floor(Math.random() * demoOrderIds.length)];
-            
-            // Переходим на страницу обработки заказа
-            router.push(`/(admin)/(admin-profile)/process-order/${randomOrderId}`);
-        }, 1500);
+        // Токен из QR кода - переходим на экран выдачи заказа
+        setShowResult(false);
+        router.push({
+            pathname: '/(admin)/(admin-profile)/fulfill-order',
+            params: {
+                token: scannedData,
+            },
+        });
     };
 
-    return (
-        <SafeAreaView style={styles.container}>
-            <TabScreen title="Сканирование QR заказа">
-                {/* Заголовок */}
+    if (permission === null) {
+        return (
+            <SafeAreaView style={styles.safeArea} edges={['top']}>
                 <View style={styles.header}>
-                    <TouchableOpacity onPress={handleBack} style={styles.backButton}>
-                        <IconSymbol name="chevron.left" size={24} color="#007AFF" />
+                    <TouchableOpacity onPress={handleClose} style={styles.backButton}>
+                        <IconSymbol name="arrow.left" size={24} color="#333" />
                     </TouchableOpacity>
-                    <Text style={styles.headerTitle}>Сканировать QR</Text>
-                    <View style={styles.placeholder} />
                 </View>
+                <View style={styles.permissionContainer}>
+                    <Text style={styles.message}>Запрос разрешения на камеру...</Text>
+                </View>
+            </SafeAreaView>
+        );
+    }
 
-                <View style={styles.content}>
-                    {/* Область сканирования */}
+    if (!permission.granted) {
+        return (
+            <SafeAreaView style={styles.safeArea} edges={['top']}>
+                <View style={styles.header}>
+                    <TouchableOpacity onPress={handleClose} style={styles.backButton}>
+                        <IconSymbol name="arrow.left" size={24} color="#333" />
+                    </TouchableOpacity>
+                </View>
+                <View style={styles.permissionContainer}>
+                    <IconSymbol name="camera" size={64} color="#666" />
+                    <Text style={styles.message}>
+                        Нужен доступ к камере для сканирования QR кодов
+                    </Text>
+                    <TouchableOpacity
+                        style={styles.button}
+                        onPress={requestPermission}
+                    >
+                        <Text style={styles.buttonText}>Предоставить доступ</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={[styles.button, styles.buttonSecondary]}
+                        onPress={handleClose}
+                    >
+                        <Text style={[styles.buttonText, styles.buttonTextSecondary]}>
+                            Назад
+                        </Text>
+                    </TouchableOpacity>
+                </View>
+            </SafeAreaView>
+        );
+    }
+
+    // Убеждаемся, что разрешение точно получено перед рендерингом камеры
+    if (!permission || !permission.granted) {
+        return null;
+    }
+
+    // Токен из QR кода всегда можно обработать
+    const canProcessToken = !!scannedData;
+
+    return (
+        <View style={styles.container}>
+            <CameraView
+                style={styles.camera}
+                facing="back"
+                onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
+                barcodeScannerSettings={{
+                    barcodeTypes: ["qr"],
+                }}
+            >
+                <View style={styles.overlay}>
                     <View style={styles.scanArea}>
-                        <View style={styles.qrFrame}>
-                            <View style={[styles.corner, styles.topLeft]} />
-                            <View style={[styles.corner, styles.topRight]} />
-                            <View style={[styles.corner, styles.bottomLeft]} />
-                            <View style={[styles.corner, styles.bottomRight]} />
-                            
-                            <IconSymbol name="qrcode" size={120} color="#007AFF" />
+                        <View style={[styles.corner, styles.topLeft]} />
+                        <View style={[styles.corner, styles.topRight]} />
+                        <View style={[styles.corner, styles.bottomLeft]} />
+                        <View style={[styles.corner, styles.bottomRight]} />
+                    </View>
+                    <Text style={styles.instruction}>
+                        Наведите камеру на QR код
+                    </Text>
+                </View>
+            </CameraView>
+
+            {/* Модальное окно с результатом сканирования */}
+            <Modal
+                visible={showResult}
+                transparent={true}
+                animationType="slide"
+                onRequestClose={() => setShowResult(false)}
+            >
+                <View style={styles.modalContainer}>
+                    <View style={styles.modalContent}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>Данные QR кода</Text>
+                            <TouchableOpacity
+                                onPress={() => setShowResult(false)}
+                                style={styles.closeButton}
+                            >
+                                <IconSymbol name="xmark" size={24} color="#333" />
+                            </TouchableOpacity>
+                        </View>
+                        <ScrollView style={styles.modalBody}>
+                            <View style={styles.dataContainer}>
+                                <Text style={styles.dataLabel}>Содержимое:</Text>
+                                <Text style={styles.dataText}>{scannedData}</Text>
+                            </View>
+                        </ScrollView>
+                        <View style={styles.modalFooter}>
+                            {canProcessToken && (
+                                <TouchableOpacity
+                                    style={[styles.button, styles.buttonPrimary]}
+                                    onPress={handleProcessOrder}
+                                >
+                                    <Text style={styles.buttonText}>Обработать заказ</Text>
+                                </TouchableOpacity>
+                            )}
+                            <TouchableOpacity
+                                style={[styles.button, styles.buttonPrimary]}
+                                onPress={() => {
+                                    setShowResult(false);
+                                    handleReset();
+                                }}
+                            >
+                                <Text style={styles.buttonText}>Сканировать снова</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.button, styles.buttonSecondary]}
+                                onPress={() => {
+                                    setShowResult(false);
+                                    handleClose();
+                                }}
+                            >
+                                <Text style={[styles.buttonText, styles.buttonTextSecondary]}>
+                                    Закрыть
+                                </Text>
+                            </TouchableOpacity>
                         </View>
                     </View>
-
-                    {/* Инструкция */}
-                    <Text style={styles.instruction}>
-                        Наведите камеру на QR-код заказа
-                    </Text>
-
-                    {/* Кнопка для демонстрации */}
-                    <TouchableOpacity 
-                        style={[styles.scanButton, isScanning && styles.scanButtonDisabled]} 
-                        onPress={handleScan}
-                        disabled={isScanning}
-                    >
-                        {isScanning ? (
-                            <Text style={styles.scanButtonText}>Сканирование...</Text>
-                        ) : (
-                            <>
-                                <IconSymbol name="qrcode" size={24} color="#fff" />
-                                <Text style={styles.scanButtonText}>Симулировать сканирование</Text>
-                            </>
-                        )}
-                    </TouchableOpacity>
                 </View>
-            </TabScreen>
-        </SafeAreaView>
+            </Modal>
+        </View>
     );
 }
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: '#f5f5f5',
+    safeArea: {
+        position: "absolute",
+        top: 0,
+        left: 0,
+        right: 0,
+        zIndex: 10,
     },
     header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
+        flexDirection: "row",
+        alignItems: "center",
         paddingHorizontal: 16,
         paddingVertical: 12,
-        backgroundColor: '#fff',
-        borderBottomWidth: 1,
-        borderBottomColor: '#e0e0e0',
+        backgroundColor: "rgba(0, 0, 0, 0.5)",
     },
     backButton: {
         padding: 8,
     },
-    headerTitle: {
-        fontSize: 18,
-        fontWeight: '600',
-        color: '#000',
-    },
-    placeholder: {
-        width: 40,
-    },
-    content: {
+    container: {
         flex: 1,
-        alignItems: 'center',
-        justifyContent: 'center',
+        backgroundColor: "#000",
+    },
+    permissionContainer: {
+        flex: 1,
+        justifyContent: "center",
+        alignItems: "center",
         padding: 20,
+        backgroundColor: "#fff",
+    },
+    camera: {
+        flex: 1,
+    },
+    overlay: {
+        flex: 1,
+        backgroundColor: "transparent",
+        justifyContent: "center",
+        alignItems: "center",
     },
     scanArea: {
-        width: '100%',
-        aspectRatio: 1,
-        maxWidth: 300,
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginBottom: 30,
-    },
-    qrFrame: {
-        width: '80%',
-        aspectRatio: 1,
-        alignItems: 'center',
-        justifyContent: 'center',
-        position: 'relative',
+        width: 250,
+        height: 250,
+        position: "relative",
     },
     corner: {
-        position: 'absolute',
-        width: 40,
-        height: 40,
-        borderColor: '#007AFF',
-        borderWidth: 4,
+        position: "absolute",
+        width: 30,
+        height: 30,
+        borderColor: "#4CAF50",
+        borderWidth: 3,
     },
     topLeft: {
         top: 0,
@@ -157,35 +271,95 @@ const styles = StyleSheet.create({
         borderTopWidth: 0,
     },
     instruction: {
+        marginTop: 30,
+        color: "#fff",
         fontSize: 16,
-        color: '#666',
-        textAlign: 'center',
-        marginBottom: 30,
+        textAlign: "center",
+        backgroundColor: "rgba(0, 0, 0, 0.5)",
+        padding: 12,
+        borderRadius: 8,
     },
-    scanButton: {
-        backgroundColor: '#4CAF50',
-        borderRadius: 12,
+    button: {
         padding: 16,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 12,
-        minWidth: 280,
+        borderRadius: 8,
+        alignItems: "center",
     },
-    scanButtonDisabled: {
-        backgroundColor: '#999',
+    buttonPrimary: {
+        backgroundColor: "#4CAF50",
     },
-    scanButtonText: {
-        color: '#fff',
+    buttonSecondary: {
+        backgroundColor: "#f0f0f0",
+    },
+    buttonText: {
+        color: "#fff",
         fontSize: 16,
-        fontWeight: '600',
+        fontWeight: "600",
     },
-    hint: {
+    buttonTextSecondary: {
+        color: "#333",
+    },
+    message: {
+        fontSize: 16,
+        color: "#666",
+        textAlign: "center",
         marginTop: 20,
+        marginBottom: 20,
+    },
+    modalContainer: {
+        flex: 1,
+        backgroundColor: "rgba(0, 0, 0, 0.5)",
+        justifyContent: "center",
+        alignItems: "center",
+        padding: 20,
+    },
+    modalContent: {
+        backgroundColor: "#fff",
+        borderRadius: 12,
+        width: "100%",
+        maxHeight: "80%",
+        overflow: "hidden",
+    },
+    modalHeader: {
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "center",
+        padding: 20,
+        borderBottomWidth: 1,
+        borderBottomColor: "#e0e0e0",
+    },
+    modalTitle: {
+        fontSize: 20,
+        fontWeight: "600",
+        color: "#333",
+    },
+    closeButton: {
+        padding: 4,
+    },
+    modalBody: {
+        padding: 20,
+        maxHeight: 300,
+    },
+    dataContainer: {
+        marginBottom: 16,
+    },
+    dataLabel: {
         fontSize: 14,
-        color: '#999',
-        textAlign: 'center',
-        fontStyle: 'italic',
+        fontWeight: "600",
+        color: "#666",
+        marginBottom: 8,
+    },
+    dataText: {
+        fontSize: 16,
+        color: "#333",
+        backgroundColor: "#f5f5f5",
+        padding: 12,
+        borderRadius: 8,
+        fontFamily: "monospace",
+    },
+    modalFooter: {
+        padding: 20,
+        borderTopWidth: 1,
+        borderTopColor: "#e0e0e0",
+        gap: 12,
     },
 });
-

@@ -2,22 +2,42 @@ import { TabScreen } from "@/components/TabScreen";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useCategories } from "@/hooks/useCategories";
 import { Offer, useOffers } from "@/hooks/useOffers";
+import { useProducts } from "@/hooks/useProducts";
 import { useShops } from "@/hooks/useShops";
 import { router } from "expo-router";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { ActivityIndicator, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
-
-type GroupBy = 'shop' | 'category';
 
 export default function OffersScreen() {
     const { shops, loading: shopsLoading, error: shopsError, refetch: refetchShops } = useShops();
     const { categories, getCategoryById, loading: categoriesLoading, refetch: refetchCategories } = useCategories();
     const { offers, loading: offersLoading, error: offersError, refetch: refetchOffers } = useOffers();
+    const { products, refetch: refetchProducts } = useProducts(); // Получаем список товаров для категорий
     const [expandedItems, setExpandedItems] = useState<number[]>([]);
-    const [groupBy, setGroupBy] = useState<GroupBy>('shop');
     const [showFilters, setShowFilters] = useState(false);
     const [selectedShopIds, setSelectedShopIds] = useState<number[]>([]);
     const [selectedCategoryIds, setSelectedCategoryIds] = useState<number[]>([]);
+
+    // Обогащаем офферы категориями из списка товаров, если они отсутствуют
+    const enrichedOffers = useMemo(() => {
+        return offers.map(offer => {
+            // Если у оффера уже есть категории, оставляем как есть
+            if (offer.productCategoryIds && offer.productCategoryIds.length > 0) {
+                return offer;
+            }
+            
+            // Иначе ищем категории в списке товаров
+            const product = products.find(p => p.id === offer.productId);
+            if (product && product.category_ids && product.category_ids.length > 0) {
+                return {
+                    ...offer,
+                    productCategoryIds: product.category_ids,
+                };
+            }
+            
+            return offer;
+        });
+    }, [offers, products]);
 
     // Функция для обновления всех данных
     const handleRefresh = async () => {
@@ -25,23 +45,99 @@ export default function OffersScreen() {
             refetchShops(),
             refetchCategories(),
             refetchOffers(),
+            refetchProducts(), // Обновляем товары для получения актуальных категорий
         ]);
     };
 
-    // Фильтрация предложений
-    const filteredOffers = offers.filter(offer => {
-        if (selectedShopIds.length > 0 && !selectedShopIds.includes(offer.shopId)) {
+    // Получаем все категории включая дочерние для выбранных категорий (рекурсивно)
+    const getCategoryIdsWithChildren = (categoryIds: number[]): number[] => {
+        const allCategoryIds = new Set<number>();
+        
+        const addCategoryAndChildren = (catId: number) => {
+            if (allCategoryIds.has(catId)) {
+                return; // Уже добавлена
+            }
+            allCategoryIds.add(catId);
+            
+            // Рекурсивно добавляем все дочерние категории
+            const subCategories = categories.filter(c => Number(c.parent_category_id) === Number(catId));
+            subCategories.forEach(subCat => {
+                addCategoryAndChildren(subCat.id);
+            });
+        };
+        
+        categoryIds.forEach(catId => {
+            addCategoryAndChildren(Number(catId));
+        });
+        
+        return Array.from(allCategoryIds);
+    };
+
+    // Проверяем, является ли категория оффера дочерней для выбранных категорий
+    const isCategoryInSelectedBranch = (offerCategoryId: number, selectedCategoryIds: number[]): boolean => {
+        // Сначала проверяем прямое совпадение
+        if (selectedCategoryIds.includes(Number(offerCategoryId))) {
+            return true;
+        }
+        
+        // Проверяем, является ли категория оффера дочерней для любой выбранной категории
+        const offerCategory = categories.find(c => Number(c.id) === Number(offerCategoryId));
+        if (!offerCategory) {
             return false;
         }
+        
+        // Поднимаемся по дереву категорий вверх, проверяя, встречается ли выбранная категория
+        let currentCategory = offerCategory;
+        while (currentCategory && currentCategory.parent_category_id !== null) {
+            const parentId = Number(currentCategory.parent_category_id);
+            if (selectedCategoryIds.includes(parentId)) {
+                return true;
+            }
+            currentCategory = categories.find(c => Number(c.id) === parentId);
+            if (!currentCategory) {
+                break;
+            }
+        }
+        
+        return false;
+    };
+
+    // Фильтрация предложений (используем обогащенные офферы)
+    const filteredOffers = enrichedOffers.filter(offer => {
+        // Фильтр по магазинам
+        if (selectedShopIds.length > 0 && !selectedShopIds.includes(Number(offer.shopId))) {
+            return false;
+        }
+        
+        // Фильтр по категориям
         if (selectedCategoryIds.length > 0) {
-            // Проверяем, пересекается ли хотя бы одна категория товара с выбранными
-            const hasMatchingCategory = offer.productCategoryIds.some(catId => 
-                selectedCategoryIds.includes(catId)
+            // Если у оффера нет категорий, он не проходит фильтр
+            if (!offer.productCategoryIds || offer.productCategoryIds.length === 0) {
+                return false;
+            }
+            
+            // Преобразуем ID в числа для сравнения
+            const offerCategoryIds = offer.productCategoryIds.map(id => Number(id));
+            const selectedIds = selectedCategoryIds.map(id => Number(id));
+            
+            // Метод 1: Проверяем, есть ли категория оффера в списке выбранных категорий + их дочерних
+            const categoryIdsWithChildren = getCategoryIdsWithChildren(selectedIds);
+            const hasMatchingCategory1 = offerCategoryIds.some(catId => 
+                categoryIdsWithChildren.includes(catId)
             );
+            
+            // Метод 2: Проверяем, является ли категория оффера дочерней для выбранной (поднимаемся вверх по дереву)
+            const hasMatchingCategory2 = offerCategoryIds.some(catId => 
+                isCategoryInSelectedBranch(catId, selectedIds)
+            );
+            
+            const hasMatchingCategory = hasMatchingCategory1 || hasMatchingCategory2;
+            
             if (!hasMatchingCategory) {
                 return false;
             }
         }
+        
         return true;
     });
 
@@ -62,12 +158,7 @@ export default function OffersScreen() {
     };
 
     const getOffersForGroup = (groupId: number) => {
-        if (groupBy === 'shop') {
-            return filteredOffers.filter(offer => offer.shopId === groupId);
-        } else {
-            // Для категорий проверяем, содержит ли оффер эту категорию
-            return filteredOffers.filter(offer => offer.productCategoryIds.includes(groupId));
-        }
+        return filteredOffers.filter(offer => Number(offer.shopId) === Number(groupId));
     };
 
 
@@ -94,52 +185,92 @@ export default function OffersScreen() {
 
     const hasActiveFilters = selectedShopIds.length > 0 || selectedCategoryIds.length > 0;
 
-    // Получение групп для отображения
+    // Получение групп для отображения (только по магазинам)
     const getGroups = () => {
-        if (groupBy === 'shop') {
+        // Если фильтры не активны, показываем все магазины (даже без офферов)
+        if (!hasActiveFilters) {
             return shops.map(shop => ({
                 id: shop.id,
                 name: shop.fullName || shop.name,
                 subtitle: shop.address,
             }));
-        } else {
-            // Получаем только категории, которые есть в предложениях
-            const categoryIds = new Set<number>();
-            filteredOffers.forEach(offer => {
-                offer.productCategoryIds.forEach(catId => categoryIds.add(catId));
-            });
-            
-            return Array.from(categoryIds)
-                .map(catId => {
-                    const category = getCategoryById(catId);
-                    return category ? {
-                        id: catId,
-                        name: category.name,
-                        subtitle: `Категория`,
-                    } : null;
-                })
-                .filter((g): g is NonNullable<typeof g> => g !== null);
         }
+        
+        // Если фильтры активны, показываем только магазины с отфильтрованными офферами
+        if (filteredOffers.length === 0) {
+            return [];
+        }
+        
+        // Собираем уникальные ID магазинов из отфильтрованных офферов
+        const shopIds = new Set<number>();
+        filteredOffers.forEach(offer => {
+            if (offer.shopId) {
+                shopIds.add(Number(offer.shopId)); // Преобразуем в число
+            }
+        });
+        
+        // Создаем группы для каждого магазина
+        const groups = Array.from(shopIds).map(shopId => {
+            // Ищем магазин, сравнивая как числа
+            const shop = shops.find(s => Number(s.id) === Number(shopId));
+            if (shop) {
+                return {
+                    id: shop.id,
+                    name: shop.fullName || shop.name,
+                    subtitle: shop.address,
+                };
+            } else {
+                // Если магазин не найден, создаем группу с ID из оффера
+                return {
+                    id: shopId,
+                    name: `Магазин #${shopId}`,
+                    subtitle: 'Адрес не указан',
+                };
+            }
+        });
+        
+        return groups;
     };
 
     const groups = getGroups();
 
     return (
-        <TabScreen 
+            <TabScreen 
             title="Предложения"
             onRefresh={handleRefresh}
-            refreshing={offersLoading || shopsLoading}
+            refreshing={offersLoading || shopsLoading || categoriesLoading}
         >
             <View style={styles.container}>
                 {/* Заголовок с кнопками */}
                 <View style={styles.header}>
-                    <View>
-                        <Text style={styles.headerTitle}>
-                            {groupBy === 'shop' ? 'По торговым точкам' : 'По категориям'}
-                        </Text>
+                    <View style={styles.headerTextContainer}>
+                        <Text style={styles.headerTitle}>По торговым точкам</Text>
                         <Text style={styles.headerSubtitle}>
                             Всего предложений: {filteredOffers.length}
+                            {hasActiveFilters && enrichedOffers.length !== filteredOffers.length && (
+                                <Text style={styles.headerFilterInfo}>
+                                    {' '}(из {enrichedOffers.length})
+                                </Text>
+                            )}
                         </Text>
+                        {hasActiveFilters && (
+                            <View style={styles.activeFiltersContainer}>
+                                {selectedShopIds.length > 0 && (
+                                    <View style={styles.activeFilterTag}>
+                                        <Text style={styles.activeFilterText}>
+                                            Магазинов: {selectedShopIds.length}
+                                        </Text>
+                                    </View>
+                                )}
+                                {selectedCategoryIds.length > 0 && (
+                                    <View style={styles.activeFilterTag}>
+                                        <Text style={styles.activeFilterText}>
+                                            Категорий: {selectedCategoryIds.length}
+                                        </Text>
+                                    </View>
+                                )}
+                            </View>
+                        )}
                     </View>
                     <View style={styles.headerButtons}>
                         <TouchableOpacity
@@ -156,36 +287,6 @@ export default function OffersScreen() {
                             )}
                         </TouchableOpacity>
                     </View>
-                </View>
-
-                {/* Переключатель группировки */}
-                <View style={styles.groupToggle}>
-                    <TouchableOpacity
-                        style={[styles.groupToggleButton, groupBy === 'shop' && styles.groupToggleButtonActive]}
-                        onPress={() => setGroupBy('shop')}
-                    >
-                        <IconSymbol
-                            name="map.pin.fill"
-                            size={18}
-                            color={groupBy === 'shop' ? "#fff" : "#007AFF"}
-                        />
-                        <Text style={[styles.groupToggleText, groupBy === 'shop' && styles.groupToggleTextActive]}>
-                            По точкам
-                        </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                        style={[styles.groupToggleButton, groupBy === 'category' && styles.groupToggleButtonActive]}
-                        onPress={() => setGroupBy('category')}
-                    >
-                        <IconSymbol
-                            name="list.bullet"
-                            size={18}
-                            color={groupBy === 'category' ? "#fff" : "#007AFF"}
-                        />
-                        <Text style={[styles.groupToggleText, groupBy === 'category' && styles.groupToggleTextActive]}>
-                            По категориям
-                        </Text>
-                    </TouchableOpacity>
                 </View>
 
                 {/* Список групп с предложениями */}
@@ -206,13 +307,58 @@ export default function OffersScreen() {
                             </Text>
                         </View>
                     ) : groups.length === 0 ? (
-                        <View style={styles.emptyContainer}>
-                            <Text style={styles.emptyIcon}>📦</Text>
-                            <Text style={styles.emptyStateText}>Нет данных для отображения</Text>
-                        </View>
+                        // Если нет групп (магазинов) для отображения
+                        hasActiveFilters ? (
+                            // Если фильтры активны, но нет результатов
+                            <View style={styles.emptyContainer}>
+                                <Text style={styles.emptyIcon}>📦</Text>
+                                <Text style={styles.emptyStateText}>Нет данных для отображения</Text>
+                                <Text style={styles.emptySubtext}>
+                                    Нет торговых точек с предложениями
+                                </Text>
+                                {selectedCategoryIds.length > 0 && (
+                                    <>
+                                        <Text style={styles.emptySubtext}>
+                                            ⚠️ Выбран фильтр по категориям
+                                        </Text>
+                                        <Text style={styles.emptySubtext}>
+                                            У всех товаров отсутствуют категории
+                                        </Text>
+                                        <Text style={styles.emptySubtext}>
+                                            Добавьте категории к товарам в разделе "Товары"
+                                        </Text>
+                                    </>
+                                )}
+                                <Text style={styles.emptySubtext}>
+                                    Всего предложений: {enrichedOffers.length}
+                                </Text>
+                                <Text style={styles.emptySubtext}>
+                                    Отфильтровано: {filteredOffers.length}
+                                </Text>
+                                <Text style={styles.emptySubtext}>
+                                    Магазинов: {shops.length}
+                                </Text>
+                            </View>
+                        ) : (
+                            // Если фильтры не активны и нет магазинов
+                            enrichedOffers.length === 0 ? (
+                                <View style={styles.emptyContainer}>
+                                    <Text style={styles.emptyIcon}>📦</Text>
+                                    <Text style={styles.emptyStateText}>Нет предложений</Text>
+                                    <Text style={styles.emptySubtext}>
+                                        Создайте первое предложение, чтобы начать работу
+                                    </Text>
+                                </View>
+                            ) : (
+                                <View style={styles.emptyContainer}>
+                                    <Text style={styles.emptyIcon}>📦</Text>
+                                    <Text style={styles.emptyStateText}>Нет данных для отображения</Text>
+                                </View>
+                            )
+                        )
                     ) : (
                         groups.map(group => {
-                        const offers = getOffersForGroup(group.id);
+                        const groupOffers = getOffersForGroup(group.id);
                         const isExpanded = expandedItems.includes(group.id);
 
                         return (
@@ -232,31 +378,29 @@ export default function OffersScreen() {
                                             <Text style={styles.groupName}>{group.name}</Text>
                                             <Text style={styles.groupSubtitle}>{group.subtitle}</Text>
                                             <Text style={styles.offersCount}>
-                                                {offers.length} {offers.length === 1 ? 'предложение' : 'предложений'}
+                                                {groupOffers.length} {groupOffers.length === 1 ? 'предложение' : 'предложений'}
                                             </Text>
                                         </View>
                                     </TouchableOpacity>
 
-                                    {groupBy === 'shop' && (
-                                        <TouchableOpacity
-                                            style={styles.addButton}
-                                            onPress={() => handleAddOffer(group.id)}
-                                        >
-                                            <IconSymbol name="plus" size={20} color="#007AFF" />
-                                            <Text style={styles.addButtonText}>Добавить</Text>
-                                        </TouchableOpacity>
-                                    )}
+                                    <TouchableOpacity
+                                        style={styles.addButton}
+                                        onPress={() => handleAddOffer(group.id)}
+                                    >
+                                        <IconSymbol name="plus" size={20} color="#007AFF" />
+                                        <Text style={styles.addButtonText}>Добавить</Text>
+                                    </TouchableOpacity>
                                 </View>
 
                                 {/* Список предложений (раскрывается) */}
                                 {isExpanded && (
                                     <View style={styles.offersList}>
-                                        {offers.length === 0 ? (
+                                        {groupOffers.length === 0 ? (
                                             <Text style={styles.emptyText}>
                                                 Нет предложений
                                             </Text>
                                         ) : (
-                                            offers.map((offer: Offer) => {
+                                            groupOffers.map((offer: Offer) => {
                                                 const shop = shops.find(s => s.id === offer.shopId);
                                                 // Берем первую категорию для отображения
                                                 const firstCategoryId = offer.productCategoryIds[0];
@@ -272,12 +416,7 @@ export default function OffersScreen() {
                                                             <Text style={styles.offerProductName}>
                                                                 {offer.productName}
                                                             </Text>
-                                                            {groupBy === 'category' && shop && (
-                                                                <Text style={styles.offerShopName}>
-                                                                    📍 {shop.fullName || shop.name}
-                                                                </Text>
-                                                            )}
-                                                            {groupBy === 'shop' && category && (
+                                                            {category && (
                                                                 <Text style={styles.offerCategoryName}>
                                                                     🏷️ {category.name}
                                                                 </Text>
@@ -438,6 +577,9 @@ const styles = StyleSheet.create({
         borderBottomWidth: 1,
         borderBottomColor: '#e0e0e0',
     },
+    headerTextContainer: {
+        flex: 1,
+    },
     headerTitle: {
         fontSize: 20,
         fontWeight: '700',
@@ -447,6 +589,28 @@ const styles = StyleSheet.create({
     headerSubtitle: {
         fontSize: 14,
         color: '#666',
+    },
+    headerFilterInfo: {
+        fontSize: 14,
+        color: '#007AFF',
+        fontWeight: '500',
+    },
+    activeFiltersContainer: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 6,
+        marginTop: 8,
+    },
+    activeFilterTag: {
+        backgroundColor: '#E3F2FD',
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 12,
+    },
+    activeFilterText: {
+        fontSize: 12,
+        color: '#007AFF',
+        fontWeight: '600',
     },
     headerButtons: {
         flexDirection: 'row',
@@ -480,36 +644,6 @@ const styles = StyleSheet.create({
         color: '#fff',
         fontSize: 12,
         fontWeight: '700',
-    },
-    groupToggle: {
-        flexDirection: 'row',
-        padding: 12,
-        gap: 8,
-        backgroundColor: '#fff',
-    },
-    groupToggleButton: {
-        flex: 1,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 6,
-        paddingVertical: 10,
-        paddingHorizontal: 16,
-        borderRadius: 8,
-        borderWidth: 1,
-        borderColor: '#007AFF',
-        backgroundColor: '#fff',
-    },
-    groupToggleButtonActive: {
-        backgroundColor: '#007AFF',
-    },
-    groupToggleText: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: '#007AFF',
-    },
-    groupToggleTextActive: {
-        color: '#fff',
     },
     groupCard: {
         backgroundColor: '#fff',
@@ -794,5 +928,12 @@ const styles = StyleSheet.create({
         fontSize: 18,
         fontWeight: '600',
         color: '#666',
+        marginBottom: 8,
+    },
+    emptySubtext: {
+        fontSize: 14,
+        color: '#999',
+        textAlign: 'center',
+        marginTop: 4,
     },
 });

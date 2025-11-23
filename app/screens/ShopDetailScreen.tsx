@@ -1,10 +1,13 @@
-import HorizontalOfferBlock from "@/components/offers/horizontalOfferBlock";
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import ShopInfoCard from "@/components/shop/ShopInfoCard";
+import ShopOffersList from "@/components/shop/ShopOffersList";
+import ShopStatsCard from "@/components/shop/ShopStatsCard";
 import { useOffers } from "@/hooks/useOffers";
 import { usePublicSeller } from "@/hooks/usePublicSeller";
 import { useShopPoint } from "@/hooks/useShopPoints";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import * as Linking from 'expo-linking';
+import { Alert, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function ShopDetailScreen() {
@@ -16,6 +19,68 @@ export default function ShopDetailScreen() {
   const { shopPoint, loading, error } = useShopPoint(shopId);
   const shopOffers = getOffersByShop(shopId);
   const { seller } = usePublicSeller(shopPoint?.seller_id || null);
+
+  // Функция для открытия карт с координатами магазина (показывает точку, а не маршрут)
+  const openMaps = async (latitude: number, longitude: number, address?: string) => {
+    try {
+      if (Platform.OS === 'ios') {
+        // Для iOS пробуем открыть Apple Maps (показываем точку)
+        const appleMapsUrl = `http://maps.apple.com/?ll=${latitude},${longitude}&q=${latitude},${longitude}`;
+        const canOpen = await Linking.canOpenURL(appleMapsUrl);
+        
+        if (canOpen) {
+          await Linking.openURL(appleMapsUrl);
+          return;
+        }
+        
+        // Если Apple Maps недоступен, используем Google Maps (показываем точку)
+        const googleMapsUrl = `comgooglemaps://?q=${latitude},${longitude}&center=${latitude},${longitude}&zoom=15`;
+        const canOpenGoogle = await Linking.canOpenURL(googleMapsUrl);
+        
+        if (canOpenGoogle) {
+          await Linking.openURL(googleMapsUrl);
+          return;
+        }
+        
+        // Если приложения нет, открываем в браузере (показываем точку)
+        const query = address ? encodeURIComponent(address) : `${latitude},${longitude}`;
+        await Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`);
+      } else {
+        // Для Android пробуем открыть Google Maps (показываем точку)
+        const googleMapsUrl = `geo:${latitude},${longitude}?q=${latitude},${longitude}`;
+        const canOpen = await Linking.canOpenURL(googleMapsUrl);
+        
+        if (canOpen) {
+          await Linking.openURL(googleMapsUrl);
+          return;
+        }
+        
+        // Альтернативный вариант для Google Maps на Android
+        const googleMapsUrl2 = `https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`;
+        const canOpen2 = await Linking.canOpenURL(googleMapsUrl2);
+        
+        if (canOpen2) {
+          await Linking.openURL(googleMapsUrl2);
+          return;
+        }
+        
+        // Если приложения нет, пробуем Yandex Maps (показываем точку)
+        const yandexMapsUrl = `yandexmaps://maps.yandex.ru/?pt=${longitude},${latitude}&z=15`;
+        const canOpenYandex = await Linking.canOpenURL(yandexMapsUrl);
+        
+        if (canOpenYandex) {
+          await Linking.openURL(yandexMapsUrl);
+          return;
+        }
+        
+        // Если приложения нет, открываем в браузере (показываем точку)
+        await Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`);
+      }
+    } catch (error) {
+      console.error('Ошибка открытия карт:', error);
+      Alert.alert('Ошибка', 'Не удалось открыть карты. Попробуйте еще раз.');
+    }
+  };
 
   if (loading) {
     return (
@@ -76,58 +141,32 @@ export default function ShopDetailScreen() {
 
       <ScrollView style={styles.container}>
         {/* Информация о магазине */}
-        <View style={styles.shopInfo}>
-          <View style={styles.shopIcon}>
-            <Text style={styles.shopIconText}>🏪</Text>
-          </View>
-          <View style={styles.shopDetails}>
-            {seller && (
-              <Text style={styles.sellerName}>📦 {seller.short_name}</Text>
-            )}
-            <Text style={styles.shopAddress}>📍 {shopPoint.address_formated || shopPoint.address_raw}</Text>
-            {shopPoint.city && (
-              <Text style={styles.shopCity}>🏙️ {shopPoint.city}</Text>
-            )}
-          </View>
-        </View>
+        <ShopInfoCard shopPoint={shopPoint} seller={seller} />
 
         {/* Статистика */}
-        <View style={styles.statsCard}>
-          <View style={styles.stat}>
-            <Text style={styles.statValue}>{shopOffers.length}</Text>
-            <Text style={styles.statLabel}>товаров со скидкой</Text>
-          </View>
-        </View>
+        <ShopStatsCard offersCount={shopOffers.length} />
 
-        {/* Карта (заглушка) */}
-        <TouchableOpacity style={styles.mapCard} activeOpacity={0.7}>
-          <View style={styles.mapPlaceholder}>
-            <Text style={styles.mapIcon}>🗺️</Text>
-            <Text style={styles.mapText}>Показать на карте</Text>
-          </View>
-        </TouchableOpacity>
+        {/* Карта */}
+        {shopPoint.latitude && shopPoint.longitude && (
+          <TouchableOpacity 
+            style={styles.mapCard} 
+            activeOpacity={0.7}
+            onPress={() => openMaps(
+              shopPoint.latitude!, 
+              shopPoint.longitude!, 
+              shopPoint.address_formated || shopPoint.address_raw
+            )}
+          >
+            <View style={styles.mapPlaceholder}>
+              <Text style={styles.mapIcon}>🗺️</Text>
+              <Text style={styles.mapText}>Открыть в картах</Text>
+              <Text style={styles.mapSubtext}>Показать на карте</Text>
+            </View>
+          </TouchableOpacity>
+        )}
 
         {/* Товары со скидкой */}
-        <View style={styles.offersSection}>
-          <Text style={styles.sectionTitle}>
-            Товары со скидкой ({shopOffers.length})
-          </Text>
-          
-          {shopOffers.length === 0 ? (
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyIcon}>📦</Text>
-              <Text style={styles.emptyText}>
-                В этом магазине пока нет товаров со скидкой
-              </Text>
-            </View>
-          ) : (
-            <View style={styles.offersList}>
-              {shopOffers.map((offer) => (
-                <HorizontalOfferBlock key={offer.id} offer={offer} />
-              ))}
-            </View>
-          )}
-        </View>
+        <ShopOffersList offers={shopOffers} />
 
         {/* Отступ снизу */}
         <View style={styles.bottomSpacer} />
@@ -184,69 +223,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#333',
   },
-  shopInfo: {
-    backgroundColor: '#fff',
-    padding: 20,
-    flexDirection: 'row',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E0E0E0',
-  },
-  shopIcon: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: '#E8F5E9',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 16,
-  },
-  shopIconText: {
-    fontSize: 40,
-  },
-  shopDetails: {
-    flex: 1,
-    justifyContent: 'center',
-  },
-  shopName: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 6,
-  },
-  sellerName: {
-    fontSize: 14,
-    color: '#4CAF50',
-    marginBottom: 6,
-  },
-  shopAddress: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 4,
-  },
-  shopCity: {
-    fontSize: 14,
-    color: '#2196F3',
-    marginBottom: 4,
-  },
-  statsCard: {
-    backgroundColor: '#fff',
-    padding: 20,
-    marginTop: 8,
-    flexDirection: 'row',
-    justifyContent: 'center',
-  },
-  stat: {
-    alignItems: 'center',
-  },
-  statValue: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#4CAF50',
-  },
-  statLabel: {
-    fontSize: 14,
-    color: '#666',
-  },
   mapCard: {
     backgroundColor: '#fff',
     marginTop: 8,
@@ -267,33 +243,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#4CAF50',
+    marginBottom: 4,
   },
-  offersSection: {
-    padding: 16,
-    backgroundColor: '#fff',
-    marginTop: 8,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 16,
-  },
-  emptyContainer: {
-    padding: 40,
-    alignItems: 'center',
-  },
-  emptyIcon: {
-    fontSize: 48,
-    marginBottom: 12,
-  },
-  emptyText: {
-    fontSize: 16,
+  mapSubtext: {
+    fontSize: 12,
     color: '#666',
-    textAlign: 'center',
-  },
-  offersList: {
-    gap: 12,
   },
   bottomSpacer: {
     height: 20,

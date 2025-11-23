@@ -15,8 +15,13 @@ export function CartItem({ item, status, onIncrease, onDecrease, onRemove }: Car
   const router = useRouter();
   const segments = useSegments();
   
+  // Безопасная конвертация expiresDate в Date объект
+  const expiryDate = item.expiresDate instanceof Date 
+    ? item.expiresDate 
+    : new Date(item.expiresDate || new Date());
+  
   const daysUntilExpiry = Math.ceil(
-    (item.expiresDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)
+    (expiryDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)
   );
 
   const getExpiryColor = () => {

@@ -1,3 +1,4 @@
+import CartButton from '@/components/cart/CartButton';
 import { Offer } from '@/hooks/useOffers';
 import { useShops } from '@/hooks/useShops';
 import { useRouter, useSegments } from 'expo-router';
@@ -43,57 +44,67 @@ export default function HorizontalOfferBlock({ offer, onPress }: HorizontalOffer
   const expiryColors = getExpiryColor();
 
   return (
-    <TouchableOpacity 
-      style={styles.card} 
-      activeOpacity={0.7}
-      onPress={handlePress}
-    >
-      {/* Бейдж со скидкой в правом верхнем углу блока */}
-      <View style={styles.discountBadge}>
-        <Text style={styles.discountText}>-{offer.discount}%</Text>
-      </View>
-
-      {/* Изображение товара слева */}
-      <View style={styles.imageContainer}>
-        <View style={styles.imagePlaceholder}>
-          <Text style={styles.imagePlaceholderText}>
-            {offer.productName.charAt(0)}
-          </Text>
-        </View>
-      </View>
-
-      {/* Информация о товаре справа */}
-      <View style={styles.infoContainer}>
-        <View style={styles.topInfo}>
-          <Text style={styles.shopName} numberOfLines={1}>
-            {shopShortName}
-          </Text>
-          
-          <Text style={styles.productName} numberOfLines={2}>
-            {offer.productName}
-          </Text>
+    <View style={styles.card}>
+      <TouchableOpacity 
+        style={styles.cardContent} 
+        activeOpacity={0.7}
+        onPress={handlePress}
+      >
+        {/* Бейдж со скидкой в правом верхнем углу блока */}
+        <View style={styles.discountBadge}>
+          <Text style={styles.discountText}>-{offer.discount}%</Text>
         </View>
 
-        <View style={styles.bottomInfo}>
-          {/* Срок годности */}
-          <View style={[styles.expiryContainer, { backgroundColor: expiryColors.bg }]}>
-            <Text style={[styles.expiryText, { color: expiryColors.text }]}>
-              {daysUntilExpiry} {getDaysWord(daysUntilExpiry)}
-            </Text>
-          </View>
-
-          {/* Цены */}
-          <View style={styles.priceContainer}>
-            <Text style={styles.originalPrice}>
-              {offer.originalCost.toFixed(2)} ₽
-            </Text>
-            <Text style={styles.currentPrice}>
-              {offer.currentCost.toFixed(2)} ₽
+        {/* Изображение товара слева */}
+        <View style={styles.imageContainer}>
+          <View style={styles.imagePlaceholder}>
+            <Text style={styles.imagePlaceholderText}>
+              {offer.productName.charAt(0)}
             </Text>
           </View>
         </View>
+
+        {/* Информация о товаре справа */}
+        <View style={styles.infoContainer}>
+          <View style={styles.topInfo}>
+            <Text style={styles.shopName} numberOfLines={1}>
+              {shopShortName}
+            </Text>
+            
+            <Text style={styles.productName} numberOfLines={2}>
+              {offer.productName}
+            </Text>
+          </View>
+
+          <View style={styles.bottomInfo}>
+            {/* Срок годности и цены в одной строке */}
+            <View style={styles.priceAndExpiryRow}>
+              {/* Срок годности */}
+              <View style={[styles.expiryContainer, { backgroundColor: expiryColors.bg }]}>
+                <Text style={[styles.expiryText, { color: expiryColors.text }]}>
+                  {daysUntilExpiry} {getDaysWord(daysUntilExpiry)}
+                </Text>
+              </View>
+
+              {/* Цены */}
+              <View style={styles.priceContainer}>
+                <Text style={styles.originalPrice}>
+                  {offer.originalCost.toFixed(2)} ₽
+                </Text>
+                <Text style={styles.currentPrice}>
+                  {offer.currentCost.toFixed(2)} ₽
+                </Text>
+              </View>
+            </View>
+          </View>
+        </View>
+      </TouchableOpacity>
+
+      {/* Кнопка управления корзиной - под всей карточкой */}
+      <View style={styles.cartButtonContainer}>
+        <CartButton offer={offer} size="small" variant="inline" />
       </View>
-    </TouchableOpacity>
+    </View>
   );
 }
 
@@ -106,7 +117,6 @@ const getDaysWord = (days: number): string => {
 const styles = StyleSheet.create({
   card: {
     width: '100%',
-    flexDirection: 'row',
     backgroundColor: '#fff',
     borderRadius: IMAGE_SIZE * 0.12,
     overflow: 'hidden',
@@ -119,6 +129,10 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
     minHeight: IMAGE_SIZE,
+    position: 'relative',
+  },
+  cardContent: {
+    flexDirection: 'row',
     position: 'relative',
   },
   discountBadge: {
@@ -172,10 +186,13 @@ const styles = StyleSheet.create({
     lineHeight: IMAGE_SIZE * 0.18,
   },
   bottomInfo: {
+    marginTop: IMAGE_SIZE * 0.08,
+  },
+  priceAndExpiryRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-end',
-    marginTop: IMAGE_SIZE * 0.08,
+    marginBottom: IMAGE_SIZE * 0.08,
   },
   expiryContainer: {
     borderRadius: IMAGE_SIZE * 0.04,
@@ -199,6 +216,13 @@ const styles = StyleSheet.create({
     fontSize: IMAGE_SIZE * 0.18,
     fontWeight: 'bold',
     color: '#4CAF50',
+  },
+  cartButtonContainer: {
+    paddingHorizontal: IMAGE_SIZE * 0.12,
+    paddingBottom: IMAGE_SIZE * 0.08,
+    paddingTop: IMAGE_SIZE * 0.08,
+    borderTopWidth: 1,
+    borderTopColor: '#F0F0F0',
   },
 });
 
