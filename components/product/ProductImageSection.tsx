@@ -1,19 +1,35 @@
 import { Offer } from '@/hooks/useOffers';
-import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { getFirstImageUrl } from '@/utils/imageUtils';
+import React, { useState } from 'react';
+import { Image, StyleSheet, Text, View } from 'react-native';
 
 interface ProductImageSectionProps {
   offer: Offer;
 }
 
 export default function ProductImageSection({ offer }: ProductImageSectionProps) {
+  const [imageError, setImageError] = useState(false);
+  
+  // Получаем URL первого изображения
+  const imageUrl = getFirstImageUrl(offer.productImages);
+  const hasImage = imageUrl && !imageError;
+
   return (
     <View style={styles.container}>
-      <View style={styles.imagePlaceholder}>
-        <Text style={styles.imagePlaceholderText}>
-          {offer.productName.charAt(0)}
-        </Text>
-      </View>
+      {hasImage ? (
+        <Image
+          source={{ uri: imageUrl! }}
+          style={styles.productImage}
+          onError={() => setImageError(true)}
+          resizeMode="cover"
+        />
+      ) : (
+        <View style={styles.imagePlaceholder}>
+          <Text style={styles.imagePlaceholderText}>
+            {offer.productName.charAt(0)}
+          </Text>
+        </View>
+      )}
       
       {/* Бейдж скидки */}
       {offer.discount > 0 && (
@@ -36,6 +52,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 8,
     elevation: 3,
+  },
+  productImage: {
+    width: 240,
+    height: 240,
+    borderRadius: 20,
   },
   imagePlaceholder: {
     width: 240,

@@ -34,6 +34,9 @@ export const API_ENDPOINTS = {
     BY_SELLER: '/products/seller',
     POPULAR: '/products/popular',
     RECOMMENDED: '/products/recommended',
+    UPLOAD_IMAGE: (productId: number) => `/products/${productId}/images`,
+    UPLOAD_IMAGES_BATCH: (productId: number) => `/products/${productId}/images/batch`,
+    DELETE_IMAGE: (imageId: number) => `/products/images/${imageId}`,
   },
   
   // Продавцы
@@ -42,6 +45,9 @@ export const API_ENDPOINTS = {
     POPULAR: '/sellers/popular',
     NEARBY: '/sellers/nearby',
     BY_CATEGORY: '/sellers/category',
+    UPLOAD_IMAGE: (sellerId: number) => `/sellers/${sellerId}/images`,
+    UPLOAD_IMAGES_BATCH: (sellerId: number) => `/sellers/${sellerId}/images/batch`,
+    DELETE_IMAGE: (imageId: number) => `/sellers/images/${imageId}`,
   },
   
   // Заказы

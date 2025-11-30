@@ -60,6 +60,9 @@ export const env = {
   // Окружение
   NODE_ENV: getAppConfigVar('NODE_ENV', __DEV__ ? 'development' : 'production'),
   
+  // S3 настройки
+  S3_BUCKET_PREFIX: getAppConfigVar('S3_BUCKET_PREFIX', ''),
+  
   // Дополнительные настройки
   IS_DEV: __DEV__,
   IS_PROD: !__DEV__,

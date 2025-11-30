@@ -73,7 +73,8 @@
         "CACHE_TIMEOUT": "300000",
         "ENABLE_ANIMATIONS": "true",
         "ANIMATION_DURATION": "300",
-        "NODE_ENV": "development"
+        "NODE_ENV": "development",
+        "S3_BUCKET_PREFIX": "https://gembos.ru/images/food-link-images"
       }
     }
   }

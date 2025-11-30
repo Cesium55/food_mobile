@@ -119,12 +119,14 @@ async function refreshAccessToken(): Promise<{ success: boolean; accessToken?: s
  */
 function createAuthHeaders(
   customHeaders?: HeadersInit,
-  accessToken?: string | null
+  accessToken?: string | null,
+  body?: BodyInit | null
 ): HeadersInit {
   const headers = new Headers(customHeaders);
 
   // Устанавливаем базовые заголовки если их нет
-  if (!headers.has('Content-Type')) {
+  // Для FormData не устанавливаем Content-Type - браузер/React Native сам установит правильный заголовок с boundary
+  if (!headers.has('Content-Type') && !(body instanceof FormData)) {
     headers.set('Content-Type', 'application/json');
   }
   if (!headers.has('Accept')) {
@@ -191,7 +193,7 @@ export async function authFetch(
     }
 
     // Создаем заголовки
-    const headers = createAuthHeaders(customHeaders, accessToken);
+    const headers = createAuthHeaders(customHeaders, accessToken, fetchOptions.body);
 
     // Создаем контроллер для таймаута
     const controller = new AbortController();

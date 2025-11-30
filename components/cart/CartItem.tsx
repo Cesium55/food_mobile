@@ -1,6 +1,9 @@
 import { CartItem as CartItemType } from "@/hooks/useCart";
+import { useOffers } from "@/hooks/useOffers";
+import { getFirstImageUrl } from "@/utils/imageUtils";
 import { useRouter, useSegments } from "expo-router";
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { useState } from "react";
+import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { ItemStatus } from "./types";
 
 interface CartItemProps {
@@ -14,6 +17,13 @@ interface CartItemProps {
 export function CartItem({ item, status, onIncrease, onDecrease, onRemove }: CartItemProps) {
   const router = useRouter();
   const segments = useSegments();
+  const { getOfferById } = useOffers();
+  const [imageError, setImageError] = useState(false);
+  
+  // Получаем offer для доступа к изображениям
+  const offer = getOfferById(item.offerId);
+  const imageUrl = offer ? getFirstImageUrl(offer.productImages) : null;
+  const hasImage = imageUrl && !imageError;
   
   // Безопасная конвертация expiresDate в Date объект
   const expiryDate = item.expiresDate instanceof Date 
@@ -54,11 +64,20 @@ export function CartItem({ item, status, onIncrease, onDecrease, onRemove }: Car
         onPress={handleProductPress}
         activeOpacity={0.7}
       >
-        <View style={[styles.itemImagePlaceholder, isInactive && styles.inactiveImage]}>
-          <Text style={[styles.itemImageText, isInactive && styles.inactiveText]}>
-            {item.productName.charAt(0)}
-          </Text>
-        </View>
+        {hasImage ? (
+          <Image
+            source={{ uri: imageUrl! }}
+            style={[styles.itemImage, isInactive && styles.inactiveImage]}
+            onError={() => setImageError(true)}
+            resizeMode="cover"
+          />
+        ) : (
+          <View style={[styles.itemImagePlaceholder, isInactive && styles.inactiveImage]}>
+            <Text style={[styles.itemImageText, isInactive && styles.inactiveText]}>
+              {item.productName.charAt(0)}
+            </Text>
+          </View>
+        )}
       </TouchableOpacity>
 
       <View style={styles.itemInfo}>
@@ -156,6 +175,11 @@ const styles = StyleSheet.create({
   imageButton: {
     marginRight: 12,
   },
+  itemImage: {
+    width: 60,
+    height: 60,
+    borderRadius: 8,
+  },
   itemImagePlaceholder: {
     width: 60,
     height: 60,
@@ -166,6 +190,7 @@ const styles = StyleSheet.create({
   },
   inactiveImage: {
     backgroundColor: '#E0E0E0',
+    opacity: 0.7,
   },
   itemImageText: {
     fontSize: 24,

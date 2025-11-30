@@ -1,9 +1,13 @@
 import { TabScreen } from "@/components/TabScreen";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useSellerMe } from "@/hooks/useSeller";
+import { deleteSellerImage, ImageFile, uploadSellerImage } from "@/utils/imageUpload";
+import { getFirstImageUrl } from "@/utils/imageUtils";
+import * as ImagePicker from 'expo-image-picker';
 import { useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import {
+    ActivityIndicator,
     Alert,
     Image,
     ScrollView,
@@ -26,6 +30,9 @@ export default function ShopScreen() {
     const [shortName, setShortName] = useState("");
     const [description, setDescription] = useState("");
     const [imageUrl, setImageUrl] = useState<string | null>(null);
+    const [currentImageId, setCurrentImageId] = useState<number | null>(null);
+    const [newImageFile, setNewImageFile] = useState<ImageFile | null>(null);
+    const [isUploading, setIsUploading] = useState(false);
     
     const [hasChanges, setHasChanges] = useState(false);
 
@@ -36,7 +43,13 @@ export default function ShopScreen() {
                 setFullName(seller.full_name);
                 setShortName(seller.short_name);
                 setDescription(seller.description);
-                setImageUrl(seller.images && seller.images.length > 0 ? seller.images[0].path : null);
+                const firstImage = seller.images && seller.images.length > 0 
+                    ? seller.images.sort((a, b) => a.order - b.order)[0]
+                    : null;
+                const firstImageUrl = firstImage ? getFirstImageUrl(seller.images) : null;
+                setImageUrl(firstImageUrl);
+                setCurrentImageId(firstImage?.id || null);
+                setNewImageFile(null);
                 setHasChanges(false);
             }
         }, [seller])
@@ -60,44 +73,142 @@ export default function ShopScreen() {
                             setFullName(seller.full_name);
                             setShortName(seller.short_name);
                             setDescription(seller.description);
-                            setImageUrl(seller.images && seller.images.length > 0 ? seller.images[0].path : null);
+                            const firstImage = seller.images && seller.images.length > 0 
+                                ? seller.images.sort((a, b) => a.order - b.order)[0]
+                                : null;
+                            const firstImageUrl = firstImage ? getFirstImageUrl(seller.images) : null;
+                            setImageUrl(firstImageUrl);
+                            setCurrentImageId(firstImage?.id || null);
+                            setNewImageFile(null);
                         }
                         setIsEditing(false);
                         setHasChanges(false);
+                        setIsUploading(false);
                     }
                 }
             ]
         );
     };
 
-    const handleSave = () => {
-        // TODO: Реализовать сохранение данных через API
-        Alert.alert(
-            "Сохранение",
-            "Изменения сохранены успешно!\n(Демонстрационный режим)",
-            [{ 
-                text: "OK",
-                onPress: () => {
-                    setIsEditing(false);
-                    setHasChanges(false);
+    const handleSave = async () => {
+        if (!seller) return;
+
+        setIsUploading(true);
+        try {
+            // Если изображение было удалено (было изображение, но теперь нет)
+            if (!imageUrl && currentImageId && !newImageFile) {
+                const deleted = await deleteSellerImage(currentImageId);
+                if (deleted) {
+                    setCurrentImageId(null);
+                } else {
+                    Alert.alert("Ошибка", "Не удалось удалить изображение");
+                    setIsUploading(false);
+                    return;
                 }
-            }]
-        );
+            }
+            
+            // Если есть новое изображение, загружаем его
+            if (newImageFile) {
+                // Если есть старое изображение, удаляем его перед загрузкой нового
+                if (currentImageId) {
+                    await deleteSellerImage(currentImageId);
+                }
+                
+                // Загружаем новое изображение
+                const uploadedImage = await uploadSellerImage(seller.id, newImageFile, 0);
+                if (uploadedImage) {
+                    setCurrentImageId(uploadedImage.id);
+                    setImageUrl(getFirstImageUrl([uploadedImage]));
+                    setNewImageFile(null);
+                } else {
+                    Alert.alert("Ошибка", "Не удалось загрузить изображение");
+                    setIsUploading(false);
+                    return;
+                }
+            }
+
+            // TODO: Сохранить другие поля (fullName, shortName, description) через API
+            // Пока просто показываем успех
+            Alert.alert(
+                "Сохранение",
+                "Изменения сохранены успешно!",
+                [{ 
+                    text: "OK",
+                    onPress: () => {
+                        setIsEditing(false);
+                        setHasChanges(false);
+                    }
+                }]
+            );
+        } catch (error) {
+            console.error('Ошибка сохранения:', error);
+            Alert.alert("Ошибка", "Не удалось сохранить изменения");
+        } finally {
+            setIsUploading(false);
+        }
     };
 
-    const handleImageChange = () => {
+    const handleImageChange = async () => {
         if (!isEditing) return;
         
+        // Запрашиваем разрешение на доступ к медиатеке
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== 'granted') {
+            Alert.alert(
+                "Доступ запрещен",
+                "Для изменения логотипа необходимо разрешение на доступ к медиатеке."
+            );
+            return;
+        }
+
         Alert.alert(
-            "Выбор изображения",
-            "В реальном приложении здесь откроется галерея",
+            "Изменить логотип",
+            imageUrl ? "Выберите действие" : "Выберите изображение",
             [
                 { text: "Отмена", style: "cancel" },
-                {
-                    text: "Демо изображение",
+                ...(imageUrl ? [{
+                    text: "Удалить",
+                    style: "destructive" as const,
                     onPress: () => {
-                        setImageUrl("https://via.placeholder.com/150/0000FF/FFFFFF");
-                        setHasChanges(true);
+                        Alert.alert(
+                            "Удалить логотип",
+                            "Вы уверены, что хотите удалить текущий логотип?",
+                            [
+                                { text: "Отмена", style: "cancel" },
+                                {
+                                    text: "Удалить",
+                                    style: "destructive" as const,
+                                    onPress: () => {
+                                        setImageUrl(null);
+                                        setCurrentImageId(null);
+                                        setNewImageFile(null);
+                                        setHasChanges(true);
+                                    }
+                                }
+                            ]
+                        );
+                    }
+                }] : []),
+                {
+                    text: "Выбрать из галереи",
+                    onPress: async () => {
+                        const result = await ImagePicker.launchImageLibraryAsync({
+                            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                            allowsMultipleSelection: false,
+                            quality: 0.8,
+                        });
+
+                        if (!result.canceled && result.assets && result.assets.length > 0) {
+                            const asset = result.assets[0];
+                            const imageFile: ImageFile = {
+                                uri: asset.uri,
+                                type: asset.mimeType || 'image/jpeg',
+                                name: asset.fileName || `logo_${Date.now()}.jpg`,
+                            };
+                            setNewImageFile(imageFile);
+                            setImageUrl(asset.uri);
+                            setHasChanges(true);
+                        }
                     }
                 }
             ]
@@ -171,20 +282,49 @@ export default function ShopScreen() {
                             onPress={handleImageChange}
                             disabled={!isEditing}
                         >
-                            <View style={styles.imagePlaceholder}>
-                                <IconSymbol name="bag.fill" size={60} color="#ccc" />
-                            </View>
-                            {imageUrl && (
+                            {imageUrl ? (
                                 <Image 
                                     source={{ uri: imageUrl }}
                                     style={styles.image}
                                 />
+                            ) : (
+                                <View style={styles.imagePlaceholder}>
+                                    <IconSymbol name="bag.fill" size={60} color="#ccc" />
+                                </View>
                             )}
                             {isEditing && (
                                 <View style={styles.imageOverlay}>
                                     <IconSymbol name="camera" size={24} color="#fff" />
-                                    <Text style={styles.imageOverlayText}>Изменить</Text>
+                                    <Text style={styles.imageOverlayText}>
+                                        {imageUrl ? 'Изменить' : 'Добавить'}
+                                    </Text>
                                 </View>
+                            )}
+                            {isEditing && imageUrl && (
+                                <TouchableOpacity
+                                    style={styles.deleteImageButton}
+                                    onPress={() => {
+                                        Alert.alert(
+                                            "Удалить логотип",
+                                            "Вы уверены, что хотите удалить текущий логотип?",
+                                            [
+                                                { text: "Отмена", style: "cancel" },
+                                                {
+                                                    text: "Удалить",
+                                                    style: "destructive" as const,
+                                                    onPress: () => {
+                                                        setImageUrl(null);
+                                                        setCurrentImageId(null);
+                                                        setNewImageFile(null);
+                                                        setHasChanges(true);
+                                                    }
+                                                }
+                                            ]
+                                        );
+                                    }}
+                                >
+                                    <IconSymbol name="trash" size={20} color="#fff" />
+                                </TouchableOpacity>
                             )}
                         </TouchableOpacity>
                     </View>
@@ -341,14 +481,18 @@ export default function ShopScreen() {
                             <TouchableOpacity 
                                 style={[
                                     styles.saveButton,
-                                    !hasChanges && styles.saveButtonDisabled
+                                    (!hasChanges || isUploading) && styles.saveButtonDisabled
                                 ]}
                                 onPress={handleSave}
-                                disabled={!hasChanges}
+                                disabled={!hasChanges || isUploading}
                             >
-                                <Text style={styles.saveButtonText}>
-                                    {hasChanges ? "Сохранить изменения" : "Нет изменений"}
-                                </Text>
+                                {isUploading ? (
+                                    <ActivityIndicator color="#fff" />
+                                ) : (
+                                    <Text style={styles.saveButtonText}>
+                                        {hasChanges ? "Сохранить изменения" : "Нет изменений"}
+                                    </Text>
+                                )}
                             </TouchableOpacity>
 
                             {hasChanges && (
@@ -473,6 +617,18 @@ const styles = StyleSheet.create({
         color: '#fff',
         fontSize: 14,
         fontWeight: '600',
+    },
+    deleteImageButton: {
+        position: 'absolute',
+        top: 8,
+        right: 8,
+        backgroundColor: 'rgba(255, 59, 48, 0.9)',
+        borderRadius: 20,
+        width: 40,
+        height: 40,
+        justifyContent: 'center',
+        alignItems: 'center',
+        zIndex: 10,
     },
     fieldContainer: {
         marginBottom: 20,

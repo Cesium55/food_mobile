@@ -2,11 +2,15 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { API_ENDPOINTS } from "@/constants/api";
 import { getApiUrl } from "@/constants/env";
 import { useCategories } from "@/hooks/useCategories";
+import { useProducts } from "@/hooks/useProducts";
 import { authFetch } from "@/utils/authFetch";
+import { ImageFile, uploadProductImagesBatch } from "@/utils/imageUpload";
+import * as ImagePicker from 'expo-image-picker';
 import { router } from "expo-router";
 import { useState } from "react";
 import {
     Alert,
+    Image,
     Modal,
     ScrollView,
     StyleSheet,
@@ -19,11 +23,13 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function NewProductScreen() {
     const { categories, getCategoryById, getCategoryPath } = useCategories();
+    const { refetch } = useProducts();
 
     const [name, setName] = useState("");
     const [description, setDescription] = useState("");
     const [categoryIds, setCategoryIds] = useState<number[]>([]); // Массив ID категорий
-    const [images, setImages] = useState<string[]>([]);
+    const [images, setImages] = useState<ImageFile[]>([]);
+    const [isUploading, setIsUploading] = useState(false);
     // Характеристики (можно удалять любые)
     const [characteristics, setCharacteristics] = useState<{ [key: string]: string }>({
         'Вес/Объем': '',
@@ -38,20 +44,32 @@ export default function NewProductScreen() {
     const [showAddCharModal, setShowAddCharModal] = useState(false);
     const [newCharName, setNewCharName] = useState('');
 
-    const handleAddImage = () => {
-        Alert.alert(
-            "Добавить фото",
-            "В реальном приложении здесь откроется галерея",
-            [
-                { text: "Отмена", style: "cancel" },
-                {
-                    text: "Добавить фото",
-                    onPress: () => {
-                        setImages([...images, '']);
-                    }
-                }
-            ]
-        );
+    const handleAddImage = async () => {
+        // Запрашиваем разрешение на доступ к медиатеке
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== 'granted') {
+            Alert.alert(
+                "Доступ запрещен",
+                "Для добавления фотографий необходимо разрешение на доступ к медиатеке."
+            );
+            return;
+        }
+
+        // Открываем галерею для выбора изображений
+        const result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            allowsMultipleSelection: true,
+            quality: 0.8,
+        });
+
+        if (!result.canceled && result.assets) {
+            const newImages: ImageFile[] = result.assets.map((asset: any) => ({
+                uri: asset.uri,
+                type: asset.mimeType || 'image/jpeg',
+                name: asset.fileName || `image_${Date.now()}.jpg`,
+            }));
+            setImages([...images, ...newImages]);
+        }
     };
 
     const handleRemoveImage = (index: number) => {
@@ -151,14 +169,58 @@ export default function NewProductScreen() {
                 
                 console.log('✅ Товар успешно создан:', data || 'Ответ получен');
                 
-                Alert.alert(
-                    "Успех",
-                    `Товар "${name}" успешно создан!`,
-                    [{ 
-                        text: "OK",
-                        onPress: () => router.back()
-                    }]
-                );
+                // Получаем ID созданного товара
+                const productData = data?.data || data;
+                const productId = productData?.id;
+
+                // Если есть изображения и товар создан, загружаем изображения
+                if (productId && images.length > 0) {
+                    setIsUploading(true);
+                    try {
+                        const uploadedImages = await uploadProductImagesBatch(productId, images, 0);
+                        console.log('✅ Изображения успешно загружены:', uploadedImages);
+                        
+                        // Обновляем список товаров
+                        await refetch();
+                        
+                        Alert.alert(
+                            "Успех",
+                            `Товар "${name}" успешно создан${uploadedImages.length > 0 ? ` и загружено ${uploadedImages.length} изображений` : ''}!`,
+                            [{ 
+                                text: "OK",
+                                onPress: () => router.back()
+                            }]
+                        );
+                    } catch (uploadError) {
+                        console.error('❌ Ошибка загрузки изображений:', uploadError);
+                        
+                        // Обновляем список товаров даже если изображения не загрузились
+                        await refetch();
+                        
+                        Alert.alert(
+                            "Товар создан",
+                            `Товар "${name}" успешно создан, но произошла ошибка при загрузке изображений. Вы можете добавить их позже.`,
+                            [{ 
+                                text: "OK",
+                                onPress: () => router.back()
+                            }]
+                        );
+                    } finally {
+                        setIsUploading(false);
+                    }
+                } else {
+                    // Обновляем список товаров
+                    await refetch();
+                    
+                    Alert.alert(
+                        "Успех",
+                        `Товар "${name}" успешно создан!`,
+                        [{ 
+                            text: "OK",
+                            onPress: () => router.back()
+                        }]
+                    );
+                }
             } else {
                 const errorText = await response.text();
                 console.error('❌ Ошибка создания товара:', response.status, errorText);
@@ -382,18 +444,14 @@ export default function NewProductScreen() {
                         showsHorizontalScrollIndicator={false}
                         contentContainerStyle={styles.galleryScroll}
                     >
-                        {images.map((imageUrl, index) => {
-                            const colors = ['#81C784', '#64B5F6', '#FFB74D', '#BA68C8', '#F06292', '#4DD0E1'];
-                            const backgroundColor = colors[index % colors.length];
-                            
+                        {images.map((image, index) => {
                             return (
                                 <View key={index} style={styles.imageWrapper}>
-                                    <View 
-                                        style={[styles.galleryImage, { backgroundColor }]}
-                                    >
-                                        <Text style={styles.imagePlaceholderText}>📸</Text>
-                                        <Text style={styles.imageNumberText}>Фото {index + 1}</Text>
-                                    </View>
+                                    <Image 
+                                        source={{ uri: image.uri }}
+                                        style={styles.galleryImage}
+                                        resizeMode="cover"
+                                    />
                                     <TouchableOpacity 
                                         style={styles.removeImageButton}
                                         onPress={() => handleRemoveImage(index)}
@@ -407,6 +465,7 @@ export default function NewProductScreen() {
                         <TouchableOpacity 
                             style={styles.addImageButton}
                             onPress={handleAddImage}
+                            disabled={isUploading}
                         >
                             <IconSymbol name="plus" size={32} color="#999" />
                             <Text style={styles.addImageText}>Добавить фото</Text>
@@ -546,10 +605,13 @@ export default function NewProductScreen() {
                 {/* Кнопки действий */}
                 <View style={styles.actionsSection}>
                     <TouchableOpacity 
-                        style={styles.saveButton}
+                        style={[styles.saveButton, (isUploading) && styles.saveButtonDisabled]}
                         onPress={handleSave}
+                        disabled={isUploading}
                     >
-                        <Text style={styles.saveButtonText}>Создать товар</Text>
+                        <Text style={styles.saveButtonText}>
+                            {isUploading ? 'Загрузка...' : 'Создать товар'}
+                        </Text>
                     </TouchableOpacity>
 
                     <TouchableOpacity 
@@ -668,8 +730,6 @@ const styles = StyleSheet.create({
         height: 250,
         borderRadius: 12,
         backgroundColor: '#f0f0f0',
-        justifyContent: 'center',
-        alignItems: 'center',
     },
     imagePlaceholderText: {
         fontSize: 48,
@@ -913,6 +973,10 @@ const styles = StyleSheet.create({
         padding: 16,
         alignItems: 'center',
         marginBottom: 12,
+    },
+    saveButtonDisabled: {
+        backgroundColor: '#ccc',
+        opacity: 0.6,
     },
     saveButtonText: {
         color: 'white',

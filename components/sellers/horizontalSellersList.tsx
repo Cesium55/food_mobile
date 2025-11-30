@@ -1,7 +1,9 @@
+import { PublicSeller } from '@/hooks/usePublicSeller';
 import { useSellers } from '@/hooks/useSellers';
+import { getFirstImageUrl } from '@/utils/imageUtils';
 import { useRouter, useSegments } from 'expo-router';
-import React from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useState } from 'react';
+import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 const AVATAR_SIZE = 90;
 
@@ -24,24 +26,54 @@ export default function HorizontalSellersList() {
       contentContainerStyle={styles.contentContainer}
     >
       {sellers.map((seller) => (
-        <View key={seller.id} style={styles.sellerItem}>
-          <TouchableOpacity 
-            style={styles.avatarContainer} 
-            activeOpacity={0.7}
-            onPress={() => handleSellerPress(seller.id)}
-          >
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>
-                {seller.short_name.charAt(0).toUpperCase()}
-              </Text>
-            </View>
-          </TouchableOpacity>
-          <Text style={styles.sellerName} numberOfLines={2}>
-            {seller.short_name}
-          </Text>
-        </View>
+        <SellerAvatar 
+          key={seller.id} 
+          seller={seller} 
+          onPress={() => handleSellerPress(seller.id)} 
+        />
       ))}
     </ScrollView>
+  );
+}
+
+interface SellerAvatarProps {
+  seller: PublicSeller;
+  onPress: () => void;
+}
+
+function SellerAvatar({ seller, onPress }: SellerAvatarProps) {
+  const [imageError, setImageError] = useState(false);
+  
+  // Получаем URL первого изображения
+  const imageUrl = getFirstImageUrl(seller.images);
+  const hasImage = imageUrl && !imageError;
+
+  return (
+    <View style={styles.sellerItem}>
+      <TouchableOpacity 
+        style={styles.avatarContainer} 
+        activeOpacity={0.7}
+        onPress={onPress}
+      >
+        {hasImage ? (
+          <Image
+            source={{ uri: imageUrl! }}
+            style={styles.avatarImage}
+            onError={() => setImageError(true)}
+            resizeMode="cover"
+          />
+        ) : (
+          <View style={styles.avatar}>
+            <Text style={styles.avatarText}>
+              {seller.short_name.charAt(0).toUpperCase()}
+            </Text>
+          </View>
+        )}
+      </TouchableOpacity>
+      <Text style={styles.sellerName} numberOfLines={2}>
+        {seller.short_name}
+      </Text>
+    </View>
   );
 }
 
@@ -66,6 +98,19 @@ const styles = StyleSheet.create({
     backgroundColor: '#4CAF50',
     justifyContent: 'center',
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: AVATAR_SIZE * 0.0625,
+    elevation: 3,
+  },
+  avatarImage: {
+    width: AVATAR_SIZE,
+    height: AVATAR_SIZE,
+    borderRadius: AVATAR_SIZE / 2,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,

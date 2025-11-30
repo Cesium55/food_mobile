@@ -1,5 +1,5 @@
-import { ShopPoint } from '@/hooks/useShopPoints';
 import { PublicSeller } from '@/hooks/usePublicSeller';
+import { ShopPoint } from '@/hooks/useShopPoints';
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
@@ -16,7 +16,7 @@ export default function ShopInfoCard({ shopPoint, seller }: ShopInfoCardProps) {
       </View>
       <View style={styles.shopDetails}>
         {seller && (
-          <Text style={styles.sellerName}>📦 {seller.short_name}</Text>
+          <Text style={styles.sellerName}>{seller.short_name}</Text>
         )}
         <Text style={styles.shopAddress}>📍 {shopPoint.address_formated || shopPoint.address_raw}</Text>
         {shopPoint.city && (

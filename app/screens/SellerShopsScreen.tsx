@@ -1,8 +1,10 @@
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useOffers } from "@/hooks/useOffers";
 import { useSellerWithShops } from "@/hooks/usePublicSeller";
+import { getFirstImageUrl } from "@/utils/imageUtils";
 import { useLocalSearchParams, useRouter, useSegments } from "expo-router";
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { useState } from "react";
+import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function SellerShopsScreen() {
@@ -12,9 +14,14 @@ export default function SellerShopsScreen() {
   const sellerId = Number(id);
   const { seller, loading: sellerLoading, error: sellerError } = useSellerWithShops(sellerId);
   const { getOffersBySeller } = useOffers();
+  const [imageError, setImageError] = useState(false);
 
   const sellerOffers = getOffersBySeller(sellerId);
   const shops = seller?.shop_points || [];
+  
+  // Получаем URL первого изображения продавца
+  const imageUrl = seller ? getFirstImageUrl(seller.images) : null;
+  const hasImage = imageUrl && !imageError;
 
   if (sellerLoading) {
     return (
@@ -82,11 +89,20 @@ export default function SellerShopsScreen() {
       <ScrollView style={styles.container}>
         {/* Информация о продавце */}
         <View style={styles.sellerInfo}>
-          <View style={styles.sellerAvatar}>
-            <Text style={styles.sellerAvatarText}>
-              {seller.short_name.charAt(0).toUpperCase()}
-            </Text>
-          </View>
+          {hasImage ? (
+            <Image
+              source={{ uri: imageUrl! }}
+              style={styles.sellerAvatarImage}
+              onError={() => setImageError(true)}
+              resizeMode="cover"
+            />
+          ) : (
+            <View style={styles.sellerAvatar}>
+              <Text style={styles.sellerAvatarText}>
+                {seller.short_name.charAt(0).toUpperCase()}
+              </Text>
+            </View>
+          )}
           <View style={styles.sellerDetails}>
             <Text style={styles.sellerName}>{seller.full_name}</Text>
             <View style={styles.statsRow}>
@@ -198,6 +214,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#4CAF50',
     justifyContent: 'center',
     alignItems: 'center',
+    marginRight: 16,
+  },
+  sellerAvatarImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
     marginRight: 16,
   },
   sellerAvatarText: {

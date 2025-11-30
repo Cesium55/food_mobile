@@ -3,6 +3,13 @@ import { getApiUrl } from '@/constants/env';
 import { authFetch } from '@/utils/authFetch';
 import { useCallback, useEffect, useState } from 'react';
 
+// Интерфейс изображения товара
+export interface ProductImage {
+  id: number;
+  path: string;
+  order: number;
+}
+
 // Интерфейс оффера с сервера
 export interface OfferApi {
   id: number;
@@ -20,7 +27,7 @@ export interface OfferApi {
     article: string | null;
     code: string | null;
     seller_id: number;
-    images: string[];
+    images: ProductImage[];
     attributes: Array<{
       slug: string;
       name: string;
@@ -39,6 +46,7 @@ export interface Offer {
   productName: string;
   productDescription: string;
   productCategoryIds: number[]; // Массив ID категорий товара
+  productImages: ProductImage[]; // Массив изображений товара
   productAttributes?: Array<{
     slug: string;
     name: string;
@@ -69,13 +77,13 @@ export const useOffers = () => {
       ? Math.round(((apiOffer.original_cost - apiOffer.current_cost) / apiOffer.original_cost) * 100)
       : 0;
 
-
     return {
       id: apiOffer.id,
       productId: apiOffer.product_id,
       productName: apiOffer.product?.name || 'Товар',
       productDescription: apiOffer.product?.description || '',
       productCategoryIds: apiOffer.product?.category_ids || [],
+      productImages: apiOffer.product?.images || [],
       productAttributes: apiOffer.product?.attributes || [],
       shopId: apiOffer.shop_id,
       sellerId: apiOffer.product?.seller_id || 0,

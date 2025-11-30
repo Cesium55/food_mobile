@@ -37,6 +37,9 @@ export interface AppConfig {
   isDevelopment: boolean;
   isProduction: boolean;
   
+  // S3 настройки
+  s3BucketPrefix: string;
+  
   // API endpoints
   endpoints: typeof API_ENDPOINTS;
 }
@@ -70,6 +73,9 @@ export const config: AppConfig = {
   environment: currentEnv.name,
   isDevelopment: currentEnv.name === 'Development',
   isProduction: currentEnv.name === 'Production',
+  
+  // S3 настройки
+  s3BucketPrefix: env.S3_BUCKET_PREFIX || '',
   
   // API endpoints
   endpoints: API_ENDPOINTS,

@@ -1,9 +1,10 @@
 import CartButton from '@/components/cart/CartButton';
 import { Offer } from '@/hooks/useOffers';
 import { useShops } from '@/hooks/useShops';
+import { getFirstImageUrl } from '@/utils/imageUtils';
 import { useRouter, useSegments } from 'expo-router';
-import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useState } from 'react';
+import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 interface VerticalOfferCardProps {
   offer: Offer;
@@ -13,10 +14,15 @@ export default function VerticalOfferCard({ offer }: VerticalOfferCardProps) {
   const router = useRouter();
   const segments = useSegments();
   const { shops } = useShops();
+  const [imageError, setImageError] = useState(false);
   
   // Получаем название магазина по shopId
   const shop = shops.find(s => s.id === offer.shopId);
   const shopShortName = offer.shopShortName || shop?.shortName || shop?.name || 'Магазин';
+  
+  // Получаем URL первого изображения
+  const imageUrl = getFirstImageUrl(offer.productImages);
+  const hasImage = imageUrl && !imageError;
 
   // Проверяем срок годности
   const now = new Date();
@@ -45,9 +51,20 @@ export default function VerticalOfferCard({ offer }: VerticalOfferCardProps) {
       activeOpacity={0.7}
       onPress={handlePress}
     >
-      {/* Изображение товара (заглушка) */}
+      {/* Изображение товара */}
       <View style={styles.imageContainer}>
-        <Text style={styles.imagePlaceholder}>📦</Text>
+        {hasImage ? (
+          <Image
+            source={{ uri: imageUrl }}
+            style={styles.productImage}
+            onError={() => setImageError(true)}
+            resizeMode="cover"
+          />
+        ) : (
+          <Text style={styles.imagePlaceholder}>
+            {offer.productName.charAt(0)}
+          </Text>
+        )}
         <View style={styles.discountBadge}>
           <Text style={styles.discountText}>-{offer.discount}%</Text>
         </View>
@@ -107,9 +124,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     position: 'relative',
+    overflow: 'hidden',
+  },
+  productImage: {
+    width: '100%',
+    height: '100%',
   },
   imagePlaceholder: {
     fontSize: 48,
+    fontWeight: 'bold',
+    color: '#4CAF50',
   },
   discountBadge: {
     position: 'absolute',

@@ -1,9 +1,11 @@
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useShopPoint } from "@/hooks/useShopPoints";
+import { getImageUrl } from "@/utils/imageUtils";
 import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
 import {
     Alert,
+    Image,
     ScrollView,
     StyleSheet,
     Text,
@@ -203,19 +205,26 @@ export default function PointDetailScreen() {
                         showsHorizontalScrollIndicator={false}
                         contentContainerStyle={styles.galleryScroll}
                     >
-                        {(shopPoint.images || []).map((imageUrl, index) => {
-                            // Массив приятных пастельных цветов
-                            const colors = ['#81C784', '#64B5F6', '#FFB74D', '#BA68C8', '#F06292', '#4DD0E1', '#AED581', '#FFD54F'];
-                            const backgroundColor = colors[index % colors.length];
+                        {(shopPoint.images || []).map((imageItem, index) => {
+                            const imageUrl = getImageUrl(imageItem.path);
+                            const hasImage = !!imageUrl;
                             
                             return (
-                                <View key={index} style={styles.imageWrapper}>
-                                    <View 
-                                        style={[styles.galleryImage, { backgroundColor }]}
-                                    >
-                                        <Text style={styles.imagePlaceholderText}>📸</Text>
-                                        <Text style={styles.imageNumberText}>Фото {index + 1}</Text>
-                                    </View>
+                                <View key={imageItem.id || index} style={styles.imageWrapper}>
+                                    {hasImage ? (
+                                        <Image
+                                            source={{ uri: imageUrl! }}
+                                            style={styles.galleryImage}
+                                            resizeMode="cover"
+                                        />
+                                    ) : (
+                                        <View 
+                                            style={[styles.galleryImage, styles.galleryImagePlaceholder]}
+                                        >
+                                            <Text style={styles.imagePlaceholderText}>📸</Text>
+                                            <Text style={styles.imageNumberText}>Фото {index + 1}</Text>
+                                        </View>
+                                    )}
                                     {isEditing && (
                                         <TouchableOpacity 
                                             style={styles.removeImageButton}
@@ -373,6 +382,8 @@ const styles = StyleSheet.create({
         width: 300,
         height: 200,
         borderRadius: 12,
+    },
+    galleryImagePlaceholder: {
         backgroundColor: '#f0f0f0',
         justifyContent: 'center',
         alignItems: 'center',

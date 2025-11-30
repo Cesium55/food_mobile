@@ -10,7 +10,7 @@ export interface PublicSeller {
     is_IP: boolean;
     status: number;
     verification_level: number;
-    images: Array<string>;
+    images: ImageItem[];
 }
 
 export interface ImageItem {

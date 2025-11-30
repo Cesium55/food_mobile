@@ -1,9 +1,10 @@
 import CartButton from '@/components/cart/CartButton';
 import { Offer } from '@/hooks/useOffers';
 import { useShops } from '@/hooks/useShops';
+import { getFirstImageUrl } from '@/utils/imageUtils';
 import { useRouter, useSegments } from 'expo-router';
-import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useState } from 'react';
+import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 const IMAGE_SIZE = 100;
 
@@ -16,10 +17,15 @@ export default function HorizontalOfferBlock({ offer, onPress }: HorizontalOffer
   const router = useRouter();
   const segments = useSegments();
   const { shops } = useShops();
+  const [imageError, setImageError] = useState(false);
   
   // Получаем название магазина по shopId
   const shop = shops.find(s => s.id === offer.shopId);
   const shopShortName = offer.shopShortName || shop?.shortName || shop?.name || 'Магазин';
+  
+  // Получаем URL первого изображения
+  const imageUrl = getFirstImageUrl(offer.productImages);
+  const hasImage = imageUrl && !imageError;
   
   const daysUntilExpiry = Math.ceil(
     (new Date(offer.expiresDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)
@@ -57,11 +63,20 @@ export default function HorizontalOfferBlock({ offer, onPress }: HorizontalOffer
 
         {/* Изображение товара слева */}
         <View style={styles.imageContainer}>
-          <View style={styles.imagePlaceholder}>
-            <Text style={styles.imagePlaceholderText}>
-              {offer.productName.charAt(0)}
-            </Text>
-          </View>
+          {hasImage ? (
+            <Image
+              source={{ uri: imageUrl! }}
+              style={styles.productImage}
+              onError={() => setImageError(true)}
+              resizeMode="cover"
+            />
+          ) : (
+            <View style={styles.imagePlaceholder}>
+              <Text style={styles.imagePlaceholderText}>
+                {offer.productName.charAt(0)}
+              </Text>
+            </View>
+          )}
         </View>
 
         {/* Информация о товаре справа */}
@@ -153,6 +168,11 @@ const styles = StyleSheet.create({
   imageContainer: {
     width: IMAGE_SIZE * 1.12,
     height: IMAGE_SIZE * 1.12,
+    overflow: 'hidden',
+  },
+  productImage: {
+    width: '100%',
+    height: '100%',
   },
   imagePlaceholder: {
     width: '100%',

@@ -201,8 +201,8 @@ export default function OrderPaidScreen() {
           </View>
         )}
 
-        {/* QR код - не показываем для завершенных заказов, показываем для оплаченных и подтвержденных */}
-        {purchase.status !== 'completed' && (
+        {/* QR код - показываем только для подтвержденных заказов */}
+        {purchase.status === 'confirmed' && (
           loadingToken ? (
             <View style={styles.qrSection}>
               <ActivityIndicator size="small" color="#4CAF50" />

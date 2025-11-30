@@ -1,11 +1,13 @@
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useCategories } from "@/hooks/useCategories";
-import { useProducts, Product as ApiProduct } from "@/hooks/useProducts";
+import { useProducts } from "@/hooks/useProducts";
+import { getImageUrl } from "@/utils/imageUtils";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import {
     ActivityIndicator,
     Alert,
+    Image,
     Modal,
     ScrollView,
     StyleSheet,
@@ -428,18 +430,26 @@ export default function ProductDetailScreen() {
                         showsHorizontalScrollIndicator={false}
                         contentContainerStyle={styles.galleryScroll}
                     >
-                        {product.images.map((imageUrl, index) => {
-                            const colors = ['#81C784', '#64B5F6', '#FFB74D', '#BA68C8', '#F06292', '#4DD0E1'];
-                            const backgroundColor = colors[index % colors.length];
+                        {product.images.map((imagePath, index) => {
+                            const imageUrl = getImageUrl(imagePath);
+                            const hasImage = !!imageUrl;
                             
                             return (
                                 <View key={index} style={styles.imageWrapper}>
-                                    <View 
-                                        style={[styles.galleryImage, { backgroundColor }]}
-                                    >
-                                        <Text style={styles.imagePlaceholderText}>📸</Text>
-                                        <Text style={styles.imageNumberText}>Фото {index + 1}</Text>
-                                    </View>
+                                    {hasImage ? (
+                                        <Image
+                                            source={{ uri: imageUrl! }}
+                                            style={styles.galleryImage}
+                                            resizeMode="cover"
+                                        />
+                                    ) : (
+                                        <View 
+                                            style={[styles.galleryImage, styles.galleryImagePlaceholder]}
+                                        >
+                                            <Text style={styles.imagePlaceholderText}>📸</Text>
+                                            <Text style={styles.imageNumberText}>Фото {index + 1}</Text>
+                                        </View>
+                                    )}
                                     {isEditing && (
                                         <TouchableOpacity 
                                             style={styles.removeImageButton}
@@ -780,6 +790,8 @@ const styles = StyleSheet.create({
         width: 250,
         height: 250,
         borderRadius: 12,
+    },
+    galleryImagePlaceholder: {
         backgroundColor: '#f0f0f0',
         justifyContent: 'center',
         alignItems: 'center',
