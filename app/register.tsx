@@ -1,7 +1,10 @@
+import PhoneInput from '@/components/PhoneInput';
 import { config, log } from '@/constants/config';
 import { ApiResponse, authService } from '@/services/authService';
 import { authService as autoAuthService } from '@/services/autoAuthService';
+import { sendTokenAfterAuth } from '@/services/firebaseService';
 import { FieldError, getFieldError, processAuthResponse } from '@/utils/errorHandler';
+import { decodeJWT } from '@/utils/jwt';
 import { saveTokens } from '@/utils/storage';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
@@ -17,7 +20,6 @@ import {
     TouchableOpacity,
     View
 } from 'react-native';
-import PhoneInput from '@/components/PhoneInput';
 
 export default function Register() {
   const [phone, setPhone] = useState('');
@@ -89,8 +91,12 @@ export default function Register() {
         await saveTokens(result.data.access_token, result.data.refresh_token);
         log('info', 'Пользователь успешно зарегистрирован');
         
+        // Отправляем FCM токен на сервер после успешной регистрации
+        sendTokenAfterAuth().catch((error) => {
+          log('warn', 'Не удалось отправить FCM токен после регистрации', error);
+        });
+        
         // Проверяем phone_verified в токене
-        const { decodeJWT } = await import('@/utils/jwt');
         const payload = decodeJWT(result.data.access_token);
         
         if (payload && payload.phone_verified === true) {

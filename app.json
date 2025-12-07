@@ -10,7 +10,12 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.makenti22.food"
+      "bundleIdentifier": "com.makenti22.food",
+      "infoPlist": {
+        "UIBackgroundModes": [
+          "remote-notification"
+        ]
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -23,7 +28,8 @@
       "permissions": [
         "INTERNET",
         "ACCESS_NETWORK_STATE",
-        "CAMERA"
+        "CAMERA",
+        "RECEIVE_BOOT_COMPLETED"
       ],
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
@@ -50,6 +56,15 @@
         "expo-camera",
         {
           "cameraPermission": "Приложению требуется доступ к камере для сканирования QR кодов."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/icon.png",
+          "color": "#ffffff",
+          "sounds": [],
+          "mode": "production"
         }
       ]
     ],

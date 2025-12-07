@@ -18,6 +18,7 @@ export const API_ENDPOINTS = {
     VERIFY_PHONE: '/auth/verify-phone',
     RESEND_VERIFICATION_CODE: '/auth/resend-verification-code',
     RESET_PASSWORD: '/auth/reset-password',
+    FIREBASE_TOKEN: '/auth/firebase-token',
   },
   
   // Пользователи

@@ -1,22 +1,24 @@
+import PhoneInput from '@/components/PhoneInput';
 import { config, log } from '@/constants/config';
 import { ApiResponse, authService } from '@/services/authService';
 import { authService as autoAuthService } from '@/services/autoAuthService';
+import { sendTokenAfterAuth } from '@/services/firebaseService';
 import { FieldError, getFieldError, processAuthResponse } from '@/utils/errorHandler';
+import { decodeJWT } from '@/utils/jwt';
 import { saveTokens } from '@/utils/storage';
-import PhoneInput from '@/components/PhoneInput';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
-  BackHandler,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View
+    ActivityIndicator,
+    BackHandler,
+    KeyboardAvoidingView,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
 } from 'react-native';
 
 export default function Login() {
@@ -78,8 +80,12 @@ export default function Login() {
         await saveTokens(result.data.access_token, result.data.refresh_token);
         log('info', 'Пользователь успешно вошел в систему');
         
+        // Отправляем FCM токен на сервер после успешной авторизации
+        sendTokenAfterAuth().catch((error) => {
+          log('warn', 'Не удалось отправить FCM токен после входа', error);
+        });
+        
         // Проверяем phone_verified в токене
-        const { decodeJWT } = await import('@/utils/jwt');
         const payload = decodeJWT(result.data.access_token);
         
         if (payload && payload.phone_verified === true) {
