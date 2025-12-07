@@ -1,28 +1,86 @@
 import { Offer } from '@/hooks/useOffers';
-import { getFirstImageUrl } from '@/utils/imageUtils';
-import React, { useState } from 'react';
-import { Image, StyleSheet, Text, View } from 'react-native';
+import { getImageUrl } from '@/utils/imageUtils';
+import React, { useRef, useState } from 'react';
+import {
+  Image,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View
+} from 'react-native';
 
 interface ProductImageSectionProps {
   offer: Offer;
 }
 
 export default function ProductImageSection({ offer }: ProductImageSectionProps) {
-  const [imageError, setImageError] = useState(false);
+  const scrollViewRef = useRef<ScrollView>(null);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [imageErrors, setImageErrors] = useState<boolean[]>([]);
   
-  // Получаем URL первого изображения
-  const imageUrl = getFirstImageUrl(offer.productImages);
-  const hasImage = imageUrl && !imageError;
+  // Получаем все валидные URL изображений
+  const imageUrls = (offer.productImages || [])
+    .map(img => getImageUrl(img.path))
+    .filter((url): url is string => url !== null);
+  
+  const hasImages = imageUrls.length > 0;
+  const hasMultipleImages = imageUrls.length > 1;
+
+  const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const scrollPosition = event.nativeEvent.contentOffset.x;
+    const imageWidth = 240; // ширина изображения
+    const index = Math.round(scrollPosition / imageWidth);
+    setCurrentImageIndex(index);
+  };
+
+  const handleImageError = (index: number) => {
+    const newErrors = [...imageErrors];
+    newErrors[index] = true;
+    setImageErrors(newErrors);
+  };
 
   return (
     <View style={styles.container}>
-      {hasImage ? (
-        <Image
-          source={{ uri: imageUrl! }}
-          style={styles.productImage}
-          onError={() => setImageError(true)}
-          resizeMode="cover"
-        />
+      {hasImages ? (
+        <>
+          <ScrollView
+            ref={scrollViewRef}
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            onScroll={handleScroll}
+            scrollEventThrottle={16}
+            style={styles.scrollView}
+            contentContainerStyle={styles.scrollContent}
+          >
+            {imageUrls.map((imageUrl, index) => (
+              <Image
+                key={index}
+                source={{ uri: imageUrl }}
+                style={styles.productImage}
+                onError={() => handleImageError(index)}
+                resizeMode="cover"
+              />
+            ))}
+          </ScrollView>
+          
+          {/* Индикаторы изображений */}
+          {hasMultipleImages && (
+            <View style={styles.indicators}>
+              {imageUrls.map((_, index) => (
+                <View
+                  key={index}
+                  style={[
+                    styles.indicatorDot,
+                    index === currentImageIndex && styles.indicatorDotActive
+                  ]}
+                />
+              ))}
+            </View>
+          )}
+        </>
       ) : (
         <View style={styles.imagePlaceholder}>
           <Text style={styles.imagePlaceholderText}>
@@ -53,10 +111,36 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 3,
   },
+  scrollView: {
+    width: 240,
+    height: 240,
+  },
+  scrollContent: {
+    alignItems: 'center',
+  },
   productImage: {
     width: 240,
     height: 240,
     borderRadius: 20,
+  },
+  indicators: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 16,
+    gap: 6,
+  },
+  indicatorDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#ccc',
+  },
+  indicatorDotActive: {
+    backgroundColor: '#34C759',
+    width: 10,
+    height: 10,
+    borderRadius: 5,
   },
   imagePlaceholder: {
     width: 240,

@@ -1,7 +1,7 @@
+import { useState, useEffect, useCallback } from 'react';
+import { getCurrentPendingPurchase, CreateOrderResponse } from '@/services/orderService';
 import { useOffers } from '@/hooks/useOffers';
 import { useShops } from '@/hooks/useShops';
-import { CreateOrderResponse, getCurrentPendingPurchase, getPurchasesList, PurchaseListItem } from '@/services/orderService';
-import { useCallback, useEffect, useState } from 'react';
 
 export interface OrderItem {
   id: number;
@@ -14,7 +14,7 @@ export interface OrderItem {
 export interface Order {
   id: number;
   date: Date;
-  status: 'completed' | 'confirmed' | 'cancelled' | 'processing' | 'reserved' | 'paid';
+  status: 'completed' | 'cancelled' | 'processing' | 'reserved' | 'paid';
   items: OrderItem[];
   totalAmount: number;
   discount: number;
@@ -80,64 +80,23 @@ export const useOrders = () => {
     };
   }, [getOfferById, getShopById]);
 
-  // Преобразуем PurchaseListItem в Order
-  const convertPurchaseListItemToOrder = useCallback((purchase: PurchaseListItem): Order => {
-    // Определяем статус
-    let status: Order['status'] = 'processing';
-    if (purchase.status === 'completed') {
-      status = 'completed';
-    } else if (purchase.status === 'confirmed') {
-      status = 'confirmed';
-    } else if (purchase.status === 'cancelled') {
-      status = 'cancelled';
-    } else if (purchase.status === 'pending') {
-      status = 'reserved';
-    } else if (purchase.status === 'paid') {
-      status = 'paid';
-    }
-
-    return {
-      id: purchase.id,
-      date: new Date(purchase.created_at),
-      status,
-      items: [], // В упрощенном ответе нет информации о товарах
-      totalAmount: purchase.total_cost,
-      discount: 0, // Не можем вычислить без информации о товарах
-      paymentMethod: 'card', // По умолчанию
-      shops: [], // Не можем определить без информации о товарах
-    };
-  }, []);
-
-  // Загружаем список покупок
-  const loadPurchases = useCallback(async () => {
-    try {
-      setLoading(true);
-      const purchasesList = await getPurchasesList();
-      const convertedOrders = purchasesList.map(convertPurchaseListItemToOrder);
-      setOrders(convertedOrders);
-    } catch (error) {
-      console.error('Ошибка загрузки списка покупок:', error);
-      setOrders([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [convertPurchaseListItemToOrder]);
-
   // Загружаем текущий pending заказ
   const loadCurrentPending = useCallback(async () => {
     try {
+      setLoading(true);
       const pending = await getCurrentPendingPurchase();
       setCurrentPending(pending);
     } catch (error) {
       console.error('Ошибка загрузки текущего заказа:', error);
       setCurrentPending(null);
+    } finally {
+      setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    loadPurchases();
     loadCurrentPending();
-  }, [loadPurchases, loadCurrentPending]);
+  }, [loadCurrentPending]);
 
   const getOrderById = (id: number): Order | undefined => {
     return orders.find(order => order.id === id);
@@ -184,7 +143,6 @@ export const useOrders = () => {
     getTotalSaved,
     getCurrentOrders,
     refetchCurrentPending: loadCurrentPending,
-    refetchOrders: loadPurchases,
   };
 };
 

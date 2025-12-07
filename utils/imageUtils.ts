@@ -15,7 +15,8 @@ type ImageWithPath = {
  * @returns полный URL изображения или null, если путь не указан
  */
 export const getImageUrl = (imagePath: string | null | undefined): string | null => {
-  if (!imagePath) {
+  // Проверяем, что imagePath является строкой
+  if (!imagePath || typeof imagePath !== 'string') {
     return null;
   }
 

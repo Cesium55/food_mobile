@@ -14,7 +14,14 @@ export default function HorizontalOfferBlockList({
 }: HorizontalOfferBlockListProps) {
   const { offers } = useOffers();
   
-  const displayOffers = limit ? offers.slice(0, limit) : offers;
+  // Фильтруем предложения: показываем только те, у которых срок годности еще не истек
+  const now = new Date();
+  const validOffers = offers.filter(offer => {
+    const expiresDate = new Date(offer.expiresDate);
+    return expiresDate > now;
+  });
+  
+  const displayOffers = limit ? validOffers.slice(0, limit) : validOffers;
 
   return (
     <View style={styles.container}>

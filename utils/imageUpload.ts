@@ -145,6 +145,33 @@ export const uploadSellerImage = async (
 };
 
 /**
+ * Удаляет изображение товара
+ * @param imageId - ID изображения
+ * @returns true если удалено успешно, false при ошибке
+ */
+export const deleteProductImage = async (imageId: number): Promise<boolean> => {
+  try {
+    const url = getApiUrl(API_ENDPOINTS.PRODUCTS.DELETE_IMAGE(imageId));
+
+    const response = await authFetch(url, {
+      method: 'DELETE',
+      requireAuth: true,
+    });
+
+    if (response.ok) {
+      return true;
+    } else {
+      const errorText = await response.text();
+      console.error('Ошибка удаления изображения товара:', response.status, errorText);
+      return false;
+    }
+  } catch (error) {
+    console.error('Ошибка при удалении изображения товара:', error);
+    return false;
+  }
+};
+
+/**
  * Удаляет изображение продавца
  * @param imageId - ID изображения
  * @returns true если удалено успешно, false при ошибке

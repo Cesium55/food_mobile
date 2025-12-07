@@ -1,7 +1,12 @@
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import { API_ENDPOINTS } from "@/constants/api";
+import { getApiUrl } from "@/constants/env";
 import { useCategories } from "@/hooks/useCategories";
 import { useProducts } from "@/hooks/useProducts";
+import { authFetch } from "@/utils/authFetch";
+import { ImageFile, deleteProductImage, uploadProductImagesBatch } from "@/utils/imageUpload";
 import { getImageUrl } from "@/utils/imageUtils";
+import * as ImagePicker from 'expo-image-picker';
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import {
@@ -27,6 +32,11 @@ interface Product {
     characteristics: { [key: string]: string };
 }
 
+interface ProductImage {
+    path: string;
+    id?: number; // ID изображения, если доступен
+}
+
 export default function ProductDetailScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
     const productId = Number(id);
@@ -40,47 +50,65 @@ export default function ProductDetailScreen() {
 
     // Данные товара
     const [product, setProduct] = useState<Product | null>(null);
-
     const [hasChanges, setHasChanges] = useState(false);
+    
+    // Работа с изображениями
+    const [existingImages, setExistingImages] = useState<ProductImage[]>([]); // Существующие изображения с сервера
+    const [newImages, setNewImages] = useState<ImageFile[]>([]); // Новые изображения для загрузки
+    const [imagesToDelete, setImagesToDelete] = useState<number[]>([]); // ID изображений для удаления
+    const [isUploading, setIsUploading] = useState(false);
+
+    // Функция загрузки товара с сервера
+    const loadProduct = async () => {
+        if (!productId || isNaN(productId)) {
+            setError('Неверный ID товара');
+            setLoading(false);
+            return;
+        }
+
+        try {
+            setLoading(true);
+            setError(null);
+            
+            const apiProduct = await fetchProductById(productId);
+            
+            if (apiProduct) {
+                // Данные уже преобразованы в хуке, просто используем их
+                const productData = {
+                    id: apiProduct.id,
+                    name: apiProduct.name,
+                    description: apiProduct.description || '',
+                    categoryIds: apiProduct.category_ids || [],
+                    images: apiProduct.images || [],
+                    characteristics: apiProduct.characteristics || {},
+                };
+                setProduct(productData);
+                
+                // Инициализируем существующие изображения
+                // Преобразуем строки путей в объекты (ID будет добавлен позже, если доступен)
+                // Фильтруем только валидные строки
+                setExistingImages(
+                    (apiProduct.images || [])
+                        .filter((path): path is string => typeof path === 'string' && path.length > 0)
+                        .map(path => ({ path }))
+                );
+                setNewImages([]);
+                setImagesToDelete([]);
+            } else {
+                setError('Товар не найден');
+                setProduct(null);
+            }
+        } catch (err) {
+            console.error('Ошибка загрузки товара:', err);
+            setError('Ошибка загрузки товара');
+            setProduct(null);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     // Загрузка товара с сервера
     useEffect(() => {
-        const loadProduct = async () => {
-            if (!productId || isNaN(productId)) {
-                setError('Неверный ID товара');
-                setLoading(false);
-                return;
-            }
-
-            try {
-                setLoading(true);
-                setError(null);
-                
-                const apiProduct = await fetchProductById(productId);
-                
-                if (apiProduct) {
-                    // Данные уже преобразованы в хуке, просто используем их
-                    setProduct({
-                        id: apiProduct.id,
-                        name: apiProduct.name,
-                        description: apiProduct.description || '',
-                        categoryIds: apiProduct.category_ids || [],
-                        images: apiProduct.images || [],
-                        characteristics: apiProduct.characteristics || {},
-                    });
-                } else {
-                    setError('Товар не найден');
-                    setProduct(null);
-                }
-            } catch (err) {
-                console.error('Ошибка загрузки товара:', err);
-                setError('Ошибка загрузки товара');
-                setProduct(null);
-            } finally {
-                setLoading(false);
-            }
-        };
-
         loadProduct();
     }, [productId, fetchProductById]);
 
@@ -97,7 +125,9 @@ export default function ProductDetailScreen() {
                 {
                     text: "Да",
                     style: "destructive",
-                    onPress: () => {
+                    onPress: async () => {
+                        // Отменяем все изменения, включая изображения
+                        await loadProduct();
                         setIsEditing(false);
                         setHasChanges(false);
                     }
@@ -106,19 +136,98 @@ export default function ProductDetailScreen() {
         );
     };
 
-    const handleSave = () => {
-        Alert.alert(
-            "Сохранение",
-            "Изменения сохранены успешно!\n(Демонстрационный режим)",
-            [{ 
-                text: "OK",
-                onPress: () => {
-                    setIsEditing(false);
-                    setHasChanges(false);
+    const handleSave = async () => {
+        if (!product) return;
+
+        if (!product.name || !product.description) {
+            Alert.alert("Ошибка", "Заполните обязательные поля: Название и Описание");
+            return;
+        }
+
+        if (product.categoryIds.length === 0) {
+            Alert.alert("Ошибка", "Выберите хотя бы одну категорию");
+            return;
+        }
+
+        try {
+            setIsUploading(true);
+
+            // Преобразуем characteristics в формат attributes для API
+            const attributes = Object.entries(product.characteristics)
+                .filter(([key, value]) => value.trim() !== '')
+                .map(([key, value]) => {
+                    // Генерируем slug из названия
+                    const slug = key.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+                    return {
+                        slug,
+                        name: key,
+                        value: value,
+                    };
+                });
+
+            // Обновляем данные товара
+            const productData = {
+                name: product.name.trim(),
+                description: product.description.trim(),
+                category_ids: product.categoryIds,
+                attributes: attributes,
+            };
+
+            const response = await authFetch(getApiUrl(`${API_ENDPOINTS.PRODUCTS.BASE}/${product.id}`), {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(productData),
+                requireAuth: true,
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(errorText || 'Ошибка обновления товара');
+            }
+
+            // Удаляем помеченные изображения
+            for (const imageId of imagesToDelete) {
+                try {
+                    await deleteProductImage(imageId);
+                } catch (err) {
+                    console.error(`Ошибка удаления изображения ${imageId}:`, err);
                 }
-            }]
-        );
+            }
+
+            // Загружаем новые изображения
+            if (newImages.length > 0) {
+                const existingCount = existingImages.length - imagesToDelete.length;
+                await uploadProductImagesBatch(product.id, newImages, existingCount);
+            }
+
+            // Обновляем данные товара
+            await loadProduct();
+            
+            Alert.alert(
+                "Успех",
+                "Товар успешно обновлен!",
+                [{ 
+                    text: "OK",
+                    onPress: () => {
+                        setIsEditing(false);
+                        setHasChanges(false);
+                    }
+                }]
+            );
+        } catch (err: any) {
+            console.error('Ошибка сохранения товара:', err);
+            Alert.alert(
+                "Ошибка",
+                err.message || "Ошибка сохранения товара. Проверьте подключение к интернету.",
+                [{ text: "OK" }]
+            );
+        } finally {
+            setIsUploading(false);
+        }
     };
+
 
     const handleDelete = () => {
         if (!product) return;
@@ -142,29 +251,38 @@ export default function ProductDetailScreen() {
         );
     };
 
-    const handleAddImage = () => {
+    const handleAddImage = async () => {
         if (!isEditing) return;
-        
-        Alert.alert(
-            "Добавить фото",
-            "В реальном приложении здесь откроется галерея",
-            [
-                { text: "Отмена", style: "cancel" },
-                {
-                    text: "Добавить фото",
-                    onPress: () => {
-                        setProduct({
-                            ...product,
-                            images: [...product.images, '']
-                        });
-                        setHasChanges(true);
-                    }
-                }
-            ]
-        );
+
+        // Запрашиваем разрешение на доступ к медиатеке
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== 'granted') {
+            Alert.alert(
+                "Доступ запрещен",
+                "Для добавления фотографий необходимо разрешение на доступ к медиатеке."
+            );
+            return;
+        }
+
+        // Открываем галерею для выбора изображений
+        const result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            allowsMultipleSelection: true,
+            quality: 0.8,
+        });
+
+        if (!result.canceled && result.assets) {
+            const newImageFiles: ImageFile[] = result.assets.map((asset: any) => ({
+                uri: asset.uri,
+                type: asset.mimeType || 'image/jpeg',
+                name: asset.fileName || `image_${Date.now()}.jpg`,
+            }));
+            setNewImages([...newImages, ...newImageFiles]);
+            setHasChanges(true);
+        }
     };
 
-    const handleRemoveImage = (index: number) => {
+    const handleRemoveImage = (index: number, isNewImage: boolean) => {
         if (!isEditing) return;
         
         Alert.alert(
@@ -176,10 +294,17 @@ export default function ProductDetailScreen() {
                     text: "Удалить",
                     style: "destructive",
                     onPress: () => {
-                        setProduct({
-                            ...product,
-                            images: product.images.filter((_, i) => i !== index)
-                        });
+                        if (isNewImage) {
+                            // Удаляем из новых изображений
+                            setNewImages(newImages.filter((_, i) => i !== index));
+                        } else {
+                            // Помечаем существующее изображение на удаление
+                            const imageToDelete = existingImages[index];
+                            if (imageToDelete.id) {
+                                setImagesToDelete([...imagesToDelete, imageToDelete.id]);
+                            }
+                            setExistingImages(existingImages.filter((_, i) => i !== index));
+                        }
                         setHasChanges(true);
                     }
                 }
@@ -188,11 +313,13 @@ export default function ProductDetailScreen() {
     };
 
     const handleFieldChange = <K extends keyof Product>(field: K, value: Product[K]) => {
+        if (!product) return;
         setProduct({ ...product, [field]: value });
         setHasChanges(true);
     };
 
     const handleCharacteristicChange = (key: string, value: string) => {
+        if (!product) return;
         setProduct({
             ...product,
             characteristics: { ...product.characteristics, [key]: value }
@@ -201,7 +328,7 @@ export default function ProductDetailScreen() {
     };
 
     const handleDeleteCharacteristic = (key: string) => {
-        if (!isEditing) return;
+        if (!isEditing || !product) return;
         
         setTimeout(() => {
             Alert.alert(
@@ -213,6 +340,7 @@ export default function ProductDetailScreen() {
                         text: "Удалить",
                         style: "destructive",
                         onPress: () => {
+                            if (!product) return;
                             const newCharacteristics = { ...product.characteristics };
                             delete newCharacteristics[key];
                             setProduct({
@@ -233,15 +361,14 @@ export default function ProductDetailScreen() {
     };
 
     const handleConfirmAddCharacteristic = () => {
-        if (newCharName.trim()) {
-            setProduct({
-                ...product,
-                characteristics: { ...product.characteristics, [newCharName.trim()]: '' }
-            });
-            setHasChanges(true);
-            setNewCharName('');
-            setShowAddCharModal(false);
-        }
+        if (!product || !newCharName.trim()) return;
+        setProduct({
+            ...product,
+            characteristics: { ...product.characteristics, [newCharName.trim()]: '' }
+        });
+        setHasChanges(true);
+        setNewCharName('');
+        setShowAddCharModal(false);
     };
 
     const handleCancelAddCharacteristic = () => {
@@ -257,7 +384,7 @@ export default function ProductDetailScreen() {
     const [newCharName, setNewCharName] = useState('');
 
     const handleToggleCategory = (categoryId: number) => {
-        if (!isEditing) return;
+        if (!isEditing || !product) return;
         
         if (product.categoryIds.includes(categoryId)) {
             // Снимаем выбор - удаляем категорию из списка
@@ -283,6 +410,7 @@ export default function ProductDetailScreen() {
 
     // Рекурсивный компонент для отображения категории
     const renderCategoryItem = (category: typeof categories[0], level: number = 0) => {
+        if (!product) return null;
         const subCategories = categories.filter(c => c.parent_category_id === category.id);
         const isExpanded = expandedCategories.includes(category.id);
         const isSelected = product.categoryIds.includes(category.id);
@@ -430,15 +558,15 @@ export default function ProductDetailScreen() {
                         showsHorizontalScrollIndicator={false}
                         contentContainerStyle={styles.galleryScroll}
                     >
-                        {product.images.map((imagePath, index) => {
-                            const imageUrl = getImageUrl(imagePath);
-                            const hasImage = !!imageUrl;
+                        {/* Существующие изображения */}
+                        {existingImages.map((image, index) => {
+                            const imageUrl = getImageUrl(image?.path);
                             
                             return (
-                                <View key={index} style={styles.imageWrapper}>
-                                    {hasImage ? (
+                                <View key={`existing-${index}`} style={styles.imageWrapper}>
+                                    {imageUrl ? (
                                         <Image
-                                            source={{ uri: imageUrl! }}
+                                            source={{ uri: imageUrl }}
                                             style={styles.galleryImage}
                                             resizeMode="cover"
                                         />
@@ -453,7 +581,7 @@ export default function ProductDetailScreen() {
                                     {isEditing && (
                                         <TouchableOpacity 
                                             style={styles.removeImageButton}
-                                            onPress={() => handleRemoveImage(index)}
+                                            onPress={() => handleRemoveImage(index, false)}
                                         >
                                             <IconSymbol name="trash" size={16} color="#fff" />
                                         </TouchableOpacity>
@@ -462,10 +590,30 @@ export default function ProductDetailScreen() {
                             );
                         })}
                         
+                        {/* Новые изображения */}
+                        {newImages.map((image, index) => (
+                            <View key={`new-${index}`} style={styles.imageWrapper}>
+                                <Image
+                                    source={{ uri: image.uri }}
+                                    style={styles.galleryImage}
+                                    resizeMode="cover"
+                                />
+                                {isEditing && (
+                                    <TouchableOpacity 
+                                        style={styles.removeImageButton}
+                                        onPress={() => handleRemoveImage(index, true)}
+                                    >
+                                        <IconSymbol name="trash" size={16} color="#fff" />
+                                    </TouchableOpacity>
+                                )}
+                            </View>
+                        ))}
+                        
                         {isEditing && (
                             <TouchableOpacity 
                                 style={styles.addImageButton}
                                 onPress={handleAddImage}
+                                disabled={isUploading}
                             >
                                 <IconSymbol name="plus" size={32} color="#999" />
                                 <Text style={styles.addImageText}>Добавить фото</Text>
@@ -601,7 +749,7 @@ export default function ProductDetailScreen() {
                         )}
                     </View>
 
-                    {Object.entries(product.characteristics).map(([key, value]) => {
+                    {product && Object.entries(product.characteristics).map(([key, value]) => {
                         return (
                             <View key={key} style={styles.characteristicRow}>
                                 <View style={styles.characteristicLeft}>
@@ -643,13 +791,13 @@ export default function ProductDetailScreen() {
                         <TouchableOpacity 
                             style={[
                                 styles.saveButton,
-                                !hasChanges && styles.saveButtonDisabled
+                                (!hasChanges || isUploading) && styles.saveButtonDisabled
                             ]}
                             onPress={handleSave}
-                            disabled={!hasChanges}
+                            disabled={!hasChanges || isUploading}
                         >
                             <Text style={styles.saveButtonText}>
-                                {hasChanges ? "Сохранить изменения" : "Нет изменений"}
+                                {isUploading ? "Сохранение..." : hasChanges ? "Сохранить изменения" : "Нет изменений"}
                             </Text>
                         </TouchableOpacity>
 
@@ -759,6 +907,9 @@ const styles = StyleSheet.create({
         color: '#ff3b30',
         fontSize: 16,
         fontWeight: '600',
+    },
+    headerSpacer: {
+        width: 40,
     },
     scrollView: {
         flex: 1,

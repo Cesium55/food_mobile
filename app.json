@@ -28,7 +28,8 @@
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "package": "com.makenti22.food",
-      "networkSecurityConfig": "./network_security_config.xml"
+      "networkSecurityConfig": "./network_security_config.xml",
+      "googleServicesFile": "./google-services.json"
     },
     "web": {
       "output": "static",

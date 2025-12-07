@@ -1,11 +1,13 @@
 import { TabScreen } from "@/components/TabScreen";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useCategories } from "@/hooks/useCategories";
-import { useProducts, Product } from "@/hooks/useProducts";
+import { Product, useProducts } from "@/hooks/useProducts";
+import { getImageUrl } from "@/utils/imageUtils";
 import { router } from "expo-router";
 import { useState } from "react";
 import {
     ActivityIndicator,
+    Image,
     ScrollView,
     StyleSheet,
     Text,
@@ -141,27 +143,41 @@ export default function ProductsScreen() {
                                                     </Text>
                                                 </View>
 
-                                                {groupedProducts[categoryId].map(product => (
-                                                    <TouchableOpacity
-                                                        key={product.id}
-                                                        style={styles.productCard}
-                                                        activeOpacity={0.7}
-                                                        onPress={() => handleProductPress(product.id)}
-                                                    >
-                                                        <View style={styles.productIcon}>
-                                                            <Text style={styles.productIconText}>📦</Text>
-                                                        </View>
-                                                        
-                                                        <View style={styles.productInfo}>
-                                                            <Text style={styles.productName}>{product.name}</Text>
-                                                            <Text style={styles.productDescription} numberOfLines={1}>
-                                                                {product.description}
-                                                            </Text>
-                                                        </View>
+                                                {groupedProducts[categoryId].map(product => {
+                                                    const firstImageUrl = product.images && product.images.length > 0 
+                                                        ? getImageUrl(product.images[0]) 
+                                                        : null;
+                                                    
+                                                    return (
+                                                        <TouchableOpacity
+                                                            key={product.id}
+                                                            style={styles.productCard}
+                                                            activeOpacity={0.7}
+                                                            onPress={() => handleProductPress(product.id)}
+                                                        >
+                                                            <View style={styles.productIcon}>
+                                                                {firstImageUrl ? (
+                                                                    <Image
+                                                                        source={{ uri: firstImageUrl }}
+                                                                        style={styles.productImage}
+                                                                        resizeMode="cover"
+                                                                    />
+                                                                ) : (
+                                                                    <Text style={styles.productIconText}>📦</Text>
+                                                                )}
+                                                            </View>
+                                                            
+                                                            <View style={styles.productInfo}>
+                                                                <Text style={styles.productName}>{product.name}</Text>
+                                                                <Text style={styles.productDescription} numberOfLines={1}>
+                                                                    {product.description}
+                                                                </Text>
+                                                            </View>
 
-                                                        <IconSymbol name="chevron.right" color="#999" size={20} />
-                                                    </TouchableOpacity>
-                                                ))}
+                                                            <IconSymbol name="chevron.right" color="#999" size={20} />
+                                                        </TouchableOpacity>
+                                                    );
+                                                })}
                                             </View>
                                         );
                                     }
@@ -179,29 +195,43 @@ export default function ProductsScreen() {
                                                 </Text>
                                             </View>
 
-                                            {groupedProducts[categoryId].map(product => (
-                                                <TouchableOpacity
-                                                    key={product.id}
-                                                    style={styles.productCard}
-                                                    activeOpacity={0.7}
-                                                    onPress={() => handleProductPress(product.id)}
-                                                >
-                                                    <View style={styles.productIcon}>
-                                                        <Text style={styles.productIconText}>
-                                                            {getCategoryIcon(categoryId)}
-                                                        </Text>
-                                                    </View>
-                                                    
-                                                    <View style={styles.productInfo}>
-                                                        <Text style={styles.productName}>{product.name}</Text>
-                                                        <Text style={styles.productDescription} numberOfLines={1}>
-                                                            {product.description}
-                                                        </Text>
-                                                    </View>
+                                            {groupedProducts[categoryId].map(product => {
+                                                const firstImageUrl = product.images && product.images.length > 0 
+                                                    ? getImageUrl(product.images[0]) 
+                                                    : null;
+                                                
+                                                return (
+                                                    <TouchableOpacity
+                                                        key={product.id}
+                                                        style={styles.productCard}
+                                                        activeOpacity={0.7}
+                                                        onPress={() => handleProductPress(product.id)}
+                                                    >
+                                                        <View style={styles.productIcon}>
+                                                            {firstImageUrl ? (
+                                                                <Image
+                                                                    source={{ uri: firstImageUrl }}
+                                                                    style={styles.productImage}
+                                                                    resizeMode="cover"
+                                                                />
+                                                            ) : (
+                                                                <Text style={styles.productIconText}>
+                                                                    {getCategoryIcon(categoryId)}
+                                                                </Text>
+                                                            )}
+                                                        </View>
+                                                        
+                                                        <View style={styles.productInfo}>
+                                                            <Text style={styles.productName}>{product.name}</Text>
+                                                            <Text style={styles.productDescription} numberOfLines={1}>
+                                                                {product.description}
+                                                            </Text>
+                                                        </View>
 
-                                                    <IconSymbol name="chevron.right" color="#999" size={20} />
-                                                </TouchableOpacity>
-                                            ))}
+                                                        <IconSymbol name="chevron.right" color="#999" size={20} />
+                                                    </TouchableOpacity>
+                                                );
+                                            })}
                                         </View>
                                     );
                                 })
@@ -304,31 +334,6 @@ const styles = StyleSheet.create({
         paddingVertical: 2,
         borderRadius: 12,
     },
-    productCard: {
-        flexDirection: 'row',
-        backgroundColor: '#fff',
-        borderRadius: 12,
-        padding: 12,
-        marginBottom: 8,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.1,
-        shadowRadius: 2,
-        elevation: 2,
-        alignItems: 'center',
-    },
-    productIcon: {
-        width: 50,
-        height: 50,
-        borderRadius: 25,
-        backgroundColor: '#f0f0f0',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginRight: 12,
-    },
-    productIconText: {
-        fontSize: 24,
-    },
     productInfo: {
         flex: 1,
         justifyContent: 'center',
@@ -370,6 +375,51 @@ const styles = StyleSheet.create({
     loadingText: {
         marginTop: 16,
         fontSize: 16,
+        color: '#666',
+    },
+    productCard: {
+        flexDirection: 'row',
+        backgroundColor: '#fff',
+        borderRadius: 12,
+        padding: 12,
+        marginBottom: 8,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.1,
+        shadowRadius: 2,
+        elevation: 2,
+        alignItems: 'center',
+    },
+    productIcon: {
+        width: 50,
+        height: 50,
+        borderRadius: 25,
+        backgroundColor: '#f0f0f0',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 12,
+        overflow: 'hidden',
+    },
+    productImage: {
+        width: 50,
+        height: 50,
+        borderRadius: 25,
+    },
+    productIconText: {
+        fontSize: 24,
+    },
+    productInfo: {
+        flex: 1,
+        justifyContent: 'center',
+    },
+    productName: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#333',
+        marginBottom: 2,
+    },
+    productDescription: {
+        fontSize: 14,
         color: '#666',
     },
 });
