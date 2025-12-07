@@ -8,7 +8,9 @@ import { clearTokens, getTokens, saveTokens } from '@/utils/storage';
 
 export interface UserProfile {
   id: number;
-  email: string;
+  email?: string | null;
+  phone?: string | null;
+  phone_verified?: boolean;
   is_seller?: boolean;
 }
 
@@ -232,16 +234,20 @@ class AuthService {
         
         // Проверяем структуру ответа - может быть data.data.data или data.data
         let userData = null;
-        if (data && data.data && data.data.data && data.data.data.id && data.data.data.email) {
+        if (data && data.data && data.data.data && data.data.data.id && (data.data.data.email || data.data.data.phone)) {
           userData = {
             id: data.data.data.id,
-            email: data.data.data.email,
+            email: data.data.data.email || null,
+            phone: data.data.data.phone || null,
+            phone_verified: data.data.data.phone_verified || false,
             is_seller: data.data.data.is_seller || false,
           };
-        } else if (data && data.data && data.data.id && data.data.email) {
+        } else if (data && data.data && data.data.id && (data.data.email || data.data.phone)) {
           userData = {
             id: data.data.id,
-            email: data.data.email,
+            email: data.data.email || null,
+            phone: data.data.phone || null,
+            phone_verified: data.data.phone_verified || false,
             is_seller: data.data.is_seller || false,
           };
         }
@@ -383,16 +389,20 @@ class AuthService {
         
         // Проверяем структуру ответа - может быть data.data.data или data.data
         let userData = null;
-        if (data && data.data && data.data.data && data.data.data.id && data.data.data.email) {
+        if (data && data.data && data.data.data && data.data.data.id && (data.data.data.email || data.data.data.phone)) {
           userData = {
             id: data.data.data.id,
-            email: data.data.data.email,
+            email: data.data.data.email || null,
+            phone: data.data.data.phone || null,
+            phone_verified: data.data.data.phone_verified || false,
             is_seller: data.data.data.is_seller || false,
           };
-        } else if (data && data.data && data.data.id && data.data.email) {
+        } else if (data && data.data && data.data.id && (data.data.email || data.data.phone)) {
           userData = {
             id: data.data.id,
-            email: data.data.email,
+            email: data.data.email || null,
+            phone: data.data.phone || null,
+            phone_verified: data.data.phone_verified || false,
             is_seller: data.data.is_seller || false,
           };
         }

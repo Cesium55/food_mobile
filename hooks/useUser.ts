@@ -4,7 +4,8 @@ import { useCallback, useEffect, useState } from 'react';
 
 interface User {
   id: number;
-  email: string;
+  email?: string | null;
+  phone?: string | null;
   verified: boolean;
   active: boolean;
   is_seller: boolean;
@@ -13,7 +14,8 @@ interface User {
 export const useUser = (): User => {
   const [user, setUser] = useState<User>({
     id: 0,
-    email: 'Загрузка...',
+    email: null,
+    phone: null,
     verified: false,
     active: false,
     is_seller: false,
@@ -38,15 +40,17 @@ export const useUser = (): User => {
       if (userProfile) {
         setUser({
           id: userProfile.id,
-          email: userProfile.email,
-          verified: true, // Предполагаем, что пользователь верифицирован
+          email: userProfile.email || null,
+          phone: userProfile.phone || null,
+          verified: userProfile.phone_verified || false,
           active: true,  // Предполагаем, что пользователь активен
           is_seller: userProfile.is_seller || false,
         });
       } else {
         setUser({
           id: 0,
-          email: 'Не авторизован',
+          email: null,
+          phone: null,
           verified: false,
           active: false,
           is_seller: false,
@@ -55,7 +59,8 @@ export const useUser = (): User => {
     } catch (error) {
       setUser({
         id: 0,
-        email: 'Ошибка соединения',
+        email: null,
+        phone: null,
         verified: false,
         active: false,
         is_seller: false,

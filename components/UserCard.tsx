@@ -3,7 +3,8 @@ import { StyleSheet, Text, View } from "react-native";
 
 interface User {
   id: number;
-  email: string;
+  email?: string | null;
+  phone?: string | null;
   verified: boolean;
   active: boolean;
 }
@@ -21,7 +22,9 @@ export function UserCard({ user }: UserCardProps) {
         color="#007AFF" 
         style={styles.userIcon}
       />
-      <Text style={styles.userEmail}>{user.email}</Text>
+      <Text style={styles.userEmail}>
+        {user.phone || user.email || 'Не указан'}
+      </Text>
       <View style={styles.statusContainer}>
         <View style={[styles.statusBadge, user.verified ? styles.verified : styles.unverified]}>
           <Text style={styles.statusText}>

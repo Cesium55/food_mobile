@@ -8,12 +8,12 @@ import { config, log } from '@/constants/config';
 import { env } from '@/constants/env';
 
 export interface LoginRequest {
-  email: string;
+  phone: string;
   password: string;
 }
 
 export interface RegisterRequest {
-  email: string;
+  phone: string;
   password: string;
 }
 
@@ -121,21 +121,21 @@ class AuthService {
   /**
    * Вход в систему
    */
-  async login(email: string, password: string): Promise<ApiResponse> {
+  async login(phone: string, password: string): Promise<ApiResponse> {
     try {
-      log('info', 'Попытка входа пользователя', { email });
+      log('info', 'Попытка входа пользователя', { phone });
       
       const response = await this.makeRequest(
         API_ENDPOINTS.AUTH.LOGIN,
         HTTP_METHODS.POST,
-        { email, password }
+        { phone, password }
       );
       
       if (response.status === HTTP_STATUS.OK) {
-        log('info', 'Пользователь успешно вошел в систему', { email });
+        log('info', 'Пользователь успешно вошел в систему', { phone });
       } else {
         log('warn', 'Ошибка входа в систему', { 
-          email, 
+          phone, 
           status: response.status,
           message: response.data?.message || response.statusText 
         });
@@ -144,7 +144,7 @@ class AuthService {
       return response;
       
     } catch (error) {
-      log('error', 'Ошибка при входе в систему', { email, error });
+      log('error', 'Ошибка при входе в систему', { phone, error });
       throw error;
     }
   }
@@ -152,21 +152,21 @@ class AuthService {
   /**
    * Регистрация пользователя
    */
-  async register(email: string, password: string): Promise<ApiResponse> {
+  async register(phone: string, password: string): Promise<ApiResponse> {
     try {
-      log('info', 'Попытка регистрации пользователя', { email });
+      log('info', 'Попытка регистрации пользователя', { phone });
       
       const response = await this.makeRequest(
         API_ENDPOINTS.AUTH.REGISTER,
         HTTP_METHODS.POST,
-        { email, password }
+        { phone, password }
       );
       
       if (response.status === HTTP_STATUS.CREATED || response.status === HTTP_STATUS.OK) {
-        log('info', 'Пользователь успешно зарегистрирован', { email });
+        log('info', 'Пользователь успешно зарегистрирован', { phone });
       } else {
         log('warn', 'Ошибка регистрации', { 
-          email, 
+          phone, 
           status: response.status,
           message: response.data?.message || response.statusText 
         });
@@ -175,7 +175,7 @@ class AuthService {
       return response;
       
     } catch (error) {
-      log('error', 'Ошибка при регистрации', { email, error });
+      log('error', 'Ошибка при регистрации', { phone, error });
       throw error;
     }
   }

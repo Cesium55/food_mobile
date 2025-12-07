@@ -3,6 +3,8 @@ import { authService } from '@/services/autoAuthService';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, BackHandler, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { getTokens } from '@/utils/storage';
+import { decodeJWT } from '@/utils/jwt';
 
 export default function Index() {
   const [loading, setLoading] = useState(true);
@@ -40,8 +42,23 @@ export default function Index() {
       });
       
       if (result.success && result.userData) {
-        // Успешная авторизация - переходим на главную страницу
-        router.replace('/(tabs)/(home)');
+        // Проверяем phone_verified в токене
+        const tokens = await getTokens();
+        if (tokens.accessToken) {
+          const payload = decodeJWT(tokens.accessToken);
+          
+          if (payload && payload.phone_verified === true) {
+            // Телефон верифицирован - переходим на главную страницу
+            router.replace('/(tabs)/(home)');
+          } else {
+            // Телефон не верифицирован - переходим на экран верификации
+            log('info', 'Phone not verified, redirecting to verification screen');
+            router.replace('/verify-phone');
+          }
+        } else {
+          // Нет токена - переходим на главную (на случай если проверка прошла через кеш)
+          router.replace('/(tabs)/(home)');
+        }
       } else if (result.errorType === 'network') {
         // Сетевая ошибка - показываем экран с возможностью повтора
         log('info', 'Network error detected, showing retry UI');

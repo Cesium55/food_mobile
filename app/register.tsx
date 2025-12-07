@@ -17,9 +17,10 @@ import {
     TouchableOpacity,
     View
 } from 'react-native';
+import PhoneInput from '@/components/PhoneInput';
 
 export default function Register() {
-  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -38,21 +39,21 @@ export default function Register() {
   }, []);
 
   const handleRegister = async () => {
-    log('debug', 'Начало handleRegister', { email, loading });
+    log('debug', 'Начало handleRegister', { phone, loading });
     
     // Очищаем предыдущие ошибки
     setFieldErrors([]);
     setGeneralError(null);
     
-    if (!email.trim() || !password.trim() || !confirmPassword.trim()) {
+    if (!phone.trim() || !password.trim() || !confirmPassword.trim()) {
       setGeneralError('Пожалуйста, заполните все поля');
       return;
     }
 
-    // Простая валидация email
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      setFieldErrors([{ field: 'email', message: 'Пожалуйста, введите корректный email' }]);
+    // Валидация телефона: строка из 11 цифр, начинающаяся с 7
+    const phoneRegex = /^7\d{10}$/;
+    if (!phoneRegex.test(phone.trim())) {
+      setFieldErrors([{ field: 'phone', message: 'Телефон должен состоять из 11 цифр и начинаться с 7' }]);
       return;
     }
 
@@ -71,12 +72,12 @@ export default function Register() {
       return;
     }
 
-    log('debug', 'Начинаем API запрос', { email });
+    log('debug', 'Начинаем API запрос', { phone });
     setLoading(true);
     setApiResponse(null);
 
     try {
-      const response = await authService.register(email, password);
+      const response = await authService.register(phone.trim(), password);
       setApiResponse(response);
       
       const result = processAuthResponse(response);
@@ -88,8 +89,17 @@ export default function Register() {
         await saveTokens(result.data.access_token, result.data.refresh_token);
         log('info', 'Пользователь успешно зарегистрирован');
         
-        // Переходим на главную страницу
-        router.replace('/(tabs)/(home)');
+        // Проверяем phone_verified в токене
+        const { decodeJWT } = await import('@/utils/jwt');
+        const payload = decodeJWT(result.data.access_token);
+        
+        if (payload && payload.phone_verified === true) {
+          // Телефон верифицирован - переходим на главную страницу
+          router.replace('/(tabs)/(home)');
+        } else {
+          // Телефон не верифицирован - переходим на экран верификации
+          router.replace('/verify-phone');
+        }
       } else if (result.error) {
         // Обрабатываем ошибки
         if (result.error.fieldErrors) {
@@ -113,7 +123,7 @@ export default function Register() {
       setApiResponse(errorResponse);
       
       setGeneralError(`Ошибка соединения: ${errorMessage}`);
-      log('error', 'Ошибка при регистрации', { email, error: errorMessage });
+      log('error', 'Ошибка при регистрации', { phone, error: errorMessage });
     } finally {
       setLoading(false);
     }
@@ -133,22 +143,13 @@ export default function Register() {
           <Text style={styles.title}>Регистрация</Text>
           
           <View style={styles.inputContainer}>
-            <Text style={styles.label}>Email</Text>
-            <TextInput
-              style={[
-                styles.input,
-                getFieldError(fieldErrors, 'email') && styles.inputError
-              ]}
-              value={email}
-              onChangeText={setEmail}
-              placeholder="Введите email"
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoCorrect={false}
+            <Text style={styles.label}>Телефон</Text>
+            <PhoneInput
+              value={phone}
+              onChangeText={setPhone}
+              error={!!getFieldError(fieldErrors, 'phone')}
+              errorText={getFieldError(fieldErrors, 'phone')}
             />
-            {getFieldError(fieldErrors, 'email') && (
-              <Text style={styles.errorText}>{getFieldError(fieldErrors, 'email')}</Text>
-            )}
           </View>
 
           <View style={styles.inputContainer}>

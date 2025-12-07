@@ -15,6 +15,8 @@ export const API_ENDPOINTS = {
     LOGOUT: '/auth/logout',
     PROFILE: '/auth',
     VERIFY_EMAIL: '/auth/verify-email',
+    VERIFY_PHONE: '/auth/verify-phone',
+    RESEND_VERIFICATION_CODE: '/auth/resend-verification-code',
     RESET_PASSWORD: '/auth/reset-password',
   },
   
