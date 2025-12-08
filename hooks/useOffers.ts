@@ -1,7 +1,7 @@
 import { API_ENDPOINTS } from '@/constants/api';
 import { getApiUrl } from '@/constants/env';
 import { authFetch } from '@/utils/authFetch';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 
 // Интерфейс изображения товара
 export interface ProductImage {
@@ -67,7 +67,7 @@ export interface Offer {
 
 export const useOffers = () => {
   const [offers, setOffers] = useState<Offer[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
   // Преобразование данных с сервера в локальный формат
@@ -97,32 +97,58 @@ export const useOffers = () => {
   }, []);
 
   // Функция для загрузки офферов с сервера
-  const fetchOffers = useCallback(async () => {
+  const fetchOffers = useCallback(async (filters?: {
+    minLatitude?: number;
+    maxLatitude?: number;
+    minLongitude?: number;
+    maxLongitude?: number;
+  }) => {
     try {
       setLoading(true);
       setError(null);
       
-      // Загружаем все офферы для текущего продавца (в админке)
-      const response = await authFetch(getApiUrl(API_ENDPOINTS.OFFERS.WITH_PRODUCTS), {
+      // Формируем URL с параметрами фильтрации
+      const params = new URLSearchParams();
+      
+      if (filters?.minLatitude !== undefined) {
+        params.append('min_latitude', filters.minLatitude.toString());
+      }
+      if (filters?.maxLatitude !== undefined) {
+        params.append('max_latitude', filters.maxLatitude.toString());
+      }
+      if (filters?.minLongitude !== undefined) {
+        params.append('min_longitude', filters.minLongitude.toString());
+      }
+      if (filters?.maxLongitude !== undefined) {
+        params.append('max_longitude', filters.maxLongitude.toString());
+      }
+      
+      // Добавляем фильтр по сроку годности - только не просроченные офферы
+      // Используем текущее время в UTC
+      const now = new Date();
+      const minExpiresDate = now.toISOString();
+      params.append('min_expires_date', minExpiresDate);
+      
+      // Всегда используем /offers/with-products для получения данных с продуктами
+      // Добавляем параметры фильтрации если есть
+      let url = getApiUrl(API_ENDPOINTS.OFFERS.WITH_PRODUCTS);
+      if (params.toString()) {
+        url += `?${params.toString()}`;
+      }
+      
+      const response = await authFetch(url, {
         method: 'GET',
         requireAuth: true,
       });
 
       if (response.ok) {
         const data = await response.json();
-        console.log('📦 Получены данные офферов:', data);
-        
-        // Ожидаем структуру ответа: { data: OfferApi[] }
         const offersData = data.data || data;
         
         if (Array.isArray(offersData)) {
-          console.log(`✅ Найдено ${offersData.length} офферов`);
-          // Преобразуем данные с сервера в локальный формат
           const transformedOffers = offersData.map(transformOffer);
-          console.log('✅ Преобразованные офферы:', transformedOffers);
           setOffers(transformedOffers);
         } else {
-          console.error('❌ Неверный формат данных офферов:', offersData);
           setError('Неверный формат данных офферов');
           setOffers([]);
         }
@@ -131,12 +157,10 @@ export const useOffers = () => {
         setOffers([]);
       } else {
         const errorText = await response.text();
-        console.error('❌ Ошибка загрузки офферов:', response.status, errorText);
         setError('Ошибка загрузки офферов');
         setOffers([]);
       }
     } catch (err) {
-      console.error('❌ Ошибка подключения к серверу при загрузке офферов:', err);
       setError('Ошибка подключения к серверу');
       setOffers([]);
     } finally {
@@ -144,8 +168,16 @@ export const useOffers = () => {
     }
   }, [transformOffer]);
 
-  useEffect(() => {
-    fetchOffers();
+  // Не загружаем автоматически - загружаем только когда явно вызывается fetchOffers или fetchOffersWithLocation
+
+  // Функция для загрузки офферов с фильтрацией по координатам
+  const fetchOffersWithLocation = useCallback(async (filters: {
+    minLatitude: number;
+    maxLatitude: number;
+    minLongitude: number;
+    maxLongitude: number;
+  }) => {
+    await fetchOffers(filters);
   }, [fetchOffers]);
 
   const getOfferById = (id: number): Offer | undefined => {
@@ -182,12 +214,6 @@ export const useOffers = () => {
     try {
       const url = getApiUrl(API_ENDPOINTS.OFFERS.BASE);
       const requestBody = JSON.stringify(offerData);
-      
-      console.log('📤 Создание оффера:', {
-        url,
-        method: 'POST',
-        data: offerData,
-      });
 
       const response = await authFetch(url, {
         method: 'POST',
@@ -198,18 +224,10 @@ export const useOffers = () => {
         body: requestBody,
       });
 
-      console.log('📥 Ответ сервера:', {
-        status: response.status,
-        statusText: response.statusText,
-        ok: response.ok,
-      });
-
       if (response.ok) {
         const data = await response.json();
-        console.log('✅ Данные созданного оффера:', data);
         const createdOfferData = data.data || data;
         const newOffer = transformOffer(createdOfferData as OfferApi);
-        console.log('✅ Преобразованный оффер:', newOffer);
         
         // Обновляем локальный список офферов
         setOffers(prev => [...prev, newOffer]);
@@ -217,15 +235,9 @@ export const useOffers = () => {
         return newOffer;
       } else {
         const errorText = await response.text();
-        console.error('❌ Ошибка создания оффера:', {
-          status: response.status,
-          statusText: response.statusText,
-          error: errorText,
-        });
         throw new Error(errorText || 'Ошибка создания оффера');
       }
     } catch (err) {
-      console.error('❌ Ошибка подключения к серверу при создании оффера:', err);
       throw err;
     }
   }, [transformOffer]);
@@ -235,6 +247,7 @@ export const useOffers = () => {
     loading,
     error,
     refetch,
+    fetchOffersWithLocation,
     getOfferById,
     getOffersByShop,
     getOffersBySeller,

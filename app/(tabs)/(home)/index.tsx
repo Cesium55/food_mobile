@@ -4,10 +4,35 @@ import { TabScreen } from '@/components/TabScreen';
 import HorizontalOfferBlockList from '@/components/offers/horizontalOfferBlockList';
 import Search from '@/components/search/search';
 import HorizontalSellersList from '@/components/sellers/horizontalSellersList';
-import { useState } from 'react';
+import { useOffers } from '@/hooks/useOffers';
+import { getCurrentLocation } from '@/services/locationService';
+import { getBoundingBox } from '@/utils/locationUtils';
+import { useEffect, useState } from 'react';
 
 export default function HomeScreen() {
   const [searchText, setSearchText] = useState('');
+  const { offers, fetchOffersWithLocation } = useOffers();
+
+  useEffect(() => {
+    const loadOffersWithLocation = async () => {
+      const location = await getCurrentLocation();
+      if (location) {
+        const boundingBox = getBoundingBox(location.latitude, location.longitude, 1000);
+        await fetchOffersWithLocation(boundingBox);
+      } else {
+        // Если местоположение недоступно, загружаем без фильтров
+        await fetchOffersWithLocation({
+          minLatitude: -90,
+          maxLatitude: 90,
+          minLongitude: -180,
+          maxLongitude: 180,
+        });
+      }
+    };
+
+    loadOffersWithLocation();
+  }, [fetchOffersWithLocation]);
+
   return (
     <TabScreen title="Home">
       <View style={styles.searchContainer}>
@@ -36,6 +61,7 @@ export default function HomeScreen() {
         <View style={styles.offersContainer}>
 
           <HorizontalOfferBlockList
+            offers={offers}
             limit={10}
           />
 

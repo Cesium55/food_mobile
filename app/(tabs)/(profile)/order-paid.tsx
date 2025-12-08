@@ -237,10 +237,15 @@ export default function OrderPaidScreen() {
 
   const totalDiscount = originalTotal - totalAmount;
 
+  const handleBackPress = () => {
+    router.replace('/(tabs)/(profile)');
+  };
+
   return (
     <TabScreen 
       title="Заказ оплачен" 
       showBackButton={true}
+      onBackPress={handleBackPress}
     >
       <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
         {/* Информация о времени оплаты */}

@@ -1,7 +1,7 @@
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { API_ENDPOINTS } from '@/constants/api';
 import { getApiUrl } from '@/constants/env';
 import { authFetch } from '@/utils/authFetch';
+import React, { createContext, useCallback, useContext, useState } from 'react';
 
 export interface Shop {
   id: number;
@@ -29,11 +29,17 @@ const ShopsContext = createContext<ShopsContextType | undefined>(undefined);
 
 export const ShopsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [shops, setShops] = useState<Shop[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [isInitialized, setIsInitialized] = useState<boolean>(false);
 
   // Функция для загрузки всех точек продаж с сервера
   const fetchShops = useCallback(async () => {
+    // Если уже загружаем или уже загружено, не делаем повторный запрос
+    if (loading || isInitialized) {
+      return;
+    }
+
     try {
       setLoading(true);
       setError(null);
@@ -62,33 +68,33 @@ export const ShopsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           }));
           
           setShops(transformedShops);
+          setIsInitialized(true);
         } else {
           console.error('❌ Неверный формат данных точек продаж:', shopPointsData);
           setError('Неверный формат данных точек продаж');
           setShops([]);
+          setIsInitialized(true);
         }
       } else if (response.status === 404) {
         setError('Точки продаж не найдены');
         setShops([]);
+        setIsInitialized(true);
       } else {
         const errorText = await response.text();
         console.error('❌ Ошибка загрузки точек продаж:', response.status, errorText);
         setError('Ошибка загрузки точек продаж');
         setShops([]);
+        setIsInitialized(true);
       }
     } catch (err) {
       console.error('❌ Ошибка подключения к серверу при загрузке точек продаж:', err);
       setError('Ошибка подключения к серверу');
       setShops([]);
+      setIsInitialized(true);
     } finally {
       setLoading(false);
     }
-  }, []);
-
-  // Загружаем магазины при инициализации
-  useEffect(() => {
-    fetchShops();
-  }, [fetchShops]);
+  }, [loading, isInitialized]);
 
   const getShopById = useCallback((id: number): Shop | undefined => {
     return shops.find((shop) => shop.id === id);
@@ -115,6 +121,14 @@ export const useShops = () => {
   if (context === undefined) {
     throw new Error('useShops must be used within a ShopsProvider');
   }
+  
+  // Ленивая загрузка - загружаем только когда хук используется
+  React.useEffect(() => {
+    if (!context.loading && context.shops.length === 0 && !context.error) {
+      context.refetch();
+    }
+  }, []);
+  
   return context;
 };
 

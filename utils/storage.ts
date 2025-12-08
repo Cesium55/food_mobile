@@ -10,6 +10,9 @@ const TOKEN_KEYS = {
   REFRESH_TOKEN: 'refresh_token',
 } as const;
 
+// Ключ для хранения последнего местоположения
+const LOCATION_KEY = 'last_location';
+
 /**
  * Сохраняет токены в AsyncStorage
  */
@@ -68,4 +71,32 @@ export const clearTokens = async (): Promise<void> => {
 export const hasTokens = async (): Promise<boolean> => {
   const { accessToken } = await getTokens();
   return accessToken !== null;
+};
+
+/**
+ * Сохраняет последнее местоположение в AsyncStorage
+ */
+export const saveLastLocation = async (latitude: number, longitude: number): Promise<void> => {
+  try {
+    const locationData = JSON.stringify({ latitude, longitude });
+    await AsyncStorage.setItem(LOCATION_KEY, locationData);
+  } catch (error) {
+    console.error('❌ Ошибка сохранения местоположения:', error);
+  }
+};
+
+/**
+ * Получает последнее сохраненное местоположение из AsyncStorage
+ */
+export const getLastLocation = async (): Promise<{ latitude: number; longitude: number } | null> => {
+  try {
+    const locationData = await AsyncStorage.getItem(LOCATION_KEY);
+    if (locationData) {
+      return JSON.parse(locationData);
+    }
+    return null;
+  } catch (error) {
+    console.error('❌ Ошибка получения местоположения:', error);
+    return null;
+  }
 };

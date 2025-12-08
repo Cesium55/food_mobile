@@ -1,6 +1,6 @@
 import { API_ENDPOINTS } from '@/constants/api';
 import { getApiUrl } from '@/constants/env';
-import { PublicSeller } from '@/hooks/usePublicSeller';
+import { PublicSeller, populateSellerCache } from '@/hooks/usePublicSeller';
 import { authFetch } from '@/utils/authFetch';
 import { useEffect, useState } from 'react';
 
@@ -20,7 +20,10 @@ export const useSellers = () => {
 
         if (response.ok) {
           const data = await response.json();
-          setSellers(data.data || []);
+          const sellersList = data.data || [];
+          setSellers(sellersList);
+          // Заполняем глобальный кэш продавцов
+          populateSellerCache(sellersList);
         } else {
           setError('Ошибка загрузки продавцов');
         }

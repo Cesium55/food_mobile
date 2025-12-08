@@ -1,6 +1,7 @@
 import { CartProvider } from '@/contexts/CartContext';
 import { ShopsProvider } from '@/contexts/ShopsContext';
 import { initializeAndSendToken } from '@/services/firebaseService';
+import { initializeLocationUpdate } from '@/services/locationService';
 import { DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -19,6 +20,11 @@ export default function RootLayout() {
   // Инициализируем Firebase и отправляем FCM токен при запуске приложения
   useEffect(() => {
     initializeAndSendToken();
+  }, []);
+
+  // Инициализируем обновление местоположения при запуске приложения
+  useEffect(() => {
+    initializeLocationUpdate();
   }, []);
 
   return (

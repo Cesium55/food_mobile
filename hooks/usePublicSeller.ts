@@ -45,16 +45,82 @@ export interface SellerWithShops {
     shop_points: ShopPoint[];
 }
 
+// Глобальный кэш продавцов
+const sellerCache = new Map<number, PublicSeller>();
+const loadingPromises = new Map<number, Promise<PublicSeller | null>>();
+
+/**
+ * Заполняет кэш продавцов из списка (используется при загрузке списка продавцов)
+ */
+export function populateSellerCache(sellers: PublicSeller[]): void {
+  sellers.forEach(seller => {
+    sellerCache.set(seller.id, seller);
+  });
+}
+
+/**
+ * Получает продавца из кэша или загружает с сервера
+ */
+async function fetchSellerById(sellerId: number): Promise<PublicSeller | null> {
+  // Проверяем кэш
+  if (sellerCache.has(sellerId)) {
+    return sellerCache.get(sellerId)!;
+  }
+
+  // Проверяем, не выполняется ли уже запрос для этого продавца
+  if (loadingPromises.has(sellerId)) {
+    return loadingPromises.get(sellerId)!;
+  }
+
+  // Создаем новый запрос
+  const promise = (async () => {
+    try {
+      const response = await authFetch(getApiUrl(`${API_ENDPOINTS.SELLERS.BASE}/${sellerId}`), {
+        method: 'GET',
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const seller = data.data || null;
+        if (seller) {
+          sellerCache.set(sellerId, seller);
+        }
+        return seller;
+      } else if (response.status === 404) {
+        return null;
+      } else {
+        return null;
+      }
+    } catch (err) {
+      return null;
+    } finally {
+      loadingPromises.delete(sellerId);
+    }
+  })();
+
+  loadingPromises.set(sellerId, promise);
+  return promise;
+}
+
 export const usePublicSeller = (sellerId: number | null) => {
   const [seller, setSeller] = useState<PublicSeller | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const fetchSeller = async () => {
+    const loadSeller = async () => {
       if (!sellerId) {
         setSeller(null);
         setLoading(false);
+        setError(null);
+        return;
+      }
+
+      // Проверяем кэш синхронно
+      if (sellerCache.has(sellerId)) {
+        setSeller(sellerCache.get(sellerId)!);
+        setLoading(false);
+        setError(null);
         return;
       }
 
@@ -62,18 +128,12 @@ export const usePublicSeller = (sellerId: number | null) => {
         setLoading(true);
         setError(null);
         
-        const response = await authFetch(getApiUrl(`${API_ENDPOINTS.SELLERS.BASE}/${sellerId}`), {
-          method: 'GET',
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          setSeller(data.data || null);
-        } else if (response.status === 404) {
-          setError('Продавец не найден');
-          setSeller(null);
+        const fetchedSeller = await fetchSellerById(sellerId);
+        
+        if (fetchedSeller) {
+          setSeller(fetchedSeller);
         } else {
-          setError('Ошибка загрузки данных продавца');
+          setError('Продавец не найден');
           setSeller(null);
         }
       } catch (err) {
@@ -84,7 +144,7 @@ export const usePublicSeller = (sellerId: number | null) => {
       }
     };
 
-    fetchSeller();
+    loadSeller();
   }, [sellerId]);
 
   return {

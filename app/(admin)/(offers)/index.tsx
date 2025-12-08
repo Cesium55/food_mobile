@@ -5,13 +5,18 @@ import { Offer, useOffers } from "@/hooks/useOffers";
 import { useProducts } from "@/hooks/useProducts";
 import { useShops } from "@/hooks/useShops";
 import { router } from "expo-router";
-import { useState, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 export default function OffersScreen() {
     const { shops, loading: shopsLoading, error: shopsError, refetch: refetchShops } = useShops();
     const { categories, getCategoryById, loading: categoriesLoading, refetch: refetchCategories } = useCategories();
     const { offers, loading: offersLoading, error: offersError, refetch: refetchOffers } = useOffers();
+    
+    // Загружаем offers при монтировании компонента (для админки)
+    useEffect(() => {
+        refetchOffers();
+    }, [refetchOffers]);
     const { products, refetch: refetchProducts } = useProducts(); // Получаем список товаров для категорий
     const [expandedItems, setExpandedItems] = useState<number[]>([]);
     const [showFilters, setShowFilters] = useState(false);

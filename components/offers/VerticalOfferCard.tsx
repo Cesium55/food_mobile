@@ -1,9 +1,12 @@
 import CartButton from '@/components/cart/CartButton';
+import { useLocation } from '@/hooks/useLocation';
 import { Offer } from '@/hooks/useOffers';
+import { usePublicSeller } from '@/hooks/usePublicSeller';
 import { useShops } from '@/hooks/useShops';
 import { getFirstImageUrl } from '@/utils/imageUtils';
+import { calculateDistance, formatDistance } from '@/utils/locationUtils';
 import { useRouter, useSegments } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 interface VerticalOfferCardProps {
@@ -14,11 +17,27 @@ export default function VerticalOfferCard({ offer }: VerticalOfferCardProps) {
   const router = useRouter();
   const segments = useSegments();
   const { shops } = useShops();
+  const { seller } = usePublicSeller(offer.sellerId || null);
+  const { coords: userLocation } = useLocation();
   const [imageError, setImageError] = useState(false);
   
-  // Получаем название магазина по shopId
+  // Получаем название продавца или магазина
   const shop = shops.find(s => s.id === offer.shopId);
-  const shopShortName = offer.shopShortName || shop?.shortName || shop?.name || 'Магазин';
+  const shopShortName = seller?.short_name || offer.shopShortName || shop?.shortName || shop?.name || 'Магазин';
+  
+  // Вычисляем дистанцию до магазина
+  const distance = useMemo(() => {
+    if (!userLocation || !shop?.latitude || !shop?.longitude) {
+      return null;
+    }
+    const dist = calculateDistance(
+      userLocation.latitude,
+      userLocation.longitude,
+      shop.latitude,
+      shop.longitude
+    );
+    return formatDistance(dist);
+  }, [userLocation, shop]);
   
   // Получаем URL первого изображения
   const imageUrl = getFirstImageUrl(offer.productImages);
@@ -93,8 +112,17 @@ export default function VerticalOfferCard({ offer }: VerticalOfferCardProps) {
           <Text style={styles.currentPrice}>{offer.currentCost.toFixed(0)} ₽</Text>
         </View>
 
-        {/* Кнопка управления корзиной */}
-        <CartButton offer={offer} size="small" />
+        {/* Кнопка управления корзиной и дистанция */}
+        <View style={styles.cartButtonRow}>
+          <View style={styles.cartButtonLeft}>
+            <CartButton offer={offer} size="small" />
+          </View>
+          {distance && (
+            <View style={styles.cartButtonRight}>
+              <Text style={styles.distance}>{distance}</Text>
+            </View>
+          )}
+        </View>
       </View>
     </TouchableOpacity>
   );
@@ -190,6 +218,23 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
     color: '#4CAF50',
+  },
+  cartButtonRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  cartButtonLeft: {
+    flex: 1,
+  },
+  cartButtonRight: {
+    flex: 1,
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+  },
+  distance: {
+    fontSize: 11,
+    color: '#999',
   },
 });
 

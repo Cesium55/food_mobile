@@ -19,6 +19,7 @@ export const API_ENDPOINTS = {
     RESEND_VERIFICATION_CODE: '/auth/resend-verification-code',
     RESET_PASSWORD: '/auth/reset-password',
     FIREBASE_TOKEN: '/auth/firebase-token',
+    LAST_LOCATION: '/auth/last-location',
   },
   
   // Пользователи
