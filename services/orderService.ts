@@ -354,3 +354,143 @@ export async function getPurchasesHistory(): Promise<CreateOrderResponse[]> {
   return getPurchasesByStatus();
 }
 
+// Типы для верификации токена и выдачи заказа
+export interface VerifyTokenItem {
+  purchase_offer_id: number;
+  offer_id: number;
+  quantity: number;
+  fulfilled_quantity: number;
+  fulfillment_status: string;
+  product_name: string;
+  shop_point_id: number;
+  cost_at_purchase: number;
+}
+
+export interface VerifyTokenResponse {
+  purchase_id: number;
+  status: string;
+  items: VerifyTokenItem[];
+  total_cost: number;
+}
+
+export interface FulfillItemRequest {
+  purchase_offer_id: number;
+  offer_id: number;
+  status: 'fulfilled' | 'partially_fulfilled' | 'unfulfilled';
+  fulfilled_quantity: number;
+  unfulfilled_reason?: string;
+}
+
+export interface FulfilledItem {
+  purchase_offer_id: number;
+  offer_id: number;
+  status: 'fulfilled' | 'partially_fulfilled' | 'unfulfilled';
+  fulfilled_quantity: number;
+  unfulfilled_reason?: string;
+}
+
+export interface FulfillPurchaseRequest {
+  items: FulfillItemRequest[];
+}
+
+export interface FulfillPurchaseResponse {
+  fulfilled_items: FulfilledItem[];
+}
+
+/**
+ * Проверяет токен QR-кода и возвращает данные заказа для выдачи
+ * @param token - Токен из QR-кода
+ * @returns Promise с данными заказа для выдачи
+ * @throws Error если токен невалиден или заказ не найден
+ */
+export async function verifyToken(token: string): Promise<VerifyTokenResponse> {
+  const response = await authFetch(
+    getApiUrl(API_ENDPOINTS.PURCHASES.VERIFY_TOKEN),
+    {
+      method: 'POST',
+      requireAuth: true,
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ token }),
+    }
+  );
+
+  if (response.status === 404) {
+    throw new Error('Заказ не найден');
+  }
+
+  if (response.status === 400) {
+    const errorText = await response.text();
+    throw new Error(`Неверный токен: ${errorText}`);
+  }
+
+  if (response.status === 403) {
+    throw new Error('Нет доступа к этому заказу');
+  }
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Ошибка проверки токена: ${response.status} ${errorText}`);
+  }
+
+  const responseData = await response.json();
+  const rawData = responseData.data || responseData;
+
+  return {
+    purchase_id: rawData.purchase_id || rawData.purchaseId,
+    status: rawData.status,
+    items: rawData.items || [],
+    total_cost: rawData.total_cost || rawData.totalCost || 0,
+  };
+}
+
+/**
+ * Подтверждает выдачу товаров заказа
+ * @param purchaseId - ID заказа
+ * @param data - Данные о выдаче товаров
+ * @returns Promise с результатом выдачи
+ * @throws Error если выдача не удалась
+ */
+export async function fulfillPurchase(
+  purchaseId: number,
+  data: FulfillPurchaseRequest
+): Promise<FulfillPurchaseResponse> {
+  const response = await authFetch(
+    getApiUrl(API_ENDPOINTS.PURCHASES.FULFILL(purchaseId)),
+    {
+      method: 'POST',
+      requireAuth: true,
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    }
+  );
+
+  if (response.status === 404) {
+    throw new Error('Заказ не найден');
+  }
+
+  if (response.status === 403) {
+    throw new Error('Нет доступа к этому заказу');
+  }
+
+  if (response.status === 400) {
+    const errorText = await response.text();
+    throw new Error(`Неверные данные выдачи: ${errorText}`);
+  }
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Ошибка выдачи заказа: ${response.status} ${errorText}`);
+  }
+
+  const responseData = await response.json();
+  const rawData = responseData.data || responseData;
+
+  return {
+    fulfilled_items: rawData.fulfilled_items || rawData.fulfilledItems || [],
+  };
+}
+

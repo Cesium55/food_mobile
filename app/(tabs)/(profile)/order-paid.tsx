@@ -36,7 +36,7 @@ export default function OrderPaidScreen() {
         // Загружаем данные заказа
         const purchase = await getPurchaseById(parseInt(params.purchaseId));
         
-        // Если заказ отменен, не загружаем платеж и QR код
+        // Если заказ отменен, не загружаем платеж
         if (purchase.status === 'cancelled') {
           const orderResponse: CreateOrderResponse = {
             purchase: {

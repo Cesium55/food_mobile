@@ -1,10 +1,8 @@
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { CameraView, useCameraPermissions } from "expo-camera";
-import { router } from "expo-router";
-import { useEffect, useState } from "react";
+import { router, useFocusEffect } from "expo-router";
+import { useCallback, useEffect, useState } from "react";
 import {
-    Modal,
-    ScrollView,
     StyleSheet,
     Text,
     TouchableOpacity,
@@ -15,8 +13,6 @@ import { SafeAreaView } from "react-native-safe-area-context";
 export default function ScanOrder() {
     const [permission, requestPermission] = useCameraPermissions();
     const [scanned, setScanned] = useState(false);
-    const [scannedData, setScannedData] = useState<string | null>(null);
-    const [showResult, setShowResult] = useState(false);
 
     useEffect(() => {
         if (permission === null) {
@@ -26,35 +22,32 @@ export default function ScanOrder() {
         }
     }, [permission, requestPermission]);
 
+    // Сбрасываем состояние сканирования при возврате на экран
+    useFocusEffect(
+        useCallback(() => {
+            setScanned(false);
+        }, [])
+    );
+
     const handleBarCodeScanned = ({ data }: { data: string }) => {
         if (!scanned) {
             setScanned(true);
-            setScannedData(data);
-            setShowResult(true);
+            // Сразу переходим к обработке заказа без показа токена
+            router.push({
+                pathname: '/(admin)/(admin-profile)/fulfill-order',
+                params: {
+                    token: data,
+                },
+            });
         }
     };
 
     const handleReset = () => {
         setScanned(false);
-        setScannedData(null);
-        setShowResult(false);
     };
 
     const handleClose = () => {
         router.back();
-    };
-
-    const handleProcessOrder = () => {
-        if (!scannedData) return;
-        
-        // Токен из QR кода - переходим на экран выдачи заказа
-        setShowResult(false);
-        router.push({
-            pathname: '/(admin)/(admin-profile)/fulfill-order',
-            params: {
-                token: scannedData,
-            },
-        });
     };
 
     if (permission === null) {
@@ -109,9 +102,6 @@ export default function ScanOrder() {
         return null;
     }
 
-    // Токен из QR кода всегда можно обработать
-    const canProcessToken = !!scannedData;
-
     return (
         <View style={styles.container}>
             <CameraView
@@ -134,64 +124,6 @@ export default function ScanOrder() {
                     </Text>
                 </View>
             </CameraView>
-
-            {/* Модальное окно с результатом сканирования */}
-            <Modal
-                visible={showResult}
-                transparent={true}
-                animationType="slide"
-                onRequestClose={() => setShowResult(false)}
-            >
-                <View style={styles.modalContainer}>
-                    <View style={styles.modalContent}>
-                        <View style={styles.modalHeader}>
-                            <Text style={styles.modalTitle}>Данные QR кода</Text>
-                            <TouchableOpacity
-                                onPress={() => setShowResult(false)}
-                                style={styles.closeButton}
-                            >
-                                <IconSymbol name="xmark" size={24} color="#333" />
-                            </TouchableOpacity>
-                        </View>
-                        <ScrollView style={styles.modalBody}>
-                            <View style={styles.dataContainer}>
-                                <Text style={styles.dataLabel}>Содержимое:</Text>
-                                <Text style={styles.dataText}>{scannedData}</Text>
-                            </View>
-                        </ScrollView>
-                        <View style={styles.modalFooter}>
-                            {canProcessToken && (
-                                <TouchableOpacity
-                                    style={[styles.button, styles.buttonPrimary]}
-                                    onPress={handleProcessOrder}
-                                >
-                                    <Text style={styles.buttonText}>Обработать заказ</Text>
-                                </TouchableOpacity>
-                            )}
-                            <TouchableOpacity
-                                style={[styles.button, styles.buttonPrimary]}
-                                onPress={() => {
-                                    setShowResult(false);
-                                    handleReset();
-                                }}
-                            >
-                                <Text style={styles.buttonText}>Сканировать снова</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                                style={[styles.button, styles.buttonSecondary]}
-                                onPress={() => {
-                                    setShowResult(false);
-                                    handleClose();
-                                }}
-                            >
-                                <Text style={[styles.buttonText, styles.buttonTextSecondary]}>
-                                    Закрыть
-                                </Text>
-                            </TouchableOpacity>
-                        </View>
-                    </View>
-                </View>
-            </Modal>
         </View>
     );
 }
@@ -304,62 +236,5 @@ const styles = StyleSheet.create({
         textAlign: "center",
         marginTop: 20,
         marginBottom: 20,
-    },
-    modalContainer: {
-        flex: 1,
-        backgroundColor: "rgba(0, 0, 0, 0.5)",
-        justifyContent: "center",
-        alignItems: "center",
-        padding: 20,
-    },
-    modalContent: {
-        backgroundColor: "#fff",
-        borderRadius: 12,
-        width: "100%",
-        maxHeight: "80%",
-        overflow: "hidden",
-    },
-    modalHeader: {
-        flexDirection: "row",
-        justifyContent: "space-between",
-        alignItems: "center",
-        padding: 20,
-        borderBottomWidth: 1,
-        borderBottomColor: "#e0e0e0",
-    },
-    modalTitle: {
-        fontSize: 20,
-        fontWeight: "600",
-        color: "#333",
-    },
-    closeButton: {
-        padding: 4,
-    },
-    modalBody: {
-        padding: 20,
-        maxHeight: 300,
-    },
-    dataContainer: {
-        marginBottom: 16,
-    },
-    dataLabel: {
-        fontSize: 14,
-        fontWeight: "600",
-        color: "#666",
-        marginBottom: 8,
-    },
-    dataText: {
-        fontSize: 16,
-        color: "#333",
-        backgroundColor: "#f5f5f5",
-        padding: 12,
-        borderRadius: 8,
-        fontFamily: "monospace",
-    },
-    modalFooter: {
-        padding: 20,
-        borderTopWidth: 1,
-        borderTopColor: "#e0e0e0",
-        gap: 12,
     },
 });

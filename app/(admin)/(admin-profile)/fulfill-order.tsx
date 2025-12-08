@@ -1,6 +1,5 @@
 import { TabScreen } from "@/components/TabScreen";
-import { IconSymbol } from "@/components/ui/icon-symbol";
-import { verifyToken, fulfillPurchase, VerifyTokenItem, FulfillItemRequest } from "@/services/orderService";
+import { FulfillItemRequest, fulfillPurchase, verifyToken, VerifyTokenItem } from "@/services/orderService";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import {
@@ -171,7 +170,7 @@ export default function FulfillOrderScreen() {
                     [
                         {
                             text: "OK",
-                            onPress: () => router.back(),
+                            onPress: () => router.replace('/(admin)/(admin-profile)'),
                         },
                     ]
                 );
@@ -182,7 +181,7 @@ export default function FulfillOrderScreen() {
                     [
                         {
                             text: "OK",
-                            onPress: () => router.back(),
+                            onPress: () => router.replace('/(admin)/(admin-profile)'),
                         },
                     ]
                 );
@@ -193,7 +192,7 @@ export default function FulfillOrderScreen() {
                     [
                         {
                             text: "OK",
-                            onPress: () => router.back(),
+                            onPress: () => router.replace('/(admin)/(admin-profile)'),
                         },
                     ]
                 );
