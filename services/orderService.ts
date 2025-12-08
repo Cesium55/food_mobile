@@ -241,3 +241,116 @@ export async function updatePurchaseStatus(
   return purchase;
 }
 
+/**
+ * Получает покупку по ID
+ * @param purchaseId - ID покупки
+ * @returns Promise с данными покупки
+ */
+export async function getPurchaseById(purchaseId: number): Promise<Purchase> {
+  try {
+    const response = await authFetch(
+      getApiUrl(`${API_ENDPOINTS.PURCHASES.BASE}/${purchaseId}`),
+      {
+        method: 'GET',
+        requireAuth: true,
+      }
+    );
+
+    if (response.status === 404) {
+      throw new Error('Покупка не найдена');
+    }
+
+    if (response.status === 403) {
+      throw new Error('Нет доступа к этой покупке');
+    }
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Ошибка получения покупки: ${response.status} ${errorText}`);
+    }
+
+    const responseData = await response.json();
+    const rawData = responseData.data || responseData;
+    
+    const purchase: Purchase = {
+      id: rawData.id,
+      user_id: rawData.user_id,
+      status: rawData.status,
+      total_cost: rawData.total_cost,
+      created_at: rawData.created_at,
+      updated_at: rawData.updated_at,
+      purchase_offers: rawData.purchase_offers || [],
+      ttl: rawData.ttl || 0,
+    };
+
+    return purchase;
+  } catch (error) {
+    console.error('Ошибка получения покупки:', error);
+    throw error;
+  }
+}
+
+/**
+ * Получает список покупок пользователя с фильтром по статусу
+ * @param status - Фильтр по статусу (опционально)
+ * @returns Promise с массивом покупок
+ */
+export async function getPurchasesByStatus(status?: string): Promise<CreateOrderResponse[]> {
+  try {
+    let url = getApiUrl(API_ENDPOINTS.PURCHASES.LIST);
+    if (status) {
+      url += `?status=${encodeURIComponent(status)}`;
+    }
+    
+    const response = await authFetch(url, {
+      method: 'GET',
+      requireAuth: true,
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Ошибка получения истории заказов: ${response.status} ${errorText}`);
+    }
+
+    const responseData = await response.json();
+    const rawData = responseData.data || responseData;
+    
+    // Если это массив, обрабатываем каждый элемент
+    if (Array.isArray(rawData)) {
+      return rawData.map((item: any) => {
+        const purchaseData = item.purchase || item;
+        const purchase: Purchase = {
+          id: purchaseData.id,
+          user_id: purchaseData.user_id,
+          status: purchaseData.status,
+          total_cost: purchaseData.total_cost,
+          created_at: purchaseData.created_at,
+          updated_at: purchaseData.updated_at,
+          purchase_offers: purchaseData.purchase_offers || [],
+          ttl: purchaseData.ttl || 300,
+        };
+        
+        return {
+          purchase,
+          offer_results: item.offer_results || [],
+          total_processed: item.total_processed || (item.offer_results?.length || 0),
+          total_failed: item.total_failed || 0,
+        };
+      });
+    }
+    
+    return [];
+  } catch (error) {
+    console.error('Ошибка получения покупок:', error);
+    throw error;
+  }
+}
+
+/**
+ * Получает список всех покупок пользователя (история заказов)
+ * @returns Promise с массивом покупок
+ */
+export async function getPurchasesHistory(): Promise<CreateOrderResponse[]> {
+  return getPurchasesByStatus();
+}
+

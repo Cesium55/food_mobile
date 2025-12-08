@@ -13,14 +13,16 @@ import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View } fr
 
 export default function Profile() {
     const user = useUser();
-    const { getCurrentOrders, loading, refetchCurrentPending } = useOrders();
+    const { getCurrentOrders, loading, refetchCurrentPending, refetchPaidOrders } = useOrders();
     const currentOrders = getCurrentOrders();
 
-    // Обновляем текущий заказ при фокусе на экране
+    // Обновляем текущий заказ и оплаченные заказы при фокусе на экране
     useFocusEffect(
         useCallback(() => {
             refetchCurrentPending();
-        }, [refetchCurrentPending])
+            refetchPaidOrders();
+            // eslint-disable-next-line react-hooks/exhaustive-deps
+        }, [])
     );
 
     const handleSwitchToAdmin = () => {

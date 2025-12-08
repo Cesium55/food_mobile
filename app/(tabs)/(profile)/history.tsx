@@ -48,7 +48,8 @@ export default function History() {
   useFocusEffect(
     useCallback(() => {
       refetchOrders();
-    }, [refetchOrders])
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [])
   );
 
   return (
@@ -103,6 +104,17 @@ export default function History() {
                   style={[styles.orderCard, { borderLeftWidth: 4, borderLeftColor: statusColor }]}
                   activeOpacity={0.7}
                         onPress={() => {
+                          // Если заказ отменен, показываем его на экране просмотра (но без QR и платежа)
+                          if (order.status === 'cancelled') {
+                            router.push({
+                              pathname: '/(tabs)/(profile)/order-paid',
+                              params: {
+                                purchaseId: order.id.toString(),
+                              },
+                            });
+                            return;
+                          }
+                          
                           // Если заказ оплачен, подтвержден или завершен, переходим на экран оплаченного заказа
                           if (order.status === 'paid' || order.status === 'confirmed' || order.status === 'completed') {
                             router.push({
@@ -112,7 +124,7 @@ export default function History() {
                               },
                             });
                           } else {
-                            // Иначе на экран оплаты
+                            // Иначе на экран оплаты (только для reserved/pending)
                             router.push({
                               pathname: '/(tabs)/(profile)/checkout',
                               params: {

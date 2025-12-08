@@ -36,25 +36,58 @@ export default function OrderPaidScreen() {
         // Загружаем данные заказа
         const purchase = await getPurchaseById(parseInt(params.purchaseId));
         
-        // Загружаем данные платежа для получения времени оплаты
-        try {
-          const payment = await getPaymentByPurchaseId(parseInt(params.purchaseId));
-          if (payment.status === 'succeeded' && payment.updated_at) {
-            setPaymentDate(new Date(payment.updated_at));
+        // Если заказ отменен, не загружаем платеж и QR код
+        if (purchase.status === 'cancelled') {
+          const orderResponse: CreateOrderResponse = {
+            purchase: {
+              id: purchase.id,
+              user_id: purchase.user_id,
+              status: purchase.status,
+              total_cost: purchase.total_cost,
+              created_at: purchase.created_at,
+              updated_at: purchase.updated_at,
+              purchase_offers: purchase.purchase_offers || [],
+              ttl: purchase.ttl || 0,
+            },
+            offer_results: purchase.purchase_offers?.map(po => ({
+              offer_id: po.offer_id,
+              status: 'success' as const,
+              quantity: po.quantity,
+              current_cost: po.offer?.current_cost || po.cost_at_purchase || 0,
+              original_cost: po.offer?.original_cost || po.cost_at_purchase || 0,
+              requested_quantity: po.quantity,
+              message: '',
+            })) || [],
+            total_processed: purchase.purchase_offers?.length || 0,
+            total_failed: 0,
+          };
+          setOrderData(orderResponse);
+          return;
+        }
+        
+        // Загружаем данные платежа для получения времени оплаты (только для оплаченных заказов)
+        if (purchase.status === 'paid' || purchase.status === 'confirmed' || purchase.status === 'completed') {
+          try {
+            const payment = await getPaymentByPurchaseId(parseInt(params.purchaseId));
+            if (payment.status === 'succeeded' && payment.updated_at) {
+              setPaymentDate(new Date(payment.updated_at));
+            }
+          } catch (error) {
+            console.error('Ошибка загрузки платежа:', error);
           }
-        } catch (error) {
-          console.error('Ошибка загрузки платежа:', error);
         }
 
-        // Загружаем токен для QR кода
-        try {
-          setLoadingToken(true);
-          const token = await getPurchaseToken(parseInt(params.purchaseId));
-          setQrToken(token);
-        } catch (error) {
-          console.error('Ошибка загрузки токена:', error);
-        } finally {
-          setLoadingToken(false);
+        // Загружаем токен для QR кода (только для подтвержденных заказов)
+        if (purchase.status === 'confirmed') {
+          try {
+            setLoadingToken(true);
+            const token = await getPurchaseToken(parseInt(params.purchaseId));
+            setQrToken(token);
+          } catch (error) {
+            console.error('Ошибка загрузки токена:', error);
+          } finally {
+            setLoadingToken(false);
+          }
         }
 
         // Преобразуем в формат CreateOrderResponse
@@ -124,6 +157,36 @@ export default function OrderPaidScreen() {
     );
   }
 
+  // Если заказ отменен, показываем специальное сообщение
+  if (orderData.purchase.status === 'cancelled') {
+    return (
+      <TabScreen title="Заказ отменен" showBackButton={true}>
+        <View style={styles.container}>
+          <View style={styles.cancelledSection}>
+            <Text style={styles.cancelledIcon}>❌</Text>
+            <Text style={styles.cancelledTitle}>Заказ отменен</Text>
+            <Text style={styles.cancelledText}>
+              Этот заказ был отменен. Товары освобождены из резерва.
+            </Text>
+          </View>
+          
+          {/* Информация о заказе */}
+          <View style={styles.orderInfoSection}>
+            <Text style={styles.sectionTitle}>Информация о заказе</Text>
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Номер заказа:</Text>
+              <Text style={styles.infoValue}>#{orderData.purchase.id}</Text>
+            </View>
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Дата создания:</Text>
+              <Text style={styles.infoValue}>{formatDate(new Date(orderData.purchase.created_at))}</Text>
+            </View>
+          </View>
+        </View>
+      </TabScreen>
+    );
+  }
+
   const purchase = orderData.purchase;
   const offerResults = orderData.offer_results || [];
 
@@ -174,23 +237,10 @@ export default function OrderPaidScreen() {
 
   const totalDiscount = originalTotal - totalAmount;
 
-  const handleBack = () => {
-    // Возвращаемся на главный экран профиля
-    // Используем push, чтобы правильно работать со стеком навигации
-    if (router.canGoBack()) {
-      // Если можем вернуться назад, делаем это
-      router.back();
-    } else {
-      // Иначе переходим на главный экран профиля
-      router.push('/(tabs)/(profile)');
-    }
-  };
-
   return (
     <TabScreen 
       title="Заказ оплачен" 
       showBackButton={true}
-      onBackPress={handleBack}
     >
       <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
         {/* Информация о времени оплаты */}
@@ -521,6 +571,33 @@ const styles = StyleSheet.create({
     marginTop: 12,
     fontSize: 14,
     color: '#666',
+  },
+  cancelledSection: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 32,
+    marginBottom: 16,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  cancelledIcon: {
+    fontSize: 64,
+    marginBottom: 16,
+  },
+  cancelledTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#F44336',
+    marginBottom: 8,
+  },
+  cancelledText: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
   },
 });
 

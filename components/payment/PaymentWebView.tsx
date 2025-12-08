@@ -1,15 +1,18 @@
+import { IconSymbol } from '@/components/ui/icon-symbol';
 import React, { useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import Modal from 'react-native-modal';
 import { WebView, WebViewMessageEvent } from 'react-native-webview';
-import { Colors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
 
 interface PaymentWebViewProps {
   visible: boolean;
   confirmationUrl: string;
+  purchaseId?: number;
+  paymentId?: number;
   onPaymentSuccess: (paymentId: number) => void;
   onPaymentCanceled: (paymentId: number) => void;
   onClose: () => void;
+  onCloseWithCheck?: (purchaseId: number, paymentId: number) => void;
 }
 
 interface PaymentStatusMessage {
@@ -22,12 +25,13 @@ interface PaymentStatusMessage {
 export function PaymentWebView({
   visible,
   confirmationUrl,
+  purchaseId,
+  paymentId,
   onPaymentSuccess,
   onPaymentCanceled,
   onClose,
+  onCloseWithCheck,
 }: PaymentWebViewProps) {
-  const colorScheme = useColorScheme();
-  const colors = Colors[colorScheme ?? 'light'];
   const [loading, setLoading] = useState(true);
   const webViewRef = useRef<WebView>(null);
 
@@ -37,12 +41,12 @@ export function PaymentWebView({
       
       if (message.type === 'payment_status') {
         if (message.status === 'succeeded') {
-          // Закрываем модалку при успешном платеже
+          // Закрываем модалку при успешном платеже (без проверки, так как статус уже известен)
           onClose();
           // Вызываем callback для обработки успешного платежа
           onPaymentSuccess(message.payment_id);
         } else if (message.status === 'canceled') {
-          // Закрываем модалку при отмене платежа
+          // Закрываем модалку при отмене платежа (без проверки)
           onClose();
           // Вызываем callback для обработки отмены платежа
           onPaymentCanceled(message.payment_id);
@@ -61,83 +65,84 @@ export function PaymentWebView({
     setLoading(false);
   };
 
-  const handleError = (syntheticEvent: any) => {
-    const { nativeEvent } = syntheticEvent;
-    console.error('WebView error:', nativeEvent);
-    Alert.alert(
-      'Ошибка загрузки',
-      'Не удалось загрузить страницу оплаты. Проверьте подключение к интернету.',
-      [
-        {
-          text: 'Закрыть',
-          onPress: onClose,
-        },
-      ]
-    );
+  const handleClose = () => {
+    // Если есть onCloseWithCheck и purchaseId/paymentId, проверяем статус
+    if (onCloseWithCheck && purchaseId && paymentId) {
+      onCloseWithCheck(purchaseId, paymentId);
+    } else {
+      onClose();
+    }
   };
-
-  if (!visible) {
-    return null;
-  }
 
   return (
     <Modal
-      visible={visible}
-      animationType="slide"
-      presentationStyle="pageSheet"
-      onRequestClose={onClose}
+      isVisible={visible}
+      onBackdropPress={handleClose}
+      onSwipeComplete={handleClose}
+      swipeDirection="down"
+      style={styles.modal}
+      avoidKeyboard={true}
     >
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={styles.modalContainer}>
         {/* Header */}
-        <View style={[styles.header, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
-          <Text style={[styles.headerTitle, { color: colors.text }]}>Оплата заказа</Text>
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Оплата заказа</Text>
           <TouchableOpacity
             style={styles.closeButton}
-            onPress={onClose}
+            onPress={handleClose}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
-            <Text style={[styles.closeButtonText, { color: colors.text }]}>✕</Text>
+            <IconSymbol name="xmark" color="#333" />
           </TouchableOpacity>
         </View>
 
         {/* WebView */}
-        <WebView
-          ref={webViewRef}
-          source={{ uri: confirmationUrl }}
-          style={styles.webview}
-          onMessage={handleMessage}
-          onLoadStart={handleLoadStart}
-          onLoadEnd={handleLoadEnd}
-          onError={handleError}
-          javaScriptEnabled={true}
-          domStorageEnabled={true}
-          startInLoadingState={true}
-          renderLoading={() => (
-            <View style={styles.loadingContainer}>
+        <View style={styles.webviewContainer}>
+          <WebView
+            ref={webViewRef}
+            source={{ uri: confirmationUrl }}
+            style={styles.webview}
+            onMessage={handleMessage}
+            onLoadStart={handleLoadStart}
+            onLoadEnd={handleLoadEnd}
+            javaScriptEnabled={true}
+            domStorageEnabled={true}
+            startInLoadingState={true}
+            renderLoading={() => (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color="#4CAF50" />
+                <Text style={styles.loadingText}>
+                  Загрузка страницы оплаты...
+                </Text>
+              </View>
+            )}
+          />
+
+          {/* Loading overlay */}
+          {loading && (
+            <View style={styles.loadingOverlay}>
               <ActivityIndicator size="large" color="#4CAF50" />
-              <Text style={[styles.loadingText, { color: colors.text }]}>
-                Загрузка страницы оплаты...
+              <Text style={styles.loadingText}>
+                Загрузка...
               </Text>
             </View>
           )}
-        />
-
-        {/* Loading overlay */}
-        {loading && (
-          <View style={styles.loadingOverlay}>
-            <ActivityIndicator size="large" color="#4CAF50" />
-            <Text style={[styles.loadingText, { color: colors.text }]}>
-              Загрузка...
-            </Text>
-          </View>
-        )}
+        </View>
       </View>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  modal: {
+    justifyContent: 'flex-end',
+    margin: 0,
+  },
+  modalContainer: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '90%',
     flex: 1,
   },
   header: {
@@ -147,24 +152,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    paddingTop: 60, // Для safe area на iOS
+    borderBottomColor: '#E0E0E0',
   },
   headerTitle: {
     fontSize: 18,
-    fontWeight: '700',
+    fontWeight: '600',
+    color: '#333',
     flex: 1,
     textAlign: 'center',
   },
   closeButton: {
-    width: 32,
-    height: 32,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginLeft: 'auto',
+    padding: 8,
   },
-  closeButtonText: {
-    fontSize: 24,
-    fontWeight: '300',
+  webviewContainer: {
+    flex: 1,
   },
   webview: {
     flex: 1,
@@ -192,6 +193,7 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 12,
     fontSize: 14,
+    color: '#666',
   },
 });
 

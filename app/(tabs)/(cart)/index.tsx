@@ -6,13 +6,13 @@ import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useCart } from "@/hooks/useCart";
 import { useOffers } from "@/hooks/useOffers";
-import { useRouter, useFocusEffect } from "expo-router";
-import React, { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 import { createOrderFromCart, getCurrentPendingPurchase } from "@/services/orderService";
 import { checkPaymentStatus } from "@/services/paymentService";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useFocusEffect, useRouter } from "expo-router";
+import React, { useCallback, useEffect, useState } from "react";
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 const PAYMENT_ID_STORAGE_KEY = '@current_payment_id';
 
@@ -40,6 +40,8 @@ export default function Cart() {
   const [isCheckingPending, setIsCheckingPending] = useState(true);
   // Состояние для создания заказа
   const [isCreatingOrder, setIsCreatingOrder] = useState(false);
+  // Состояние для проверки наличия pending заказа при загрузке
+  const [isCheckingForPendingOrder, setIsCheckingForPendingOrder] = useState(true);
   
   // Функция для увеличения количества с проверкой максимального количества
   const handleIncrease = (itemId: number) => {
@@ -67,6 +69,42 @@ export default function Cart() {
     // lowStockValidator,
     // unavailableItemValidator,
   ];
+
+  // Проверяем наличие pending заказа при загрузке компонента
+  useEffect(() => {
+    let isMounted = true;
+    
+    const checkPendingOrder = async () => {
+      try {
+        setIsCheckingForPendingOrder(true);
+        
+        // Проверяем наличие pending заказа
+        const pendingOrder = await getCurrentPendingPurchase();
+        
+        if (isMounted && pendingOrder && pendingOrder.purchase && pendingOrder.purchase.id) {
+          // Если есть pending заказ, автоматически перекидываем на экран оплаты в профиле
+          router.replace({
+            pathname: '/(tabs)/(profile)/checkout',
+            params: {
+              purchaseId: pendingOrder.purchase.id.toString(),
+              orderData: JSON.stringify(pendingOrder),
+            },
+          });
+          return;
+        }
+      } catch (error) {
+        console.error('Ошибка проверки pending заказа:', error);
+      } finally {
+        if (isMounted) setIsCheckingForPendingOrder(false);
+      }
+    };
+
+    checkPendingOrder();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []); // Пустой массив зависимостей - выполняется только при монтировании
 
   // Проверяем статус платежа при загрузке компонента
   useEffect(() => {
@@ -123,6 +161,44 @@ export default function Cart() {
     };
   }, []); // Пустой массив зависимостей - выполняется только при монтировании
 
+  // Проверяем наличие pending заказа при фокусе на экране (когда пользователь возвращается)
+  useFocusEffect(
+    useCallback(() => {
+      let isCancelled = false;
+      
+      const checkPendingOrder = async () => {
+        if (isCancelled) return;
+        
+        try {
+          // Проверяем наличие pending заказа
+          const pendingOrder = await getCurrentPendingPurchase();
+          
+          if (!isCancelled && pendingOrder && pendingOrder.purchase && pendingOrder.purchase.id) {
+            // Если есть pending заказ, автоматически перекидываем на экран оплаты в профиле
+            router.replace({
+              pathname: '/(tabs)/(profile)/checkout',
+              params: {
+                purchaseId: pendingOrder.purchase.id.toString(),
+                orderData: JSON.stringify(pendingOrder),
+              },
+            });
+            return;
+          }
+        } catch (error) {
+          if (!isCancelled) {
+            console.error('Ошибка проверки pending заказа:', error);
+          }
+        }
+      };
+
+      checkPendingOrder();
+
+      return () => {
+        isCancelled = true;
+      };
+    }, [router])
+  );
+
   // Проверяем статус платежа при фокусе на экране (когда пользователь возвращается)
   useFocusEffect(
     useCallback(() => {
@@ -177,15 +253,15 @@ export default function Cart() {
       return () => {
         isCancelled = true;
       };
-    }, []) // Пустой массив - функция стабильна
+    }, [clearCart])
   );
 
-  // Показываем индикатор загрузки во время проверки статуса платежа или загрузки корзины
-  if (isCheckingPending || isLoading) {
+  // Показываем индикатор загрузки во время проверки pending заказа, статуса платежа или загрузки корзины
+  if (isCheckingForPendingOrder || isCheckingPending || isLoading) {
     return (
       <TabScreen title="Корзина">
         <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Загрузка корзины...</Text>
+          <ActivityIndicator size="large" color="#007AFF" />
         </View>
       </TabScreen>
     );
@@ -283,6 +359,17 @@ export default function Cart() {
       setIsCreatingOrder(false);
     }
   };
+
+  // Показываем загрузку пока проверяем pending заказ
+  if (isCheckingForPendingOrder) {
+    return (
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]} edges={['top']}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#007AFF" />
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]} edges={['top']}>
@@ -445,6 +532,11 @@ const styles = StyleSheet.create({
   },
   bottomSpacer: {
     height: 100,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   fixedBottomPanel: {
     position: 'absolute',

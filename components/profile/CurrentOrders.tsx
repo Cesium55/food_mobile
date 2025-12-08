@@ -19,8 +19,7 @@ export function CurrentOrders({ orders }: CurrentOrdersProps) {
     const year = date.getFullYear();
     const hours = date.getHours().toString().padStart(2, '0');
     const minutes = date.getMinutes().toString().padStart(2, '0');
-    const seconds = date.getSeconds().toString().padStart(2, '0');
-    return `${day}.${month}.${year} ${hours}:${minutes}:${seconds}`;
+    return `${day}.${month}.${year} ${hours}:${minutes}`;
   };
 
   const getStatusInfo = (status: string, timeLeft?: number) => {
@@ -34,6 +33,12 @@ export function CurrentOrders({ orders }: CurrentOrdersProps) {
       case 'paid':
         return {
           text: 'Оплачен',
+          color: '#2196F3',
+          bg: '#E3F2FD',
+        };
+      case 'confirmed':
+        return {
+          text: 'Подтвержден',
           color: '#2196F3',
           bg: '#E3F2FD',
         };
@@ -90,28 +95,12 @@ export function CurrentOrders({ orders }: CurrentOrdersProps) {
                 <Text style={styles.dateTime}>
                   {formatDateTime(order.date)}
                 </Text>
-                <Text style={styles.shopsList}>
-                  {order.shops.join(', ')}
-                </Text>
               </View>
               <View style={[styles.statusBadge, { backgroundColor: statusInfo.bg }]}>
                 <Text style={[styles.statusText, { color: statusInfo.color }]}>
                   {statusInfo.text}
                 </Text>
               </View>
-            </View>
-
-            <View style={styles.itemsList}>
-              {order.items.slice(0, 2).map((item) => (
-                <Text key={item.id} style={styles.itemText} numberOfLines={1}>
-                  • {item.productName} ({item.quantity} шт.)
-                </Text>
-              ))}
-              {order.items.length > 2 && (
-                <Text style={styles.moreItems}>
-                  и еще {order.items.length - 2} товар(а/ов)
-                </Text>
-              )}
             </View>
 
             <View style={styles.orderFooter}>
@@ -133,11 +122,11 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
     color: '#333',
-    marginBottom: 12,
+    marginBottom: 8,
     paddingHorizontal: 16,
   },
   emptyContainer: {
-    padding: 32,
+    padding: 16,
     alignItems: 'center',
   },
   emptyText: {
@@ -147,9 +136,9 @@ const styles = StyleSheet.create({
   orderCard: {
     backgroundColor: '#fff',
     borderRadius: 12,
-    padding: 16,
+    padding: 12,
     marginHorizontal: 16,
-    marginBottom: 12,
+    marginBottom: 8,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -163,7 +152,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 12,
+    marginBottom: 8,
   },
   orderInfo: {
     flex: 1,
@@ -177,11 +166,6 @@ const styles = StyleSheet.create({
   dateTime: {
     fontSize: 12,
     color: '#999',
-    marginBottom: 4,
-  },
-  shopsList: {
-    fontSize: 12,
-    color: '#666',
   },
   statusBadge: {
     paddingHorizontal: 10,
@@ -193,27 +177,7 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '600',
   },
-  itemsList: {
-    borderTopWidth: 1,
-    borderTopColor: '#E0E0E0',
-    paddingTop: 12,
-    marginBottom: 12,
-  },
-  itemText: {
-    fontSize: 13,
-    color: '#333',
-    marginBottom: 4,
-  },
-  moreItems: {
-    fontSize: 12,
-    color: '#999',
-    fontStyle: 'italic',
-    marginTop: 4,
-  },
   orderFooter: {
-    borderTopWidth: 1,
-    borderTopColor: '#E0E0E0',
-    paddingTop: 12,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',

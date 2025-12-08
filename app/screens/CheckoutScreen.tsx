@@ -1,16 +1,16 @@
+import { PaymentWebView } from "@/components/payment/PaymentWebView";
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import { useCart } from "@/hooks/useCart";
 import { useOffers } from "@/hooks/useOffers";
 import { useShops } from "@/hooks/useShops";
-import { useCart } from "@/hooks/useCart";
 import { CreateOrderResponse, OfferResult, PurchaseOffer, getCurrentPendingPurchase, updatePurchaseStatus } from "@/services/orderService";
-import { getPaymentByPurchaseId, checkPaymentStatus } from "@/services/paymentService";
-import { PaymentWebView } from "@/components/payment/PaymentWebView";
+import { checkPaymentStatus, getPaymentByPurchaseId } from "@/services/paymentService";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Alert, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from "react-native-safe-area-context";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const PAYMENT_ID_STORAGE_KEY = '@current_payment_id';
 
@@ -93,7 +93,7 @@ export default function CheckoutScreen() {
               setLoadedOrderData(pending);
             } else {
               // Если заказ не pending, перенаправляем на экран оплаченного заказа
-              router.push({
+              router.replace({
                 pathname: '/(tabs)/(profile)/order-paid',
                 params: {
                   purchaseId: params.purchaseId,
@@ -103,7 +103,7 @@ export default function CheckoutScreen() {
           } else {
             // Заказ не найден как pending, возможно он уже оплачен
             // Перенаправляем на экран оплаченного заказа
-            router.push({
+            router.replace({
               pathname: '/(tabs)/(profile)/order-paid',
               params: {
                 purchaseId: params.purchaseId,
@@ -113,7 +113,7 @@ export default function CheckoutScreen() {
         } catch (error) {
           console.error('Ошибка загрузки заказа:', error);
           // В случае ошибки тоже перенаправляем на экран оплаченного заказа
-          router.push({
+          router.replace({
             pathname: '/(tabs)/(profile)/order-paid',
             params: {
               purchaseId: params.purchaseId,
@@ -407,7 +407,7 @@ export default function CheckoutScreen() {
             // Перенаправляем на экран оплаченного заказа
             setLoadedOrderData((prevData) => {
               if (prevData && prevData.purchase && prevData.purchase.id) {
-                router.push({
+                router.replace({
                   pathname: '/(tabs)/(profile)/order-paid',
                   params: {
                     purchaseId: prevData.purchase.id.toString(),
@@ -470,8 +470,9 @@ export default function CheckoutScreen() {
         
         // Перенаправляем на экран оплаченного заказа
         if (purchase && purchase.id) {
-          // Используем push для правильной навигации в стек профиля
-          router.push({
+          // Используем replace чтобы не оставлять экран оплаты в стеке навигации
+          // handleBackPress в order-paid.tsx обработает правильную навигацию назад
+          router.replace({
             pathname: '/(tabs)/(profile)/order-paid',
             params: {
               purchaseId: purchase.id.toString(),
@@ -510,10 +511,45 @@ export default function CheckoutScreen() {
     );
   };
 
-  const handleCloseWebView = () => {
-    // Просто закрываем модалку без предупреждения
+  const handleCloseWebView = async () => {
+    // Закрываем модалку
     setPaymentWebViewVisible(false);
     setConfirmationUrl(null);
+  };
+
+  const handleCloseWebViewWithCheck = async (purchaseId: number, paymentId: number) => {
+    // Закрываем модалку
+    setPaymentWebViewVisible(false);
+    setConfirmationUrl(null);
+    
+    try {
+      // Проверяем статус платежа один раз
+      const payment = await checkPaymentStatus(paymentId);
+      
+      if (payment.status === 'succeeded') {
+        // Удаляем paymentId из storage, так как платеж завершен
+        await AsyncStorage.removeItem(PAYMENT_ID_STORAGE_KEY).catch(() => {});
+        
+        // Очищаем корзину после успешного платежа
+        await clearCart();
+        
+        // Перенаправляем на экран оплаченного заказа
+        // handleBackPress в order-paid.tsx обработает правильную навигацию назад
+        router.replace({
+          pathname: '/(tabs)/(profile)/order-paid',
+          params: {
+            purchaseId: purchaseId.toString(),
+          },
+        });
+      } else {
+        // Если платеж не завершен, просто закрываем модалку
+        handleCloseWebView();
+      }
+    } catch (error: any) {
+      console.error('Ошибка проверки статуса платежа при закрытии:', error);
+      // В случае ошибки просто закрываем модалку
+      handleCloseWebView();
+    }
   };
 
   const handleCancelOrder = () => {
@@ -881,13 +917,16 @@ export default function CheckoutScreen() {
       </View>
 
       {/* WebView для оплаты */}
-      {confirmationUrl && (
+      {confirmationUrl && purchase && currentPaymentId && (
         <PaymentWebView
           visible={paymentWebViewVisible}
           confirmationUrl={confirmationUrl}
+          purchaseId={purchase.id}
+          paymentId={currentPaymentId}
           onPaymentSuccess={handlePaymentSuccess}
           onPaymentCanceled={handlePaymentCanceled}
           onClose={handleCloseWebView}
+          onCloseWithCheck={handleCloseWebViewWithCheck}
         />
       )}
 
