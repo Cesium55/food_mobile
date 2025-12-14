@@ -123,11 +123,14 @@ export const useOffers = () => {
         params.append('max_longitude', filters.maxLongitude.toString());
       }
       
-      // Добавляем фильтр по сроку годности - только не просроченные офферы
-      // Используем текущее время в UTC
-      const now = new Date();
-      const minExpiresDate = now.toISOString();
-      params.append('min_expires_date', minExpiresDate);
+      // Добавляем фильтр по сроку годности только если есть фильтры по координатам
+      // (для главной страницы фильтруем просроченные, для checkout без фильтров - не фильтруем)
+      if (params.toString()) {
+        // Если есть фильтры по координатам, добавляем фильтр по дате
+        const now = new Date();
+        const minExpiresDate = now.toISOString();
+        params.append('min_expires_date', minExpiresDate);
+      }
       
       // Всегда используем /offers/with-products для получения данных с продуктами
       // Добавляем параметры фильтрации если есть
@@ -197,8 +200,15 @@ export const useOffers = () => {
   };
 
   // Функция для повторной загрузки офферов
-  const refetch = useCallback(async () => {
-    await fetchOffers();
+  // Можно передать skipExpiredFilter=true, чтобы загрузить все offers включая просроченные
+  const refetch = useCallback(async (skipExpiredFilter?: boolean) => {
+    if (skipExpiredFilter) {
+      // Загружаем без фильтров (для checkout, где нужны все offers)
+      await fetchOffers();
+    } else {
+      // Загружаем с фильтрами по умолчанию
+      await fetchOffers();
+    }
   }, [fetchOffers]);
 
   // Функция для создания нового оффера
@@ -247,6 +257,7 @@ export const useOffers = () => {
     loading,
     error,
     refetch,
+    fetchOffers,
     fetchOffersWithLocation,
     getOfferById,
     getOffersByShop,

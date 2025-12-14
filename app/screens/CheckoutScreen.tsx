@@ -46,8 +46,18 @@ export default function CheckoutScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ purchaseId?: string; orderData?: string }>();
   const { shops, getShopById } = useShops();
-  const { getOfferById } = useOffers();
+  const { getOfferById, fetchOffers } = useOffers();
   const { clearCart } = useCart();
+  
+  // Загружаем offers при монтировании без фильтров (для работы getOfferById)
+  useEffect(() => {
+    const loadOffers = async () => {
+      // Загружаем все offers без фильтров (включая просроченные, которые могут быть в заказе)
+      // Вызываем fetchOffers без параметров, чтобы не применять фильтры по координатам и дате
+      await fetchOffers();
+    };
+    loadOffers();
+  }, [fetchOffers]);
   const [loadedOrderData, setLoadedOrderData] = useState<CreateOrderResponse | null>(null);
   const [loadingOrder, setLoadingOrder] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
@@ -176,17 +186,24 @@ export default function CheckoutScreen() {
       // Получаем информацию об офере из локального кэша
       const offer = getOfferById(result.offer_id);
       
-      // Если офера нет в кэше, пропускаем (не можем определить shop_id)
-      if (!offer) {
-        console.warn(`Offer ${result.offer_id} not found in cache`);
+      // Получаем информацию из purchase_offer
+      const purchaseOffer = purchaseOffersMap.get(result.offer_id);
+      
+      // Определяем shopId: сначала из offer, потом из purchase_offer
+      let shopId: number | undefined = offer?.shopId;
+      if (!shopId && purchaseOffer) {
+        shopId = purchaseOffer.offer.shop_id;
+      }
+      
+      // Если не можем определить shopId, пропускаем
+      if (!shopId) {
+        console.warn(`Offer ${result.offer_id} not found in cache and no purchase_offer`);
         return;
       }
-
-      const shopId = offer.shopId;
       
       // Получаем информацию о магазине
       const shop = getShopById(shopId);
-      const shopName = shop?.shortName || shop?.name || offer.shopShortName || `Магазин #${shopId}`;
+      const shopName = shop?.shortName || shop?.name || offer?.shopShortName || `Магазин #${shopId}`;
       // Получаем адрес: сначала address, потом fullName, потом name, потом пустая строка
       const shopAddress = shop?.address || shop?.fullName || shop?.name || '';
       const shopLatitude = shop?.latitude;
@@ -210,16 +227,14 @@ export default function CheckoutScreen() {
         group.shopAddress = shopAddress;
       }
       
-      // Получаем информацию из purchase_offer, если товар был успешно обработан
-      const purchaseOffer = purchaseOffersMap.get(result.offer_id);
-      
       // Определяем количество и стоимость
       let quantity = result.processed_quantity || 0;
-      let currentCost = offer.currentCost;
-      let originalCost = offer.originalCost;
-      let expiresDate: Date | null = offer.expiresDate ? new Date(offer.expiresDate) : null;
+      let currentCost = offer?.currentCost || 0;
+      let originalCost = offer?.originalCost || 0;
+      let expiresDate: Date | null = offer?.expiresDate ? new Date(offer.expiresDate) : null;
+      let productName = offer?.productName || 'Товар';
 
-      // Если есть purchase_offer, используем данные оттуда
+      // Если есть purchase_offer, используем данные оттуда (приоритет)
       if (purchaseOffer) {
         quantity = purchaseOffer.quantity;
         currentCost = purchaseOffer.cost_at_purchase;
@@ -229,7 +244,7 @@ export default function CheckoutScreen() {
 
       group.items.push({
         offerId: result.offer_id,
-        productName: offer.productName,
+        productName: productName,
         quantity: quantity,
         requestedQuantity: result.requested_quantity,
         currentCost: currentCost,
