@@ -19,6 +19,11 @@ interface PricingStrategyApi {
   steps: PricingStrategyStepApi[];
 }
 
+// ГЛОБАЛЬНЫЙ кэш для стратегий (вне хука, чтобы был общим для всех инстансов)
+const strategyCache = new Map<number, PricingStrategy>();
+// ГЛОБАЛЬНЫЙ кэш для промисов загрузки (чтобы избежать дублирующихся запросов)
+const loadingPromises = new Map<number, Promise<PricingStrategy | null>>();
+
 export const usePricingStrategies = () => {
   const [strategies, setStrategies] = useState<PricingStrategy[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
@@ -57,6 +62,11 @@ export const usePricingStrategies = () => {
         if (Array.isArray(strategiesData)) {
           const transformedStrategies = strategiesData.map(transformStrategy);
           setStrategies(transformedStrategies);
+          
+          // Обновляем глобальный кэш
+          transformedStrategies.forEach(strategy => {
+            strategyCache.set(strategy.id, strategy);
+          });
         } else {
           setError('Неверный формат данных стратегий');
           setStrategies([]);
@@ -79,26 +89,60 @@ export const usePricingStrategies = () => {
 
   // Функция для получения конкретной стратегии по ID
   const getStrategyById = useCallback(async (id: number): Promise<PricingStrategy | null> => {
-    try {
-      const url = getApiUrl(API_ENDPOINTS.OFFERS.PRICING_STRATEGY_BY_ID(id));
-      const response = await authFetch(url, {
-        method: 'GET',
-        requireAuth: true,
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        const strategyData = data.data || data;
-        return transformStrategy(strategyData as PricingStrategyApi);
-      } else if (response.status === 404) {
-        return null;
-      } else {
-        throw new Error('Ошибка загрузки стратегии');
-      }
-    } catch (err) {
-      throw err;
+    // Проверяем глобальный кэш
+    const cached = strategyCache.get(id);
+    if (cached) {
+      return cached;
     }
+    
+    // Проверяем, не идет ли уже загрузка этой стратегии
+    const existingPromise = loadingPromises.get(id);
+    if (existingPromise) {
+      return existingPromise;
+    }
+    
+    // Создаем промис загрузки
+    const loadingPromise = (async () => {
+      try {
+        const url = getApiUrl(API_ENDPOINTS.OFFERS.PRICING_STRATEGY_BY_ID(id));
+        const response = await authFetch(url, {
+          method: 'GET',
+          requireAuth: true,
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          const strategyData = data.data || data;
+          const strategy = transformStrategy(strategyData as PricingStrategyApi);
+          
+          // Сохраняем в глобальный кэш
+          strategyCache.set(id, strategy);
+          
+          return strategy;
+        } else if (response.status === 404) {
+          return null;
+        } else {
+          throw new Error('Ошибка загрузки стратегии');
+        }
+      } catch (err) {
+        throw err;
+      } finally {
+        // Удаляем промис из кэша загрузок
+        loadingPromises.delete(id);
+      }
+    })();
+    
+    // Сохраняем промис в глобальный кэш загрузок
+    loadingPromises.set(id, loadingPromise);
+    
+    return loadingPromise;
   }, [transformStrategy]);
+
+  // Функция для очистки глобального кэша (на случай если нужно обновить данные)
+  const clearCache = useCallback(() => {
+    strategyCache.clear();
+    loadingPromises.clear();
+  }, []);
 
   // Загружаем стратегии при монтировании компонента
   useEffect(() => {
@@ -111,5 +155,6 @@ export const usePricingStrategies = () => {
     error,
     fetchStrategies,
     getStrategyById,
+    clearCache,
   };
 };

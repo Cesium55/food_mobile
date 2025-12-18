@@ -6,14 +6,12 @@ import { useThemedStyles } from '@/hooks/useThemeTokens';
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, {
-    interpolate,
-    useAnimatedStyle,
-    useSharedValue,
-    withSpring,
-    withTiming,
+  Easing,
+  interpolate,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
 } from 'react-native-reanimated';
-
-const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 interface OfferActionsProps {
   isInCart: boolean;
@@ -40,141 +38,130 @@ export function OfferActions({
 }: OfferActionsProps) {
   const styles = useThemedStyles(createStyles);
   
-  // Анимация для кнопок
-  const addButtonScale = useSharedValue(1);
-  const decreaseButtonScale = useSharedValue(1);
-  const increaseButtonScale = useSharedValue(1);
-  
-  // Анимация появления/исчезновения секций
-  const notInCartOpacity = useSharedValue(isInCart ? 0 : 1);
-  const inCartOpacity = useSharedValue(isInCart ? 1 : 0);
+  // Анимация для отдельных элементов
+  const strikethroughOpacity = useSharedValue(isInCart ? 0 : 1);
+  const distanceOpacity = useSharedValue(isInCart ? 0 : 1);
+  const minusOpacity = useSharedValue(isInCart ? 1 : 0);
+  const quantityOpacity = useSharedValue(isInCart ? 1 : 0);
   
   React.useEffect(() => {
-    notInCartOpacity.value = withTiming(isInCart ? 0 : 1, { duration: 200 });
-    inCartOpacity.value = withTiming(isInCart ? 1 : 0, { duration: 200 });
+    const config = { 
+      duration: 300,
+      easing: Easing.out(Easing.quad),
+    };
+    
+    // Зачеркнутая цена и расстояние
+    strikethroughOpacity.value = withTiming(isInCart ? 0 : 1, config);
+    distanceOpacity.value = withTiming(isInCart ? 0 : 1, config);
+    
+    // Минус и количество
+    minusOpacity.value = withTiming(isInCart ? 1 : 0, config);
+    quantityOpacity.value = withTiming(isInCart ? 1 : 0, config);
   }, [isInCart]);
   
-  const notInCartStyle = useAnimatedStyle(() => ({
-    opacity: notInCartOpacity.value,
+  // Зачеркнутая цена и расстояние уезжают/приезжают вправо
+  const strikethroughStyle = useAnimatedStyle(() => ({
+    opacity: strikethroughOpacity.value,
     transform: [
-      { translateX: interpolate(notInCartOpacity.value, [0, 1], [-50, 0]) },
+      { translateX: interpolate(strikethroughOpacity.value, [0, 1], [30, 0]) },
     ],
   }));
   
-  const inCartStyle = useAnimatedStyle(() => ({
-    opacity: inCartOpacity.value,
+  const distanceStyle = useAnimatedStyle(() => ({
+    opacity: distanceOpacity.value,
     transform: [
-      { translateX: interpolate(inCartOpacity.value, [0, 1], [50, 0]) },
+      { translateX: interpolate(distanceOpacity.value, [0, 1], [30, 0]) },
     ],
   }));
   
-  const addButtonAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: addButtonScale.value }],
+  // Минус приезжает/уезжает слева
+  const minusStyle = useAnimatedStyle(() => ({
+    opacity: minusOpacity.value,
+    transform: [
+      { translateX: interpolate(minusOpacity.value, [0, 1], [-30, 0]) },
+    ],
   }));
   
-  const decreaseButtonAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: decreaseButtonScale.value }],
+  // Количество появляется/исчезает на месте
+  const quantityStyle = useAnimatedStyle(() => ({
+    opacity: quantityOpacity.value,
   }));
-  
-  const increaseButtonAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: increaseButtonScale.value }],
-  }));
-  
-  const handleAddPress = () => {
-    addButtonScale.value = withSpring(0.85, { damping: 10, stiffness: 400 }, () => {
-      addButtonScale.value = withSpring(1, { damping: 10, stiffness: 400 });
-    });
-    onAdd();
-  };
-  
-  const handleDecreasePress = () => {
-    decreaseButtonScale.value = withSpring(0.85, { damping: 10, stiffness: 400 }, () => {
-      decreaseButtonScale.value = withSpring(1, { damping: 10, stiffness: 400 });
-    });
-    onDecrease();
-  };
-  
-  const handleIncreasePress = () => {
-    increaseButtonScale.value = withSpring(0.85, { damping: 10, stiffness: 400 }, () => {
-      increaseButtonScale.value = withSpring(1, { damping: 10, stiffness: 400 });
-    });
-    onIncrease();
-  };
   
   return (
     <View style={styles.container}>
-      {!isInCart && (
-        <Animated.View style={[styles.footerRow, notInCartStyle]}>
-          <View style={styles.priceContainer}>
-            <View style={styles.priceRow}>
-              <Text style={styles.currentPrice}>{currentPrice.toFixed(0)} ₽</Text>
-              {currentPrice < originalPrice && (
-                <Text style={styles.originalPrice}>{originalPrice.toFixed(0)} ₽</Text>
-              )}
-            </View>
-            {distance && (
-              <Text style={styles.distance}>{distance}</Text>
+      <View style={styles.footerRow}>
+        {/* Минус - появляется слева */}
+        {isInCart && (
+          <Animated.View style={[styles.minusButton, minusStyle]}>
+            <Pressable 
+              style={styles.cartButton}
+              onPress={onDecrease}
+            >
+              <View style={styles.buttonTouchable}>
+                <Text style={styles.cartButtonText}>−</Text>
+              </View>
+            </Pressable>
+          </Animated.View>
+        )}
+        
+        {/* Цена и информация - всегда видна */}
+        <View style={[styles.priceContainer, isInCart && styles.priceContainerCenter]}>
+          <View style={styles.priceRow}>
+            <Text style={styles.currentPrice}>
+              {isInCart ? (currentPrice * quantity).toFixed(0) : currentPrice.toFixed(0)} ₽
+            </Text>
+            {/* Зачеркнутая цена - уезжает вправо */}
+            {!isInCart && currentPrice < originalPrice && (
+              <Animated.Text style={[styles.originalPrice, strikethroughStyle]}>
+                {originalPrice.toFixed(0)} ₽
+              </Animated.Text>
             )}
           </View>
           
-          <AnimatedPressable 
-            style={[styles.addButton, addButtonAnimatedStyle]}
-            onPress={handleAddPress}
+          {/* Расстояние или количество */}
+          {!isInCart && distance && (
+            <Animated.Text style={[styles.distance, distanceStyle]}>
+              {distance}
+            </Animated.Text>
+          )}
+          {isInCart && (
+            <Animated.Text style={[styles.cartQuantity, quantityStyle]}>
+              {quantity} шт
+            </Animated.Text>
+          )}
+        </View>
+        
+        {/* Плюс - всегда на месте */}
+        {isMaxQuantity ? (
+          <View 
+            style={styles.cartButton}
+            onStartShouldSetResponder={() => true}
+            onResponderRelease={(e) => {
+              e.stopPropagation();
+              return true;
+            }}
+          >
+            <View style={[
+              styles.buttonTouchable,
+              styles.buttonTouchableDisabled
+            ]}>
+              <Text style={[
+                styles.cartButtonText,
+                styles.cartButtonTextDisabled
+              ]}>+</Text>
+            </View>
+          </View>
+        ) : (
+          <Pressable 
+            style={styles.addButton}
+            onPress={isInCart ? onIncrease : onAdd}
           >
             <View style={styles.buttonTouchable}>
               <Text style={styles.addButtonText}>+</Text>
             </View>
-          </AnimatedPressable>
-        </Animated.View>
-      )}
-      
-      {isInCart && (
-        <Animated.View style={[styles.footerRowCart, inCartStyle]}>
-          <AnimatedPressable 
-            style={[styles.cartButton, decreaseButtonAnimatedStyle]}
-            onPress={handleDecreasePress}
-          >
-            <View style={styles.buttonTouchable}>
-              <Text style={styles.cartButtonText}>−</Text>
-            </View>
-          </AnimatedPressable>
-          
-          <View style={styles.cartInfo}>
-            <Text style={styles.cartPrice}>{(currentPrice * quantity).toFixed(0)} ₽</Text>
-            <Text style={styles.cartQuantity}>{quantity} шт</Text>
-          </View>
-          
-          {isMaxQuantity ? (
-            <Animated.View 
-              style={[styles.cartButton, increaseButtonAnimatedStyle]}
-              onStartShouldSetResponder={() => true}
-              onResponderRelease={(e) => {
-                e.stopPropagation();
-                return true;
-              }}
-            >
-              <View style={[
-                styles.buttonTouchable,
-                styles.buttonTouchableDisabled
-              ]}>
-                <Text style={[
-                  styles.cartButtonText,
-                  styles.cartButtonTextDisabled
-                ]}>+</Text>
-              </View>
-            </Animated.View>
-          ) : (
-            <AnimatedPressable 
-              style={[styles.cartButton, increaseButtonAnimatedStyle]}
-              onPress={handleIncreasePress}
-            >
-              <View style={styles.buttonTouchable}>
-                <Text style={styles.cartButtonText}>+</Text>
-              </View>
-            </AnimatedPressable>
-          )}
-        </Animated.View>
-      )}
+          </Pressable>
+        )}
+      </View>
     </View>
   );
 }
@@ -189,14 +176,20 @@ const createStyles = (tokens: any) => {
     },
     // Обычное состояние
     footerRow: {
-      position: 'absolute',
-      width: '100%',
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'flex-end',
+      gap: spacing.xs,
+    },
+    minusButton: {
+      width: 32,
+      height: 32,
     },
     priceContainer: {
       flex: 1,
+    },
+    priceContainerCenter: {
+      alignItems: 'center',
     },
     priceRow: {
       flexDirection: 'row',
@@ -239,16 +232,6 @@ const createStyles = (tokens: any) => {
       color: colors.text.primary,
       lineHeight: typography.fontSize.xl,
     },
-    
-    // Состояние "в корзине"
-    footerRowCart: {
-      position: 'absolute',
-      width: '100%',
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      gap: spacing.xs,
-    },
     cartButton: {
       width: 32,
       height: 32,
@@ -264,15 +247,6 @@ const createStyles = (tokens: any) => {
     },
     cartButtonTextDisabled: {
       color: colors.gray[500],
-    },
-    cartInfo: {
-      flex: 1,
-      alignItems: 'center',
-    },
-    cartPrice: {
-      fontSize: typography.fontSize.base,
-      fontFamily: typography.fontFamily.bold,
-      color: colors.text.primary,
     },
     cartQuantity: {
       fontSize: typography.fontSize.xs,

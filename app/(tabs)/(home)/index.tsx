@@ -22,30 +22,35 @@ export default function HomeScreen() {
   const loadData = useCallback(async (forceRefresh: boolean = false) => {
     console.log('🔄 Загрузка данных для главной страницы...');
     
+    let location = null;
+    
     if (forceRefresh) {
-      // При принудительном обновлении получаем свежее местоположение
-      const location = await getCurrentLocation(3000);
+      // При принудительном обновлении пытаемся получить свежее местоположение
+      console.log('🔄 Обновление: запрашиваем свежее местоположение...');
+      location = await getCurrentLocation(3000);
       
-      if (location) {
-        const boundingBox = getBoundingBox(location.latitude, location.longitude, 1000);
-        await fetchOffersWithLocation(boundingBox);
+      if (!location) {
+        // Если не получили свежее, берем из кэша
+        console.log('⚠️ Не удалось получить свежее местоположение, используем кэш');
+        const cached = await getLocationWithCache();
+        location = cached.location;
       } else {
-        // Загружаем все доступные офферы
-        await fetchOffers();
+        console.log('✅ Получено свежее местоположение');
       }
     } else {
       // При обычной загрузке используем кэш
-      const { location, isFromCache } = await getLocationWithCache();
-      
-      if (location) {
-        console.log(`📍 Местоположение ${isFromCache ? 'из кэша' : 'получено'}`);
-        const boundingBox = getBoundingBox(location.latitude, location.longitude, 1000);
-        await fetchOffersWithLocation(boundingBox);
-      } else {
-        console.log('📍 Местоположение недоступно, загружаем все офферы');
-        // Загружаем все доступные офферы без фильтрации
-        await fetchOffers();
-      }
+      const { location: cachedLocation, isFromCache } = await getLocationWithCache();
+      location = cachedLocation;
+      console.log(`📍 Местоположение ${isFromCache ? 'из кэша' : 'получено'}`);
+    }
+    
+    // Загружаем данные с учетом местоположения (если есть)
+    if (location) {
+      const boundingBox = getBoundingBox(location.latitude, location.longitude, 1000);
+      await fetchOffersWithLocation(boundingBox);
+    } else {
+      console.log('📍 Местоположение недоступно, загружаем все офферы');
+      await fetchOffers();
     }
   }, [fetchOffersWithLocation, fetchOffers]);
 

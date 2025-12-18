@@ -98,16 +98,6 @@ export const useOffers = () => {
     // Определяем, используется ли динамическое ценообразование
     const isDynamicPricing = !!apiOffer.pricing_strategy_id;
     
-    console.log('transformOffer:', {
-      offerId: apiOffer.id,
-      isDynamicPricing,
-      pricing_strategy_id: apiOffer.pricing_strategy_id,
-      hasPricingStrategy: !!apiOffer.pricing_strategy,
-      pricingStrategySteps: apiOffer.pricing_strategy?.steps?.length || 0,
-      current_cost: apiOffer.current_cost,
-      original_cost: apiOffer.original_cost,
-    });
-    
     // Если используется динамическое ценообразование и есть стратегия, но current_cost = null, рассчитываем цену
     let finalCurrentCost = apiOffer.current_cost;
     
@@ -178,6 +168,7 @@ export const useOffers = () => {
     maxLatitude?: number;
     minLongitude?: number;
     maxLongitude?: number;
+    skipDefaultFilters?: boolean; // Новый параметр для пропуска дефолтных фильтров
   }) => {
     try {
       setLoading(true);
@@ -199,13 +190,16 @@ export const useOffers = () => {
         params.append('max_longitude', filters.maxLongitude.toString());
       }
       
-      // Добавляем фильтр по сроку годности только если есть фильтры по координатам
-      // (для главной страницы фильтруем просроченные, для checkout без фильтров - не фильтруем)
-      if (params.toString()) {
-        // Если есть фильтры по координатам, добавляем фильтр по дате
+      // Добавляем дефолтные фильтры, если не указано skipDefaultFilters
+      // Это нужно для главной страницы, чтобы показывать только годные товары в наличии
+      if (!filters?.skipDefaultFilters) {
+        // Фильтр по сроку годности - только непросроченные товары
         const now = new Date();
         const minExpiresDate = now.toISOString();
         params.append('min_expires_date', minExpiresDate);
+        
+        // Фильтр по количеству - только товары в наличии (count > 0)
+        params.append('min_count', '1');
       }
       
       // Всегда используем /offers/with-products для получения данных с продуктами
@@ -236,8 +230,6 @@ export const useOffers = () => {
           // Загружаем стратегии для офферов, у которых они отсутствуют
           // Делаем это в отдельном шаге, чтобы не блокировать основной рендер
           if (offersNeedingStrategy.length > 0) {
-            console.log(`Loading ${offersNeedingStrategy.length} missing strategies...`);
-            
             // Сначала устанавливаем офферы без стратегий (чтобы не блокировать UI)
             setOffers(transformedOffers);
             
@@ -247,10 +239,9 @@ export const useOffers = () => {
                 if (offer.pricingStrategyId) {
                   try {
                     const strategy = await getStrategyById(offer.pricingStrategyId);
-                    console.log(`Loaded strategy ${offer.pricingStrategyId} for offer ${offer.id}:`, strategy);
                     return { offerId: offer.id, strategy };
                   } catch (err) {
-                    console.warn(`Failed to load strategy ${offer.pricingStrategyId} for offer ${offer.id}:`, err);
+                    console.warn(`⚠️ Ошибка загрузки стратегии ${offer.pricingStrategyId} для оффера ${offer.id}`);
                     return { offerId: offer.id, strategy: null };
                   }
                 }
@@ -353,10 +344,10 @@ export const useOffers = () => {
   // Можно передать skipExpiredFilter=true, чтобы загрузить все offers включая просроченные
   const refetch = useCallback(async (skipExpiredFilter?: boolean) => {
     if (skipExpiredFilter) {
-      // Загружаем без фильтров (для checkout, где нужны все offers)
-      await fetchOffers();
+      // Загружаем без дефолтных фильтров (для checkout, где нужны все offers)
+      await fetchOffers({ skipDefaultFilters: true });
     } else {
-      // Загружаем с фильтрами по умолчанию
+      // Загружаем с фильтрами по умолчанию (только годные товары в наличии)
       await fetchOffers();
     }
   }, [fetchOffers]);
