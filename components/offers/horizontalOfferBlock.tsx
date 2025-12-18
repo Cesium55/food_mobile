@@ -1,10 +1,12 @@
 import CartButton from '@/components/cart/CartButton';
+import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useLocation } from '@/hooks/useLocation';
 import { Offer } from '@/hooks/useOffers';
 import { usePublicSeller } from '@/hooks/usePublicSeller';
 import { useShops } from '@/hooks/useShops';
 import { getFirstImageUrl } from '@/utils/imageUtils';
 import { calculateDistance, formatDistance } from '@/utils/locationUtils';
+import { getCurrentPrice } from '@/utils/pricingUtils';
 import { useRouter, useSegments } from 'expo-router';
 import React, { useMemo, useState } from 'react';
 import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -69,7 +71,7 @@ export default function HorizontalOfferBlock({ offer, onPress }: HorizontalOffer
   const expiryColors = getExpiryColor();
 
   return (
-    <View style={styles.card}>
+    <View style={[styles.card, offer.isDynamicPricing && styles.dynamicPricingCard]}>
       <TouchableOpacity 
         style={styles.cardContent} 
         activeOpacity={0.7}
@@ -122,12 +124,34 @@ export default function HorizontalOfferBlock({ offer, onPress }: HorizontalOffer
 
               {/* Цены */}
               <View style={styles.priceContainer}>
-                <Text style={styles.originalPrice}>
-                  {offer.originalCost.toFixed(2)} ₽
-                </Text>
-                <Text style={styles.currentPrice}>
-                  {offer.currentCost.toFixed(2)} ₽
-                </Text>
+                {(() => {
+                  const currentPrice = getCurrentPrice(offer);
+                  const hasDiscount = currentPrice !== null && currentPrice < offer.originalCost;
+                  
+                  return (
+                    <>
+                      {hasDiscount && (
+                        <Text style={styles.originalPrice}>
+                          {offer.originalCost.toFixed(2)} ₽
+                        </Text>
+                      )}
+                      <View style={styles.currentPriceContainer}>
+                        {currentPrice !== null ? (
+                          <>
+                            <Text style={styles.currentPrice}>
+                              {currentPrice.toFixed(2)} ₽
+                            </Text>
+                            {offer.isDynamicPricing && (
+                              <IconSymbol name="chart.line.uptrend.xyaxis" size={12} color="#007AFF" />
+                            )}
+                          </>
+                        ) : (
+                          <Text style={styles.expiredPrice}>Просрочен</Text>
+                        )}
+                      </View>
+                    </>
+                  );
+                })()}
               </View>
             </View>
           </View>
@@ -173,6 +197,11 @@ const styles = StyleSheet.create({
     elevation: 3,
     minHeight: IMAGE_SIZE,
     position: 'relative',
+  },
+  dynamicPricingCard: {
+    backgroundColor: '#FFF3E0', // Оранжевый фон для динамической цены
+    borderWidth: 1,
+    borderColor: '#FFB74D',
   },
   cardContent: {
     flexDirection: 'row',
@@ -260,10 +289,30 @@ const styles = StyleSheet.create({
     textDecorationLine: 'line-through',
     marginBottom: IMAGE_SIZE * 0.02,
   },
+  currentPriceContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
   currentPrice: {
     fontSize: IMAGE_SIZE * 0.18,
     fontWeight: 'bold',
     color: '#4CAF50',
+  },
+  dynamicPriceContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  dynamicPriceText: {
+    fontSize: IMAGE_SIZE * 0.11,
+    color: '#007AFF',
+    fontWeight: '500',
+  },
+  expiredPrice: {
+    fontSize: IMAGE_SIZE * 0.12,
+    color: '#F44336',
+    fontWeight: '500',
   },
   cartButtonContainer: {
     paddingHorizontal: IMAGE_SIZE * 0.12,

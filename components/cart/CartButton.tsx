@@ -1,5 +1,6 @@
 import { useCart } from '@/hooks/useCart';
 import { Offer } from '@/hooks/useOffers';
+import { getCurrentPrice } from '@/utils/pricingUtils';
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
@@ -151,11 +152,17 @@ export default function CartButton({ offer, size = 'medium', variant = 'default'
               </TouchableOpacity>
             </View>
           </View>
-          {showTotal && (
-            <Text style={styles.fullTotal}>
-              {(offer.currentCost * cartItem.quantity).toFixed(2)} ₽
-            </Text>
-          )}
+          {showTotal && (() => {
+            const currentPrice = getCurrentPrice(offer);
+            return (
+              <Text style={styles.fullTotal}>
+                {currentPrice !== null 
+                  ? (currentPrice * cartItem.quantity).toFixed(2) + ' ₽'
+                  : 'Просрочен'
+                }
+              </Text>
+            );
+          })()}
         </View>
       );
     }

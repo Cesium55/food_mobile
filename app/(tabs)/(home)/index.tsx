@@ -14,8 +14,12 @@ export default function HomeScreen() {
   const { offers, fetchOffersWithLocation } = useOffers();
 
   useEffect(() => {
+    let isMounted = true;
+    
     const loadOffersWithLocation = async () => {
       const location = await getCurrentLocation();
+      if (!isMounted) return;
+      
       if (location) {
         const boundingBox = getBoundingBox(location.latitude, location.longitude, 1000);
         await fetchOffersWithLocation(boundingBox);
@@ -31,7 +35,12 @@ export default function HomeScreen() {
     };
 
     loadOffersWithLocation();
-  }, [fetchOffersWithLocation]);
+    
+    return () => {
+      isMounted = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Загружаем только один раз при монтировании
 
   return (
     <TabScreen title="Home">

@@ -6,7 +6,7 @@ export interface CartItem {
   shopId: number;
   shopName: string;
   originalCost: number; // Цена без скидки
-  currentCost: number; // Цена со скидкой
+  currentCost: number | null; // Цена со скидкой (может быть null для динамического ценообразования)
   discount: number; // Процент скидки
   quantity: number;
   expiresDate: Date;

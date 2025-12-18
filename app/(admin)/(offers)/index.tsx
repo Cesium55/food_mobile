@@ -4,6 +4,7 @@ import { useCategories } from "@/hooks/useCategories";
 import { Offer, useOffers } from "@/hooks/useOffers";
 import { useProducts } from "@/hooks/useProducts";
 import { useShops } from "@/hooks/useShops";
+import { getCurrentPrice } from "@/utils/pricingUtils";
 import { router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
@@ -436,25 +437,55 @@ export default function OffersScreen() {
                                                             </View>
                                                         </View>
                                                         <View style={styles.offerRight}>
-                                                            {offer.discount > 0 ? (
-                                                                <>
-                                                                    <Text style={styles.oldPrice}>
-                                                                        {offer.originalCost.toFixed(2)} ₽
-                                                                    </Text>
-                                                                    <Text style={styles.newPrice}>
-                                                                        {offer.currentCost.toFixed(2)} ₽
-                                                                    </Text>
-                                                                    <View style={styles.discountBadge}>
-                                                                        <Text style={styles.discountText}>
-                                                                            -{offer.discount}%
+                                                            {(() => {
+                                                                const currentPrice = getCurrentPrice(offer);
+                                                                const hasDiscount = currentPrice !== null && currentPrice < offer.originalCost;
+                                                                
+                                                                if (offer.isDynamicPricing) {
+                                                                    return (
+                                                                        <View style={styles.dynamicPricingContainer}>
+                                                                            {currentPrice !== null ? (
+                                                                                <>
+                                                                                    <Text style={styles.newPrice}>
+                                                                                        {currentPrice.toFixed(2)} ₽
+                                                                                    </Text>
+                                                                                    <View style={styles.dynamicPricingBadge}>
+                                                                                        <Text style={styles.dynamicPricingText}>
+                                                                                            Динамическая
+                                                                                        </Text>
+                                                                                    </View>
+                                                                                </>
+                                                                            ) : (
+                                                                                <Text style={styles.expiredPrice}>
+                                                                                    Просрочен
+                                                                                </Text>
+                                                                            )}
+                                                                        </View>
+                                                                    );
+                                                                } else if (hasDiscount) {
+                                                                    return (
+                                                                        <>
+                                                                            <Text style={styles.oldPrice}>
+                                                                                {offer.originalCost.toFixed(2)} ₽
+                                                                            </Text>
+                                                                            <Text style={styles.newPrice}>
+                                                                                {currentPrice!.toFixed(2)} ₽
+                                                                            </Text>
+                                                                            <View style={styles.discountBadge}>
+                                                                                <Text style={styles.discountText}>
+                                                                                    -{Math.round(((offer.originalCost - currentPrice!) / offer.originalCost) * 100)}%
+                                                                                </Text>
+                                                                            </View>
+                                                                        </>
+                                                                    );
+                                                                } else {
+                                                                    return (
+                                                                        <Text style={styles.price}>
+                                                                            {currentPrice !== null ? currentPrice.toFixed(2) : '0.00'} ₽
                                                                         </Text>
-                                                                    </View>
-                                                                </>
-                                                            ) : (
-                                                                <Text style={styles.price}>
-                                                                    {offer.currentCost.toFixed(2)} ₽
-                                                                </Text>
-                                                            )}
+                                                                    );
+                                                                }
+                                                            })()}
                                                         </View>
                                                     </TouchableOpacity>
                                                 );
@@ -787,6 +818,26 @@ const styles = StyleSheet.create({
         fontSize: 12,
         color: '#fff',
         fontWeight: '700',
+    },
+    dynamicPricingContainer: {
+        alignItems: 'flex-end',
+        gap: 4,
+    },
+    dynamicPricingBadge: {
+        backgroundColor: '#E3F2FD',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 4,
+    },
+    dynamicPricingText: {
+        fontSize: 10,
+        fontWeight: '600',
+        color: '#007AFF',
+    },
+    expiredPrice: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#F44336',
     },
     // Стили модального окна
     modalOverlay: {

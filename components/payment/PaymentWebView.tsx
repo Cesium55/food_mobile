@@ -82,6 +82,10 @@ export function PaymentWebView({
       swipeDirection="down"
       style={styles.modal}
       avoidKeyboard={true}
+      propagateSwipe={true}
+      backdropOpacity={0.5}
+      animationIn="slideInUp"
+      animationOut="slideOutDown"
     >
       <View style={styles.modalContainer}>
         {/* Header */}
@@ -108,6 +112,58 @@ export function PaymentWebView({
             javaScriptEnabled={true}
             domStorageEnabled={true}
             startInLoadingState={true}
+            // Настройки для корректной работы touch событий на мобильных устройствах
+            scalesPageToFit={true}
+            showsHorizontalScrollIndicator={false}
+            showsVerticalScrollIndicator={true}
+            // Android настройки
+            androidHardwareAccelerationDisabled={false}
+            androidLayerType="hardware"
+            nestedScrollEnabled={true}
+            overScrollMode="never"
+            // iOS настройки
+            allowsInlineMediaPlayback={true}
+            mediaPlaybackRequiresUserAction={false}
+            // Улучшение обработки touch событий
+            bounces={false}
+            scrollEnabled={true}
+            // Инжектируем JavaScript для улучшения touch событий на мобильных устройствах
+            injectedJavaScript={`
+              (function() {
+                // Улучшаем обработку кликов на мобильных устройствах
+                // Добавляем обработчик для всех кликабельных элементов
+                function improveTouchEvents() {
+                  const clickableElements = document.querySelectorAll('button, a, [onclick], [role="button"], input[type="submit"], input[type="button"]');
+                  clickableElements.forEach(element => {
+                    // Убираем возможные блокировки touch событий
+                    element.style.touchAction = 'manipulation';
+                    element.style.webkitTouchCallout = 'none';
+                    element.style.webkitUserSelect = 'none';
+                    element.style.userSelect = 'none';
+                    
+                    // Улучшаем обработку touch событий
+                    element.addEventListener('touchend', function(e) {
+                      // Не предотвращаем стандартное поведение, чтобы клик работал нормально
+                    }, { passive: true });
+                  });
+                }
+                
+                // Выполняем сразу и после загрузки DOM
+                if (document.readyState === 'loading') {
+                  document.addEventListener('DOMContentLoaded', improveTouchEvents);
+                } else {
+                  improveTouchEvents();
+                }
+                
+                // Также улучшаем после полной загрузки страницы
+                window.addEventListener('load', improveTouchEvents);
+              })();
+              true;
+            `}
+            onShouldStartLoadWithRequest={(request) => {
+              // Разрешаем все запросы внутри WebView
+              return true;
+            }}
             renderLoading={() => (
               <View style={styles.loadingContainer}>
                 <ActivityIndicator size="large" color="#4CAF50" />
@@ -120,7 +176,7 @@ export function PaymentWebView({
 
           {/* Loading overlay */}
           {loading && (
-            <View style={styles.loadingOverlay}>
+            <View style={styles.loadingOverlay} pointerEvents="none">
               <ActivityIndicator size="large" color="#4CAF50" />
               <Text style={styles.loadingText}>
                 Загрузка...
@@ -166,9 +222,11 @@ const styles = StyleSheet.create({
   },
   webviewContainer: {
     flex: 1,
+    overflow: 'hidden',
   },
   webview: {
     flex: 1,
+    backgroundColor: 'transparent',
   },
   loadingContainer: {
     position: 'absolute',

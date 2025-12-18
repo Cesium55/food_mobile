@@ -107,6 +107,9 @@ export const API_ENDPOINTS = {
   OFFERS: {
     BASE: '/offers',
     WITH_PRODUCTS: '/offers/with-products',
+    PRICING_STRATEGIES: '/offers/pricing-strategies',
+    PRICING_STRATEGY_BY_ID: (id: number) => `/offers/pricing-strategies/${id}`,
+    UPDATE: (id: number) => `/offers/${id}`,
   },
   
   // Платежи

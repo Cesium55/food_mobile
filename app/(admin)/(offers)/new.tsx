@@ -1,5 +1,6 @@
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useOffers } from "@/hooks/useOffers";
+import { usePricingStrategies } from "@/hooks/usePricingStrategies";
 import { useProducts } from "@/hooks/useProducts";
 import { useShops } from "@/hooks/useShops";
 import { router, useLocalSearchParams } from "expo-router";
@@ -23,8 +24,11 @@ export default function NewOfferScreen() {
     const { shops } = useShops();
     const { products, loading: productsLoading } = useProducts();
     const { createOffer, refetch } = useOffers();
+    const { strategies, loading: strategiesLoading } = usePricingStrategies();
 
     const [selectedProductId, setSelectedProductId] = useState<number | null>(null);
+    const [pricingMode, setPricingMode] = useState<'fixed' | 'strategy'>('fixed');
+    const [selectedStrategyId, setSelectedStrategyId] = useState<number | null>(null);
     const [price, setPrice] = useState('');
     const [discount, setDiscount] = useState('0');
     const [quantity, setQuantity] = useState('');
@@ -32,6 +36,7 @@ export default function NewOfferScreen() {
     const [showDatePicker, setShowDatePicker] = useState(false);
     const [description, setDescription] = useState('');
     const [showProductSelector, setShowProductSelector] = useState(false);
+    const [showStrategyPicker, setShowStrategyPicker] = useState(false);
     const [isCreating, setIsCreating] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
 
@@ -66,17 +71,8 @@ export default function NewOfferScreen() {
             Alert.alert("Ошибка", "Выберите товар");
             return;
         }
-        if (!price || parseFloat(price) <= 0) {
-            Alert.alert("Ошибка", "Укажите корректную цену");
-            return;
-        }
         if (!quantity || parseInt(quantity) <= 0) {
             Alert.alert("Ошибка", "Укажите корректное количество");
-            return;
-        }
-        const discountNum = parseFloat(discount) || 0;
-        if (discountNum < 0 || discountNum > 100) {
-            Alert.alert("Ошибка", "Скидка должна быть от 0 до 100%");
             return;
         }
         if (!expiryDate) {
@@ -84,16 +80,46 @@ export default function NewOfferScreen() {
             return;
         }
 
-        const priceNum = parseFloat(price);
+        // Валидация в зависимости от режима ценообразования
+        if (pricingMode === 'fixed') {
+            if (!price || parseFloat(price) <= 0) {
+                Alert.alert("Ошибка", "Укажите корректную цену");
+                return;
+            }
+            const discountNum = parseFloat(discount) || 0;
+            if (discountNum < 0 || discountNum > 100) {
+                Alert.alert("Ошибка", "Скидка должна быть от 0 до 100%");
+                return;
+            }
+        } else {
+            if (!selectedStrategyId) {
+                Alert.alert("Ошибка", "Выберите стратегию ценообразования");
+                return;
+            }
+            // Для динамического ценообразования нужна базовая цена (original_cost)
+            if (!price || parseFloat(price) <= 0) {
+                Alert.alert("Ошибка", "Укажите базовую цену для расчета динамической цены");
+                return;
+            }
+        }
+
+        const priceNum = parseFloat(price) || 0;
         const discountNumFinal = parseFloat(discount) || 0;
-        const currentCost = priceNum - (priceNum * discountNumFinal / 100);
+        const currentCost = pricingMode === 'fixed' 
+            ? priceNum - (priceNum * discountNumFinal / 100)
+            : null;
 
         // Форматируем дату для отображения
         const formattedDate = expiryDate.toISOString().split('T')[0];
         
+        const selectedStrategy = strategies.find(s => s.id === selectedStrategyId);
+        const pricingInfo = pricingMode === 'fixed'
+            ? `Цена: ${priceNum.toFixed(2)} ₽\nСкидка: ${discountNumFinal}%\nЦена со скидкой: ${currentCost?.toFixed(2)} ₽`
+            : `Стратегия: ${selectedStrategy?.name || 'Не выбрана'}\nЦена будет рассчитываться автоматически`;
+        
         Alert.alert(
             "Создать предложение?",
-            `Товар: ${selectedProduct?.name}\nЦена: ${priceNum.toFixed(2)} ₽\nСкидка: ${discountNumFinal}%\nЦена со скидкой: ${currentCost.toFixed(2)} ₽\nКоличество: ${quantity} шт.\nСрок годности: ${formattedDate}`,
+            `Товар: ${selectedProduct?.name}\n${pricingInfo}\nКоличество: ${quantity} шт.\nСрок годности: ${formattedDate}`,
             [
                 { text: "Отмена", style: "cancel" },
                 {
@@ -102,12 +128,17 @@ export default function NewOfferScreen() {
                         try {
                             setIsCreating(true);
                             
+                            // Устанавливаем время конца дня для выбранной даты (23:59:59)
+                            const expiryDateTime = new Date(expiryDate);
+                            expiryDateTime.setHours(23, 59, 59, 999);
+                            
                             await createOffer({
                                 product_id: selectedProductId,
                                 shop_id: selectedShopId,
-                                expires_date: expiryDate.toISOString().split('T')[0],
-                                original_cost: priceNum,
-                                current_cost: currentCost,
+                                expires_date: expiryDateTime.toISOString(), // Передаем полный datetime с часовым поясом
+                                original_cost: priceNum, // Всегда передаем базовую цену (для динамического ценообразования это базовая цена, от которой считаются скидки)
+                                current_cost: pricingMode === 'fixed' ? currentCost : null, // Для динамического ценообразования current_cost должен быть null
+                                pricing_strategy_id: pricingMode === 'strategy' ? selectedStrategyId : null,
                                 count: parseInt(quantity),
                                 description: description.trim() || undefined,
                             });
@@ -274,45 +305,199 @@ export default function NewOfferScreen() {
                     <View style={styles.infoSection}>
                         <Text style={styles.sectionTitle}>Основная информация</Text>
 
-                        {/* Цена */}
+                        {/* Режим ценообразования */}
                         <View style={styles.fieldContainer}>
-                            <Text style={styles.label}>Цена, ₽ *</Text>
-                            <TextInput
-                                style={styles.input}
-                                value={price}
-                                onChangeText={setPrice}
-                                keyboardType="decimal-pad"
-                                placeholder="0.00"
-                            />
-                        </View>
-
-                        {/* Скидка */}
-                        <View style={styles.fieldContainer}>
-                            <Text style={styles.label}>Скидка, %</Text>
-                            <TextInput
-                                style={styles.input}
-                                value={discount}
-                                onChangeText={setDiscount}
-                                keyboardType="decimal-pad"
-                                placeholder="0"
-                            />
-                        </View>
-
-                        {/* Итоговая цена */}
-                        {price && parseFloat(price) > 0 && (
-                            <View style={styles.fieldContainer}>
-                                <Text style={styles.label}>Цена со скидкой</Text>
-                                <View style={styles.valueContainer}>
-                                    <Text style={[styles.valueText, styles.finalPrice]}>
-                                        {getFinalPrice().toFixed(2)} ₽
+                            <Text style={styles.label}>Режим ценообразования *</Text>
+                            <View style={styles.segmentedControl}>
+                                <TouchableOpacity
+                                    style={[
+                                        styles.segment,
+                                        pricingMode === 'fixed' && styles.segmentActive
+                                    ]}
+                                    onPress={() => {
+                                        setPricingMode('fixed');
+                                        setSelectedStrategyId(null);
+                                    }}
+                                >
+                                    <Text style={[
+                                        styles.segmentText,
+                                        pricingMode === 'fixed' && styles.segmentTextActive
+                                    ]}>
+                                        Фиксированная цена
                                     </Text>
-                                    {parseFloat(discount) > 0 && (
-                                        <Text style={styles.savings}>
-                                            Экономия: {(parseFloat(price) - getFinalPrice()).toFixed(2)} ₽
-                                        </Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    style={[
+                                        styles.segment,
+                                        pricingMode === 'strategy' && styles.segmentActive
+                                    ]}
+                                    onPress={() => {
+                                        setPricingMode('strategy');
+                                        setPrice('');
+                                        setDiscount('0');
+                                    }}
+                                >
+                                    <Text style={[
+                                        styles.segmentText,
+                                        pricingMode === 'strategy' && styles.segmentTextActive
+                                    ]}>
+                                        Стратегия
+                                    </Text>
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+
+                        {/* Поля для фиксированной цены */}
+                        {pricingMode === 'fixed' && (
+                            <>
+                                {/* Цена */}
+                                <View style={styles.fieldContainer}>
+                                    <Text style={styles.label}>Цена, ₽ *</Text>
+                                    <TextInput
+                                        style={styles.input}
+                                        value={price}
+                                        onChangeText={setPrice}
+                                        keyboardType="decimal-pad"
+                                        placeholder="0.00"
+                                    />
+                                </View>
+
+                                {/* Скидка */}
+                                <View style={styles.fieldContainer}>
+                                    <Text style={styles.label}>Скидка, %</Text>
+                                    <TextInput
+                                        style={styles.input}
+                                        value={discount}
+                                        onChangeText={setDiscount}
+                                        keyboardType="decimal-pad"
+                                        placeholder="0"
+                                    />
+                                </View>
+
+                                {/* Итоговая цена */}
+                                {price && parseFloat(price) > 0 && (
+                                    <View style={styles.fieldContainer}>
+                                        <Text style={styles.label}>Цена со скидкой</Text>
+                                        <View style={styles.valueContainer}>
+                                            <Text style={[styles.valueText, styles.finalPrice]}>
+                                                {getFinalPrice().toFixed(2)} ₽
+                                            </Text>
+                                            {parseFloat(discount) > 0 && (
+                                                <Text style={styles.savings}>
+                                                    Экономия: {(parseFloat(price) - getFinalPrice()).toFixed(2)} ₽
+                                                </Text>
+                                            )}
+                                        </View>
+                                    </View>
+                                )}
+                            </>
+                        )}
+
+                        {/* Поля для стратегии */}
+                        {pricingMode === 'strategy' && (
+                            <>
+                                {/* Базовая цена для динамического ценообразования */}
+                                <View style={styles.fieldContainer}>
+                                    <Text style={styles.label}>Базовая цена, ₽ *</Text>
+                                    <TextInput
+                                        style={styles.input}
+                                        placeholder="0.00"
+                                        value={price}
+                                        onChangeText={setPrice}
+                                        keyboardType="decimal-pad"
+                                        placeholderTextColor="#999"
+                                    />
+                                    <Text style={styles.hintText}>
+                                        Базовая цена, от которой будут рассчитываться скидки по стратегии
+                                    </Text>
+                                </View>
+
+                                {/* Выбор стратегии */}
+                                <View style={styles.fieldContainer}>
+                                    <Text style={styles.label}>Стратегия ценообразования *</Text>
+                                    {!showStrategyPicker ? (
+                                        <TouchableOpacity
+                                            style={styles.strategyInputContainer}
+                                            onPress={() => setShowStrategyPicker(true)}
+                                            activeOpacity={0.7}
+                                        >
+                                            <Text style={[
+                                                styles.strategyInputText,
+                                                !selectedStrategyId && styles.strategyInputPlaceholder
+                                            ]}>
+                                                {selectedStrategyId
+                                                    ? strategies.find(s => s.id === selectedStrategyId)?.name || 'Не выбрана'
+                                                    : 'Выберите стратегию'
+                                                }
+                                            </Text>
+                                            <IconSymbol name="chevron.down" size={20} color="#666" />
+                                        </TouchableOpacity>
+                                    ) : (
+                                        <View style={styles.strategySelector}>
+                                            <View style={styles.selectorHeader}>
+                                                <Text style={styles.selectorTitle}>Выберите стратегию</Text>
+                                                <TouchableOpacity
+                                                    onPress={() => setShowStrategyPicker(false)}
+                                                    style={styles.closeSelectorButton}
+                                                >
+                                                    <IconSymbol name="xmark" size={20} color="#666" />
+                                                </TouchableOpacity>
+                                            </View>
+                                            {strategiesLoading ? (
+                                                <View style={styles.loadingContainer}>
+                                                    <ActivityIndicator size="small" color="#007AFF" />
+                                                    <Text style={styles.loadingText}>Загрузка стратегий...</Text>
+                                                </View>
+                                            ) : strategies.length === 0 ? (
+                                                <View style={styles.emptyContainer}>
+                                                    <Text style={styles.emptyText}>Нет доступных стратегий</Text>
+                                                </View>
+                                            ) : (
+                                                <ScrollView style={styles.strategiesList}>
+                                                    {strategies.map(strategy => (
+                                                        <TouchableOpacity
+                                                            key={strategy.id}
+                                                            style={[
+                                                                styles.strategyItem,
+                                                                selectedStrategyId === strategy.id && styles.strategyItemSelected
+                                                            ]}
+                                                            onPress={() => {
+                                                                setSelectedStrategyId(strategy.id);
+                                                                setShowStrategyPicker(false);
+                                                            }}
+                                                        >
+                                                            <View style={styles.strategyItemContent}>
+                                                                <Text style={[
+                                                                    styles.strategyItemText,
+                                                                    selectedStrategyId === strategy.id && styles.strategyItemTextSelected
+                                                                ]}>
+                                                                    {strategy.name}
+                                                                </Text>
+                                                                <Text style={styles.strategyItemSteps}>
+                                                                    {strategy.steps.length} шаг{strategy.steps.length !== 1 ? 'ов' : ''}
+                                                                </Text>
+                                                            </View>
+                                                            {selectedStrategyId === strategy.id && (
+                                                                <IconSymbol name="checkmark.circle.fill" size={24} color="#007AFF" />
+                                                            )}
+                                                        </TouchableOpacity>
+                                                    ))}
+                                                </ScrollView>
+                                            )}
+                                        </View>
                                     )}
                                 </View>
-                            </View>
+
+                                {/* Информация о динамическом ценообразовании */}
+                                {selectedStrategyId && price && parseFloat(price) > 0 && (
+                                    <View style={styles.dynamicPricingInfo}>
+                                        <IconSymbol name="info.circle" size={20} color="#007AFF" />
+                                        <Text style={styles.dynamicPricingText}>
+                                            Цена будет рассчитываться автоматически на основе базовой цены ({parseFloat(price).toFixed(2)} ₽) и выбранной стратегии
+                                        </Text>
+                                    </View>
+                                )}
+                            </>
                         )}
 
                         {/* Количество */}
@@ -672,6 +857,110 @@ const styles = StyleSheet.create({
         color: '#fff',
         fontSize: 16,
         fontWeight: '700',
+    },
+    segmentedControl: {
+        flexDirection: 'row',
+        backgroundColor: '#f0f0f0',
+        borderRadius: 8,
+        padding: 4,
+        gap: 4,
+    },
+    segment: {
+        flex: 1,
+        paddingVertical: 10,
+        paddingHorizontal: 16,
+        borderRadius: 6,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    segmentActive: {
+        backgroundColor: '#007AFF',
+    },
+    segmentText: {
+        fontSize: 14,
+        fontWeight: '500',
+        color: '#666',
+    },
+    segmentTextActive: {
+        color: '#fff',
+        fontWeight: '600',
+    },
+    strategySelector: {
+        borderWidth: 1,
+        borderColor: '#e0e0e0',
+        borderRadius: 12,
+        backgroundColor: '#fff',
+        maxHeight: 300,
+    },
+    strategiesList: {
+        maxHeight: 240,
+    },
+    strategyItem: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: '#f0f0f0',
+    },
+    strategyItemSelected: {
+        backgroundColor: '#F0F8FF',
+    },
+    strategyItemContent: {
+        flex: 1,
+        marginRight: 12,
+    },
+    strategyItemText: {
+        fontSize: 15,
+        color: '#333',
+    },
+    strategyItemTextSelected: {
+        fontWeight: '600',
+        color: '#007AFF',
+    },
+    strategyItemSteps: {
+        fontSize: 12,
+        color: '#999',
+        marginTop: 4,
+    },
+    strategyInputContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        borderWidth: 1,
+        borderColor: '#ddd',
+        borderRadius: 8,
+        padding: 12,
+        backgroundColor: '#fff',
+    },
+    strategyInputText: {
+        fontSize: 16,
+        color: '#333',
+        flex: 1,
+    },
+    strategyInputPlaceholder: {
+        color: '#999',
+    },
+    dynamicPricingInfo: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        backgroundColor: '#E3F2FD',
+        padding: 12,
+        borderRadius: 8,
+        gap: 8,
+        marginTop: 8,
+    },
+    dynamicPricingText: {
+        flex: 1,
+        fontSize: 13,
+        color: '#007AFF',
+        lineHeight: 18,
+    },
+    hintText: {
+        fontSize: 12,
+        color: '#999',
+        marginTop: 4,
+        fontStyle: 'italic',
     },
 });
 

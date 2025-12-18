@@ -1,7 +1,8 @@
+import { CartGroup, CartItem } from '@/hooks/useCart';
+import { Offer } from '@/hooks/useOffers';
+import { getCurrentPrice } from '@/utils/pricingUtils';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { Offer } from '@/hooks/useOffers';
-import { CartItem, CartGroup } from '@/hooks/useCart';
 
 // Интерфейс для сериализации в AsyncStorage
 interface CartItemStorage {
@@ -11,7 +12,7 @@ interface CartItemStorage {
   shopId: number;
   shopName: string;
   originalCost: number;
-  currentCost: number;
+  currentCost: number | null;
   discount: number;
   quantity: number;
   expiresDate: string; // ISO string для сериализации
@@ -171,7 +172,8 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
         };
       }
       acc[item.shopId].items.push(item);
-      acc[item.shopId].total += item.currentCost * item.quantity;
+      const itemCost = item.currentCost ?? 0;
+      acc[item.shopId].total += itemCost * item.quantity;
       return acc;
     }, {} as { [key: number]: CartGroup });
 
@@ -209,6 +211,13 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
           expiresDate = new Date();
         }
         
+        // Рассчитываем текущую цену с учетом динамического ценообразования
+        const calculatedPrice = getCurrentPrice(offer);
+        const finalPrice = calculatedPrice ?? offer.originalCost;
+        const finalDiscount = offer.originalCost > 0 && finalPrice < offer.originalCost
+          ? Math.round(((offer.originalCost - finalPrice) / offer.originalCost) * 100)
+          : 0;
+
         const newItem: CartItem = {
           id: Date.now(), // Генерируем уникальный ID
           offerId: offer.id,
@@ -216,8 +225,8 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
           shopId: offer.shopId,
           shopName: offer.shopShortName || 'Магазин',
           originalCost: offer.originalCost,
-          currentCost: offer.currentCost,
-          discount: offer.discount,
+          currentCost: finalPrice,
+          discount: finalDiscount,
           quantity: 1,
           expiresDate: expiresDate,
         };
@@ -259,7 +268,10 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Общая сумма корзины
   const getTotalAmount = (): number => {
-    return cartItems.reduce((sum, item) => sum + item.currentCost * item.quantity, 0);
+    return cartItems.reduce((sum, item) => {
+      const itemCost = item.currentCost ?? 0;
+      return sum + itemCost * item.quantity;
+    }, 0);
   };
 
   // Общее количество товаров

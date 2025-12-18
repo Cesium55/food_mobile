@@ -1,6 +1,7 @@
 import CartButton from "@/components/cart/CartButton";
-import { CharacteristicItem, ProductCharacteristics } from "@/components/product/ProductCharacteristics";
+import PriceChart from "@/components/product/PriceChart";
 import ProductCategories from "@/components/product/ProductCategories";
+import { CharacteristicItem, ProductCharacteristics } from "@/components/product/ProductCharacteristics";
 import ProductImageSection from "@/components/product/ProductImageSection";
 import ProductInfoCard from "@/components/product/ProductInfoCard";
 import ProductPriceSection from "@/components/product/ProductPriceSection";
@@ -10,20 +11,52 @@ import { useOffers } from "@/hooks/useOffers";
 import { usePublicSeller } from "@/hooks/usePublicSeller";
 import { useShops } from "@/hooks/useShops";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import React from "react";
+import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function ProductDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const { getOfferById } = useOffers();
+  const { getOfferById, offers, loading: offersLoading, refetch } = useOffers();
   const { shops } = useShops();
   const { categories, getCategoryById } = useCategories();
   
+  // Получаем оффер сразу (может быть undefined)
   const offer = getOfferById(Number(id));
   
-  // Получаем данные продавца
+  // Хуки должны вызываться всегда в одном порядке, не условно
+  // Вызываем usePublicSeller всегда, даже если offer еще не загружен
   const { seller } = usePublicSeller(offer?.sellerId || null);
+  
+  // Загружаем offers если их нет
+  React.useEffect(() => {
+    if (offers.length === 0 && !offersLoading) {
+      refetch();
+    }
+  }, [offers.length, offersLoading, refetch]);
+  
+  // Показываем загрузку пока offers загружаются
+  if (offersLoading && offers.length === 0) {
+    return (
+      <SafeAreaView style={styles.safeArea} edges={['top']}>
+        <View style={styles.header}>
+          <TouchableOpacity 
+            style={styles.headerBackButton}
+            onPress={() => router.back()}
+          >
+            <IconSymbol name="arrow.left" color="#333" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Загрузка...</Text>
+          <View style={styles.headerSpacer} />
+        </View>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#007AFF" />
+          <Text style={styles.loadingText}>Загрузка товара...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
   
   // Получаем название магазина по shopId
   const shop = offer ? shops.find(s => s.id === offer.shopId) : null;
@@ -182,6 +215,11 @@ export default function ProductDetail() {
         {/* Характеристики */}
         <ProductCharacteristics characteristics={characteristics} />
 
+        {/* График изменения цены для динамического ценообразования */}
+        {offer.isDynamicPricing && offer.pricingStrategy && (
+          <PriceChart offer={offer} />
+        )}
+
         {/* Отступ для фиксированной панели */}
         <View style={styles.bottomSpacer} />
       </ScrollView>
@@ -228,6 +266,17 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#FAFAFA',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 32,
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#666',
   },
   errorContainer: {
     flex: 1,

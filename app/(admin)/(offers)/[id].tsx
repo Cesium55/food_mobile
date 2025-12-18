@@ -1,8 +1,9 @@
 import { IconSymbol } from "@/components/ui/icon-symbol";
-import { useOffers, Offer } from "@/hooks/useOffers";
+import { useOffers } from "@/hooks/useOffers";
+import { usePricingStrategies } from "@/hooks/usePricingStrategies";
 import { useShops } from "@/hooks/useShops";
 import { router, useLocalSearchParams } from "expo-router";
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import {
     ActivityIndicator,
     Alert,
@@ -19,18 +20,22 @@ export default function OfferDetailScreen() {
     const { id } = useLocalSearchParams();
     const offerId = typeof id === 'string' ? parseInt(id) : 0;
     const { shops, loading: shopsLoading } = useShops();
-    const { getOfferById, loading: offersLoading } = useOffers();
+    const { getOfferById, loading: offersLoading, updateOffer } = useOffers();
+    const { strategies, loading: strategiesLoading } = usePricingStrategies();
     
     const offer = getOfferById(offerId);
     const shop = offer ? shops.find(s => s.id === offer.shopId) : null;
 
     const [isEditing, setIsEditing] = useState(false);
     const [hasChanges, setHasChanges] = useState(false);
+    const [pricingMode, setPricingMode] = useState<'fixed' | 'strategy'>('fixed');
+    const [selectedStrategyId, setSelectedStrategyId] = useState<number | null>(null);
+    const [showStrategyPicker, setShowStrategyPicker] = useState(false);
     
     // Локальное состояние для редактирования
     const [editedOffer, setEditedOffer] = useState<{
         originalCost: number;
-        currentCost: number;
+        currentCost: number | null;
         count: number;
         expiresDate: string;
         description?: string;
@@ -38,6 +43,9 @@ export default function OfferDetailScreen() {
 
     useEffect(() => {
         if (offer) {
+            const isDynamic = offer.isDynamicPricing || !!offer.pricingStrategyId;
+            setPricingMode(isDynamic ? 'strategy' : 'fixed');
+            setSelectedStrategyId(offer.pricingStrategyId ?? null);
             setEditedOffer({
                 originalCost: offer.originalCost,
                 currentCost: offer.currentCost,
@@ -109,6 +117,9 @@ export default function OfferDetailScreen() {
                             setHasChanges(false);
                             // Сбрасываем изменения
                             if (offer) {
+                                const isDynamic = offer.isDynamicPricing || !!offer.pricingStrategyId;
+                                setPricingMode(isDynamic ? 'strategy' : 'fixed');
+                                setSelectedStrategyId(offer.pricingStrategyId ?? null);
                                 setEditedOffer({
                                     originalCost: offer.originalCost,
                                     currentCost: offer.currentCost,
@@ -129,19 +140,29 @@ export default function OfferDetailScreen() {
     const handleSave = () => {
         if (!editedOffer) return;
 
-        // Валидация
-        if (editedOffer.originalCost <= 0) {
-            Alert.alert("Ошибка", "Цена должна быть больше 0");
-            return;
+        // Валидация в зависимости от режима ценообразования
+        if (pricingMode === 'fixed') {
+            if (editedOffer.originalCost <= 0) {
+                Alert.alert("Ошибка", "Цена должна быть больше 0");
+                return;
+            }
+            if (editedOffer.currentCost !== null) {
+                if (editedOffer.currentCost < 0) {
+                    Alert.alert("Ошибка", "Цена со скидкой не может быть отрицательной");
+                    return;
+                }
+                if (editedOffer.currentCost > editedOffer.originalCost) {
+                    Alert.alert("Ошибка", "Цена со скидкой не может быть больше оригинальной цены");
+                    return;
+                }
+            }
+        } else {
+            if (!selectedStrategyId) {
+                Alert.alert("Ошибка", "Выберите стратегию ценообразования");
+                return;
+            }
         }
-        if (editedOffer.currentCost < 0) {
-            Alert.alert("Ошибка", "Цена со скидкой не может быть отрицательной");
-            return;
-        }
-        if (editedOffer.currentCost > editedOffer.originalCost) {
-            Alert.alert("Ошибка", "Цена со скидкой не может быть больше оригинальной цены");
-            return;
-        }
+
         if (editedOffer.count <= 0) {
             Alert.alert("Ошибка", "Количество должно быть больше 0");
             return;
@@ -155,10 +176,59 @@ export default function OfferDetailScreen() {
                 {
                     text: "Сохранить",
                     onPress: async () => {
-                        // TODO: Реализовать API запрос для сохранения
-                        Alert.alert("Успех", "Изменения сохранены");
-                        setIsEditing(false);
-                        setHasChanges(false);
+                        try {
+                            // Преобразуем дату в полный datetime с временем конца дня (23:59:59)
+                            let expiresDateTime: string;
+                            if (editedOffer.expiresDate) {
+                                // Если дата в формате YYYY-MM-DD, добавляем время конца дня
+                                if (/^\d{4}-\d{2}-\d{2}$/.test(editedOffer.expiresDate)) {
+                                    const date = new Date(editedOffer.expiresDate + 'T23:59:59');
+                                    expiresDateTime = date.toISOString();
+                                } else {
+                                    // Если уже полный datetime, используем как есть
+                                    const date = new Date(editedOffer.expiresDate);
+                                    date.setHours(23, 59, 59, 999);
+                                    expiresDateTime = date.toISOString();
+                                }
+                            } else {
+                                expiresDateTime = editedOffer.expiresDate;
+                            }
+
+                            const updateData: {
+                                pricing_strategy_id?: number | null;
+                                current_cost?: number | null;
+                                original_cost?: number;
+                                count?: number;
+                                expires_date?: string;
+                                description?: string;
+                            } = {
+                                count: editedOffer.count,
+                                expires_date: expiresDateTime,
+                                description: editedOffer.description,
+                            };
+
+                            if (pricingMode === 'strategy') {
+                                updateData.pricing_strategy_id = selectedStrategyId;
+                                updateData.current_cost = null; // Для динамического ценообразования current_cost должен быть null
+                                updateData.original_cost = editedOffer.originalCost; // Сохраняем базовую цену для расчета скидок
+                            } else {
+                                updateData.pricing_strategy_id = null;
+                                updateData.current_cost = editedOffer.currentCost;
+                                updateData.original_cost = editedOffer.originalCost;
+                            }
+
+                            await updateOffer(offerId, updateData);
+                            
+                            Alert.alert("Успех", "Изменения сохранены");
+                            setIsEditing(false);
+                            setHasChanges(false);
+                        } catch (error: any) {
+                            console.error('Ошибка обновления оффера:', error);
+                            Alert.alert(
+                                "Ошибка",
+                                error.message || "Не удалось сохранить изменения. Попробуйте еще раз."
+                            );
+                        }
                     }
                 }
             ]
@@ -195,13 +265,13 @@ export default function OfferDetailScreen() {
     };
 
     const getFinalPrice = () => {
-        return editedOffer?.currentCost || offer.currentCost;
+        return editedOffer?.currentCost ?? offer.currentCost ?? 0;
     };
 
     const getDiscount = () => {
-        const original = editedOffer?.originalCost || offer.originalCost;
-        const current = editedOffer?.currentCost || offer.currentCost;
-        if (original > 0) {
+        const original = editedOffer?.originalCost ?? offer.originalCost;
+        const current = editedOffer?.currentCost ?? offer.currentCost;
+        if (original > 0 && current !== null) {
             return Math.round(((original - current) / original) * 100);
         }
         return 0;
@@ -269,66 +339,247 @@ export default function OfferDetailScreen() {
                 <View style={styles.infoSection}>
                     <Text style={styles.sectionTitle}>Основная информация</Text>
 
-                    {/* Оригинальная цена */}
-                    <View style={styles.fieldContainer}>
-                        <Text style={styles.label}>Оригинальная цена, ₽ *</Text>
-                        {isEditing ? (
-                            <TextInput
-                                style={styles.input}
-                                value={displayOffer.originalCost.toString()}
-                                onChangeText={(text) => {
-                                    const num = parseFloat(text) || 0;
-                                    handleFieldChange('originalCost', num);
-                                }}
-                                keyboardType="decimal-pad"
-                                placeholder="0.00"
-                            />
-                        ) : (
-                            <View style={styles.valueContainer}>
-                                <Text style={styles.valueText}>
-                                    {offer.originalCost.toFixed(2)} ₽
+                    {/* Индикатор динамического ценообразования (только для просмотра) */}
+                    {!isEditing && offer.isDynamicPricing && (
+                        <View style={styles.dynamicPricingBadge}>
+                            <IconSymbol name="chart.line.uptrend.xyaxis" size={16} color="#007AFF" />
+                            <Text style={styles.dynamicPricingBadgeText}>Динамическое ценообразование</Text>
+                            {offer.pricingStrategy && (
+                                <Text style={styles.dynamicPricingStrategyName}>
+                                    {offer.pricingStrategy.name}
                                 </Text>
-                            </View>
-                        )}
-                    </View>
+                            )}
+                        </View>
+                    )}
 
-                    {/* Цена со скидкой */}
-                    <View style={styles.fieldContainer}>
-                        <Text style={styles.label}>Цена со скидкой, ₽ *</Text>
-                        {isEditing ? (
-                            <TextInput
-                                style={styles.input}
-                                value={displayOffer.currentCost.toString()}
-                                onChangeText={(text) => {
-                                    const num = parseFloat(text) || 0;
-                                    handleFieldChange('currentCost', num);
-                                }}
-                                keyboardType="decimal-pad"
-                                placeholder="0.00"
-                            />
-                        ) : (
+                    {/* Режим ценообразования (только при редактировании) */}
+                    {isEditing && (
+                        <View style={styles.fieldContainer}>
+                            <Text style={styles.label}>Режим ценообразования *</Text>
+                            <View style={styles.segmentedControl}>
+                                <TouchableOpacity
+                                    style={[
+                                        styles.segment,
+                                        pricingMode === 'fixed' && styles.segmentActive
+                                    ]}
+                                    onPress={() => {
+                                        setPricingMode('fixed');
+                                        setSelectedStrategyId(null);
+                                        if (editedOffer) {
+                                            setEditedOffer({
+                                                ...editedOffer,
+                                                currentCost: editedOffer.currentCost ?? editedOffer.originalCost,
+                                            });
+                                        }
+                                        setHasChanges(true);
+                                    }}
+                                >
+                                    <Text style={[
+                                        styles.segmentText,
+                                        pricingMode === 'fixed' && styles.segmentTextActive
+                                    ]}>
+                                        Фиксированная цена
+                                    </Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    style={[
+                                        styles.segment,
+                                        pricingMode === 'strategy' && styles.segmentActive
+                                    ]}
+                                    onPress={() => {
+                                        setPricingMode('strategy');
+                                        if (editedOffer) {
+                                            setEditedOffer({
+                                                ...editedOffer,
+                                                currentCost: null,
+                                            });
+                                        }
+                                        setHasChanges(true);
+                                    }}
+                                >
+                                    <Text style={[
+                                        styles.segmentText,
+                                        pricingMode === 'strategy' && styles.segmentTextActive
+                                    ]}>
+                                        Стратегия
+                                    </Text>
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+                    )}
+
+                    {/* Поля для фиксированной цены */}
+                    {(pricingMode === 'fixed' || (!isEditing && !offer.isDynamicPricing)) && (
+                        <>
+                            {/* Оригинальная цена */}
+                            <View style={styles.fieldContainer}>
+                                <Text style={styles.label}>Оригинальная цена, ₽ *</Text>
+                                {isEditing ? (
+                                    <TextInput
+                                        style={styles.input}
+                                        value={displayOffer.originalCost.toString()}
+                                        onChangeText={(text) => {
+                                            const num = parseFloat(text) || 0;
+                                            handleFieldChange('originalCost', num);
+                                        }}
+                                        keyboardType="decimal-pad"
+                                        placeholder="0.00"
+                                    />
+                                ) : (
+                                    <View style={styles.valueContainer}>
+                                        <Text style={styles.valueText}>
+                                            {offer.originalCost.toFixed(2)} ₽
+                                        </Text>
+                                    </View>
+                                )}
+                            </View>
+
+                            {/* Цена со скидкой */}
+                            <View style={styles.fieldContainer}>
+                                <Text style={styles.label}>Цена со скидкой, ₽ *</Text>
+                                {isEditing ? (
+                                    <TextInput
+                                        style={styles.input}
+                                        value={(displayOffer.currentCost ?? 0).toString()}
+                                        onChangeText={(text) => {
+                                            const num = parseFloat(text) || 0;
+                                            handleFieldChange('currentCost', num);
+                                        }}
+                                        keyboardType="decimal-pad"
+                                        placeholder="0.00"
+                                    />
+                                ) : (
+                                    <View style={styles.valueContainer}>
+                                        <Text style={styles.valueText}>
+                                            {offer.currentCost ? offer.currentCost.toFixed(2) : '—'} ₽
+                                        </Text>
+                                    </View>
+                                )}
+                            </View>
+
+                            {/* Скидка */}
+                            <View style={styles.fieldContainer}>
+                                <Text style={styles.label}>Скидка</Text>
+                                <View style={styles.valueContainer}>
+                                    <Text style={styles.valueText}>
+                                        {getDiscount() > 0 ? `${getDiscount()}%` : 'Без скидки'}
+                                    </Text>
+                                    {getDiscount() > 0 && displayOffer.currentCost !== null && (
+                                        <Text style={styles.savings}>
+                                            Экономия: {(displayOffer.originalCost - (displayOffer.currentCost ?? 0)).toFixed(2)} ₽
+                                        </Text>
+                                    )}
+                                </View>
+                            </View>
+                        </>
+                    )}
+
+                    {/* Поля для стратегии */}
+                    {isEditing && pricingMode === 'strategy' && (
+                        <>
+                            {/* Выбор стратегии */}
+                            <View style={styles.fieldContainer}>
+                                <Text style={styles.label}>Стратегия ценообразования *</Text>
+                                {!showStrategyPicker ? (
+                                    <TouchableOpacity
+                                        style={styles.strategyInputContainer}
+                                        onPress={() => setShowStrategyPicker(true)}
+                                        activeOpacity={0.7}
+                                    >
+                                        <Text style={[
+                                            styles.strategyInputText,
+                                            !selectedStrategyId && styles.strategyInputPlaceholder
+                                        ]}>
+                                            {selectedStrategyId
+                                                ? strategies.find(s => s.id === selectedStrategyId)?.name || 'Не выбрана'
+                                                : 'Выберите стратегию'
+                                            }
+                                        </Text>
+                                        <IconSymbol name="chevron.down" size={20} color="#666" />
+                                    </TouchableOpacity>
+                                ) : (
+                                    <View style={styles.strategySelector}>
+                                        <View style={styles.selectorHeader}>
+                                            <Text style={styles.selectorTitle}>Выберите стратегию</Text>
+                                            <TouchableOpacity
+                                                onPress={() => setShowStrategyPicker(false)}
+                                                style={styles.closeSelectorButton}
+                                            >
+                                                <IconSymbol name="xmark" size={20} color="#666" />
+                                            </TouchableOpacity>
+                                        </View>
+                                        {strategiesLoading ? (
+                                            <View style={styles.loadingContainer}>
+                                                <ActivityIndicator size="small" color="#007AFF" />
+                                                <Text style={styles.loadingText}>Загрузка стратегий...</Text>
+                                            </View>
+                                        ) : strategies.length === 0 ? (
+                                            <View style={styles.emptyContainer}>
+                                                <Text style={styles.emptyText}>Нет доступных стратегий</Text>
+                                            </View>
+                                        ) : (
+                                            <ScrollView style={styles.strategiesList}>
+                                                {strategies.map(strategy => (
+                                                    <TouchableOpacity
+                                                        key={strategy.id}
+                                                        style={[
+                                                            styles.strategyItem,
+                                                            selectedStrategyId === strategy.id && styles.strategyItemSelected
+                                                        ]}
+                                                        onPress={() => {
+                                                            setSelectedStrategyId(strategy.id);
+                                                            setShowStrategyPicker(false);
+                                                            setHasChanges(true);
+                                                        }}
+                                                    >
+                                                        <View style={styles.strategyItemContent}>
+                                                            <Text style={[
+                                                                styles.strategyItemText,
+                                                                selectedStrategyId === strategy.id && styles.strategyItemTextSelected
+                                                            ]}>
+                                                                {strategy.name}
+                                                            </Text>
+                                                            <Text style={styles.strategyItemSteps}>
+                                                                {strategy.steps.length} шаг{strategy.steps.length !== 1 ? 'ов' : ''}
+                                                            </Text>
+                                                        </View>
+                                                        {selectedStrategyId === strategy.id && (
+                                                            <IconSymbol name="checkmark.circle.fill" size={24} color="#007AFF" />
+                                                        )}
+                                                    </TouchableOpacity>
+                                                ))}
+                                            </ScrollView>
+                                        )}
+                                    </View>
+                                )}
+                            </View>
+
+                            {/* Информация о динамическом ценообразовании */}
+                            {selectedStrategyId && (
+                                <View style={styles.dynamicPricingInfo}>
+                                    <IconSymbol name="info.circle" size={20} color="#007AFF" />
+                                    <Text style={styles.dynamicPricingText}>
+                                        Цена будет рассчитываться автоматически на основе выбранной стратегии и времени до истечения срока годности
+                                    </Text>
+                                </View>
+                            )}
+                        </>
+                    )}
+
+                    {/* Отображение текущей цены для динамического ценообразования (только для просмотра) */}
+                    {!isEditing && offer.isDynamicPricing && offer.currentCost !== null && (
+                        <View style={styles.fieldContainer}>
+                            <Text style={styles.label}>Текущая цена</Text>
                             <View style={styles.valueContainer}>
                                 <Text style={styles.valueText}>
                                     {offer.currentCost.toFixed(2)} ₽
                                 </Text>
-                            </View>
-                        )}
-                    </View>
-
-                    {/* Скидка */}
-                    <View style={styles.fieldContainer}>
-                        <Text style={styles.label}>Скидка</Text>
-                        <View style={styles.valueContainer}>
-                            <Text style={styles.valueText}>
-                                {getDiscount() > 0 ? `${getDiscount()}%` : 'Без скидки'}
-                            </Text>
-                            {getDiscount() > 0 && (
-                                <Text style={styles.savings}>
-                                    Экономия: {(displayOffer.originalCost - displayOffer.currentCost).toFixed(2)} ₽
+                                <Text style={styles.dynamicPriceNote}>
+                                    Рассчитана автоматически
                                 </Text>
-                            )}
+                            </View>
                         </View>
-                    </View>
+                    )}
 
                     {/* Количество */}
                     <View style={styles.fieldContainer}>
@@ -631,6 +882,164 @@ const styles = StyleSheet.create({
         color: '#fff',
         fontSize: 16,
         fontWeight: '700',
+    },
+    dynamicPricingBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#E3F2FD',
+        padding: 12,
+        borderRadius: 8,
+        marginBottom: 16,
+        gap: 8,
+    },
+    dynamicPricingBadgeText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#007AFF',
+        flex: 1,
+    },
+    dynamicPricingStrategyName: {
+        fontSize: 12,
+        color: '#007AFF',
+        opacity: 0.8,
+    },
+    segmentedControl: {
+        flexDirection: 'row',
+        backgroundColor: '#f0f0f0',
+        borderRadius: 8,
+        padding: 4,
+        gap: 4,
+    },
+    segment: {
+        flex: 1,
+        paddingVertical: 10,
+        paddingHorizontal: 16,
+        borderRadius: 6,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    segmentActive: {
+        backgroundColor: '#007AFF',
+    },
+    segmentText: {
+        fontSize: 14,
+        fontWeight: '500',
+        color: '#666',
+    },
+    segmentTextActive: {
+        color: '#fff',
+        fontWeight: '600',
+    },
+    strategySelector: {
+        borderWidth: 1,
+        borderColor: '#e0e0e0',
+        borderRadius: 12,
+        backgroundColor: '#fff',
+        maxHeight: 300,
+    },
+    strategiesList: {
+        maxHeight: 240,
+    },
+    strategyItem: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: '#f0f0f0',
+    },
+    strategyItemSelected: {
+        backgroundColor: '#F0F8FF',
+    },
+    strategyItemContent: {
+        flex: 1,
+        marginRight: 12,
+    },
+    strategyItemText: {
+        fontSize: 15,
+        color: '#333',
+    },
+    strategyItemTextSelected: {
+        fontWeight: '600',
+        color: '#007AFF',
+    },
+    strategyItemSteps: {
+        fontSize: 12,
+        color: '#999',
+        marginTop: 4,
+    },
+    strategyInputContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        borderWidth: 1,
+        borderColor: '#ddd',
+        borderRadius: 8,
+        padding: 12,
+        backgroundColor: '#fff',
+    },
+    strategyInputText: {
+        fontSize: 16,
+        color: '#333',
+        flex: 1,
+    },
+    strategyInputPlaceholder: {
+        color: '#999',
+    },
+    dynamicPricingInfo: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        backgroundColor: '#E3F2FD',
+        padding: 12,
+        borderRadius: 8,
+        gap: 8,
+        marginTop: 8,
+    },
+    dynamicPricingText: {
+        flex: 1,
+        fontSize: 13,
+        color: '#007AFF',
+        lineHeight: 18,
+    },
+    dynamicPriceNote: {
+        fontSize: 12,
+        color: '#999',
+        marginTop: 4,
+        fontStyle: 'italic',
+    },
+    loadingContainer: {
+        padding: 40,
+        alignItems: 'center',
+        gap: 12,
+    },
+    loadingText: {
+        fontSize: 14,
+        color: '#666',
+    },
+    emptyContainer: {
+        padding: 40,
+        alignItems: 'center',
+    },
+    emptyText: {
+        fontSize: 14,
+        color: '#999',
+        textAlign: 'center',
+    },
+    selectorHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: '#e0e0e0',
+    },
+    selectorTitle: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#333',
+    },
+    closeSelectorButton: {
+        padding: 4,
     },
 });
 
