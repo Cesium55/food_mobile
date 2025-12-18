@@ -10,7 +10,9 @@ interface ProductPriceSectionProps {
 
 export default function ProductPriceSection({ offer }: ProductPriceSectionProps) {
   const currentPrice = getCurrentPrice(offer);
-  const hasDiscount = currentPrice !== null && currentPrice < offer.originalCost;
+  const currentPriceNum = currentPrice !== null ? parseFloat(currentPrice) : null;
+  const originalCostNum = parseFloat(offer.originalCost);
+  const hasDiscount = currentPriceNum !== null && currentPriceNum < originalCostNum;
   
   // Проверяем, действительно ли товар просрочен
   const now = new Date();
@@ -29,13 +31,13 @@ export default function ProductPriceSection({ offer }: ProductPriceSectionProps)
         <>
           <View style={styles.priceRow}>
             {hasDiscount && (
-              <Text style={styles.originalPrice}>{offer.originalCost.toFixed(2)} ₽</Text>
+              <Text style={styles.originalPrice}>{offer.originalCost} ₽</Text>
             )}
-            <Text style={styles.currentPrice}>{currentPrice.toFixed(2)} ₽</Text>
+            <Text style={styles.currentPrice}>{currentPrice} ₽</Text>
           </View>
-          {hasDiscount && (
+          {hasDiscount && currentPriceNum !== null && (
             <Text style={styles.discountText}>
-              Экономия {((offer.originalCost - currentPrice).toFixed(2))} ₽
+              Экономия {(originalCostNum - currentPriceNum).toFixed(2)} ₽
             </Text>
           )}
           {offer.isDynamicPricing && (
@@ -52,7 +54,7 @@ export default function ProductPriceSection({ offer }: ProductPriceSectionProps)
         </View>
       ) : (
         <View style={styles.priceRow}>
-          <Text style={styles.currentPrice}>{offer.originalCost.toFixed(2)} ₽</Text>
+          <Text style={styles.currentPrice}>{offer.originalCost} ₽</Text>
           {offer.isDynamicPricing && (
             <Text style={styles.dynamicPriceNote}>
               Цена рассчитывается...

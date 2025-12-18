@@ -1,6 +1,6 @@
 import { IconSymbol } from "@/components/ui/icon-symbol";
-import { Colors } from "@/constants/theme";
-import { useColorScheme } from "@/hooks/use-color-scheme";
+import { spacing, typography } from "@/constants/tokens";
+import { useColors } from "@/contexts/ThemeContext";
 import { router } from "expo-router";
 import { useState } from "react";
 import { RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
@@ -23,8 +23,7 @@ export function TabScreen({
   onRefresh,
   refreshing = false,
 }: TabScreenProps) {
-  const colorScheme = useColorScheme();
-  const colors = Colors[colorScheme ?? 'light'];
+  const colors = useColors();
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const handleRefresh = async () => {
@@ -39,7 +38,7 @@ export function TabScreen({
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background.default }]} edges={['top']}>
       <View style={styles.header}>
         {showBackButton && (
           <TouchableOpacity 
@@ -48,14 +47,11 @@ export function TabScreen({
           >
             <IconSymbol 
               name="arrow.left" 
-              // size={24} 
-              color={styles.backButtonIcon.color}
-              
+              color={colors.text.primary}
             />
           </TouchableOpacity>
         )}
-        <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
-        
+        <Text style={[styles.title, { color: colors.text.primary }]}>{title}</Text>
       </View>
       <ScrollView 
         style={styles.content} 
@@ -66,8 +62,8 @@ export function TabScreen({
             <RefreshControl
               refreshing={refreshing || isRefreshing}
               onRefresh={handleRefresh}
-              tintColor={colors.text}
-              colors={['#007AFF']}
+              tintColor={colors.primary[500]}
+              colors={[colors.primary[500]]}
             />
           ) : undefined
         }
@@ -83,39 +79,31 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
-    paddingHorizontal: 16,
-    // paddingVertical: 16,
-    paddingBottom: 32,
-    paddingTop: 16,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.xxxl,
+    paddingTop: spacing.lg,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
     textAlignVertical: 'center',
-    // borderWidth: 1,
   },
   backButton: {
     position: 'absolute',
-    left: 16,
+    left: spacing.lg,
     justifyContent: 'center',
     alignItems: 'center',
-    // borderWidth: 1,
   },
   content: {
     flex: 1,
   },
   scrollContent: {
     flexGrow: 1,
-    // paddingHorizontal: 16,
   },
   title: {
-    fontSize: 24,
-    fontWeight: 'bold',
+    fontSize: typography.fontSize.xxl,
+    fontFamily: typography.fontFamily.bold,
     textAlign: 'center',
-    // borderWidth: 1,
     position: 'absolute',
-  },
-  backButtonIcon: {
-    color: '#123123',
   },
 });

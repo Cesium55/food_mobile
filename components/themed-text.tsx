@@ -1,6 +1,6 @@
+import { typography } from '@/constants/tokens';
+import { useColors } from '@/contexts/ThemeContext';
 import { StyleSheet, Text, type TextProps } from 'react-native';
-
-import { Colors } from '@/constants/theme';
 
 export type ThemedTextProps = TextProps & {
   lightColor?: string;
@@ -15,8 +15,10 @@ export function ThemedText({
   type = 'default',
   ...rest
 }: ThemedTextProps) {
-  // Принудительно используем светлую тему
-  const color = lightColor || Colors.light.text;
+  const colors = useColors();
+  
+  // Используем переданный цвет или цвет из темы
+  const color = lightColor || colors.text.primary;
 
   return (
     <Text
@@ -26,7 +28,7 @@ export function ThemedText({
         type === 'title' ? styles.title : undefined,
         type === 'defaultSemiBold' ? styles.defaultSemiBold : undefined,
         type === 'subtitle' ? styles.subtitle : undefined,
-        type === 'link' ? styles.link : undefined,
+        type === 'link' ? styles.link(colors) : undefined,
         style,
       ]}
       {...rest}
@@ -36,26 +38,41 @@ export function ThemedText({
 
 const styles = StyleSheet.create({
   default: {
-    fontSize: 16,
-    lineHeight: 24,
+    fontSize: typography.fontSize.base,
+    lineHeight: typography.lineHeight.base,
+    fontFamily: typography.fontFamily.regular,
   },
   defaultSemiBold: {
-    fontSize: 16,
-    lineHeight: 24,
-    fontWeight: '600',
+    fontSize: typography.fontSize.base,
+    lineHeight: typography.lineHeight.base,
+    fontFamily: typography.fontFamily.semibold,
   },
   title: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    lineHeight: 32,
+    fontSize: typography.fontSize.huge,
+    lineHeight: typography.lineHeight.huge,
+    fontFamily: typography.fontFamily.bold,
   },
   subtitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-  },
-  link: {
-    lineHeight: 30,
-    fontSize: 16,
-    color: '#0a7ea4',
+    fontSize: typography.fontSize.xl,
+    lineHeight: typography.lineHeight.xl,
+    fontFamily: typography.fontFamily.bold,
   },
 });
+
+// Динамические стили, зависящие от темы
+const styles_dynamic = {
+  link: (colors: any) => ({
+    lineHeight: typography.lineHeight.xl,
+    fontSize: typography.fontSize.base,
+    color: colors.text.link,
+  }),
+};
+
+// Объединяем статические и динамические стили
+const styles_combined = {
+  ...styles,
+  link: styles_dynamic.link,
+};
+
+// Переопределяем styles для использования комбинированных стилей
+Object.assign(styles, styles_combined);

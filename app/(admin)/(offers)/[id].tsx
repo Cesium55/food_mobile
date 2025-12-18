@@ -34,8 +34,8 @@ export default function OfferDetailScreen() {
     
     // Локальное состояние для редактирования
     const [editedOffer, setEditedOffer] = useState<{
-        originalCost: number;
-        currentCost: number | null;
+        originalCost: string;
+        currentCost: string | null;
         count: number;
         expiresDate: string;
         description?: string;
@@ -142,16 +142,18 @@ export default function OfferDetailScreen() {
 
         // Валидация в зависимости от режима ценообразования
         if (pricingMode === 'fixed') {
-            if (editedOffer.originalCost <= 0) {
+            const originalCostNum = parseFloat(editedOffer.originalCost);
+            if (originalCostNum <= 0) {
                 Alert.alert("Ошибка", "Цена должна быть больше 0");
                 return;
             }
             if (editedOffer.currentCost !== null) {
-                if (editedOffer.currentCost < 0) {
+                const currentCostNum = parseFloat(editedOffer.currentCost);
+                if (currentCostNum < 0) {
                     Alert.alert("Ошибка", "Цена со скидкой не может быть отрицательной");
                     return;
                 }
-                if (editedOffer.currentCost > editedOffer.originalCost) {
+                if (currentCostNum > originalCostNum) {
                     Alert.alert("Ошибка", "Цена со скидкой не может быть больше оригинальной цены");
                     return;
                 }
@@ -196,8 +198,8 @@ export default function OfferDetailScreen() {
 
                             const updateData: {
                                 pricing_strategy_id?: number | null;
-                                current_cost?: number | null;
-                                original_cost?: number;
+                                current_cost?: string | null;
+                                original_cost?: string;
                                 count?: number;
                                 expires_date?: string;
                                 description?: string;
@@ -265,14 +267,17 @@ export default function OfferDetailScreen() {
     };
 
     const getFinalPrice = () => {
-        return editedOffer?.currentCost ?? offer.currentCost ?? 0;
+        const price = editedOffer?.currentCost ?? offer.currentCost ?? '0.00';
+        return parseFloat(price);
     };
 
     const getDiscount = () => {
         const original = editedOffer?.originalCost ?? offer.originalCost;
         const current = editedOffer?.currentCost ?? offer.currentCost;
-        if (original > 0 && current !== null) {
-            return Math.round(((original - current) / original) * 100);
+        const originalNum = parseFloat(original);
+        const currentNum = current !== null ? parseFloat(current) : null;
+        if (originalNum > 0 && currentNum !== null) {
+            return Math.round(((originalNum - currentNum) / originalNum) * 100);
         }
         return 0;
     };
@@ -440,10 +445,10 @@ export default function OfferDetailScreen() {
                                 {isEditing ? (
                                     <TextInput
                                         style={styles.input}
-                                        value={(displayOffer.currentCost ?? 0).toString()}
+                                        value={displayOffer.currentCost ?? '0.00'}
                                         onChangeText={(text) => {
                                             const num = parseFloat(text) || 0;
-                                            handleFieldChange('currentCost', num);
+                                            handleFieldChange('currentCost', num.toFixed(2));
                                         }}
                                         keyboardType="decimal-pad"
                                         placeholder="0.00"
@@ -451,7 +456,7 @@ export default function OfferDetailScreen() {
                                 ) : (
                                     <View style={styles.valueContainer}>
                                         <Text style={styles.valueText}>
-                                            {offer.currentCost ? offer.currentCost.toFixed(2) : '—'} ₽
+                                            {offer.currentCost ? offer.currentCost : '—'} ₽
                                         </Text>
                                     </View>
                                 )}
@@ -466,7 +471,7 @@ export default function OfferDetailScreen() {
                                     </Text>
                                     {getDiscount() > 0 && displayOffer.currentCost !== null && (
                                         <Text style={styles.savings}>
-                                            Экономия: {(displayOffer.originalCost - (displayOffer.currentCost ?? 0)).toFixed(2)} ₽
+                                            Экономия: {(parseFloat(displayOffer.originalCost) - parseFloat(displayOffer.currentCost ?? '0')).toFixed(2)} ₽
                                         </Text>
                                     )}
                                 </View>
@@ -572,7 +577,7 @@ export default function OfferDetailScreen() {
                             <Text style={styles.label}>Текущая цена</Text>
                             <View style={styles.valueContainer}>
                                 <Text style={styles.valueText}>
-                                    {offer.currentCost.toFixed(2)} ₽
+                                    {offer.currentCost} ₽
                                 </Text>
                                 <Text style={styles.dynamicPriceNote}>
                                     Рассчитана автоматически

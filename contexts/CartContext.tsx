@@ -11,8 +11,8 @@ interface CartItemStorage {
   productName: string;
   shopId: number;
   shopName: string;
-  originalCost: number;
-  currentCost: number | null;
+  originalCost: string; // decimal формат
+  currentCost: string | null; // decimal формат
   discount: number;
   quantity: number;
   expiresDate: string; // ISO string для сериализации
@@ -172,7 +172,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
         };
       }
       acc[item.shopId].items.push(item);
-      const itemCost = item.currentCost ?? 0;
+      const itemCost = item.currentCost ? parseFloat(item.currentCost) : 0;
       acc[item.shopId].total += itemCost * item.quantity;
       return acc;
     }, {} as { [key: number]: CartGroup });
@@ -214,8 +214,11 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // Рассчитываем текущую цену с учетом динамического ценообразования
         const calculatedPrice = getCurrentPrice(offer);
         const finalPrice = calculatedPrice ?? offer.originalCost;
-        const finalDiscount = offer.originalCost > 0 && finalPrice < offer.originalCost
-          ? Math.round(((offer.originalCost - finalPrice) / offer.originalCost) * 100)
+        
+        const originalCostNum = parseFloat(offer.originalCost);
+        const finalPriceNum = parseFloat(finalPrice);
+        const finalDiscount = originalCostNum > 0 && finalPriceNum < originalCostNum
+          ? Math.round(((originalCostNum - finalPriceNum) / originalCostNum) * 100)
           : 0;
 
         const newItem: CartItem = {
@@ -269,7 +272,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Общая сумма корзины
   const getTotalAmount = (): number => {
     return cartItems.reduce((sum, item) => {
-      const itemCost = item.currentCost ?? 0;
+      const itemCost = item.currentCost ? parseFloat(item.currentCost) : 0;
       return sum + itemCost * item.quantity;
     }, 0);
   };

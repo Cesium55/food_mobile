@@ -23,7 +23,7 @@ interface ItemFulfillment {
     fulfillment_status: string;
     product_name: string;
     shop_point_id: number;
-    cost_at_purchase: number;
+    cost_at_purchase: string; // decimal формат
     // Локальное состояние для формы
     selectedStatus: FulfillmentStatus;
     inputQuantity: string;
@@ -37,7 +37,7 @@ export default function FulfillOrderScreen() {
         purchase_id: number;
         status: string;
         items: VerifyTokenItem[];
-        total_cost: number;
+        total_cost: string; // decimal формат
     } | null>(null);
     const [items, setItems] = useState<ItemFulfillment[]>([]);
 
@@ -242,7 +242,7 @@ export default function FulfillOrderScreen() {
                     </View>
                     <View style={styles.infoRow}>
                         <Text style={styles.infoLabel}>Сумма заказа:</Text>
-                        <Text style={styles.infoValue}>{orderData.total_cost.toFixed(2)} ₽</Text>
+                        <Text style={styles.infoValue}>{orderData.total_cost} ₽</Text>
                     </View>
                 </View>
 

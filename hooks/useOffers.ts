@@ -33,8 +33,8 @@ export interface OfferApi {
   product_id: number;
   shop_id: number;
   expires_date: string;
-  original_cost: number;
-  current_cost: number | null;
+  original_cost: string; // decimal формат
+  current_cost: string | null; // decimal формат
   count: number;
   description?: string;
   pricing_strategy_id?: number | null;
@@ -77,8 +77,8 @@ export interface Offer {
   shopShortName?: string; // Краткое название магазина
   sellerId: number;
   expiresDate: string; // ISO строка даты
-  originalCost: number;
-  currentCost: number | null;
+  originalCost: string; // decimal формат
+  currentCost: string | null; // decimal формат
   discount: number; // Вычисляемое поле (процент скидки)
   count: number;
   description?: string;
@@ -144,8 +144,10 @@ export const useOffers = () => {
     }
 
     // Вычисляем процент скидки
-    const discount = apiOffer.original_cost > 0 && finalCurrentCost !== null
-      ? Math.round(((apiOffer.original_cost - finalCurrentCost) / apiOffer.original_cost) * 100)
+    const originalCostNum = parseFloat(apiOffer.original_cost);
+    const finalCurrentCostNum = finalCurrentCost !== null ? parseFloat(finalCurrentCost) : null;
+    const discount = originalCostNum > 0 && finalCurrentCostNum !== null
+      ? Math.round(((originalCostNum - finalCurrentCostNum) / originalCostNum) * 100)
       : 0;
 
     return {
@@ -279,10 +281,14 @@ export const useOffers = () => {
                       const calculatedPrice = calculateDynamicPrice(updatedOffer);
                       updatedOffer.currentCost = calculatedPrice;
                       // Пересчитываем скидку
-                      if (calculatedPrice !== null && updatedOffer.originalCost > 0) {
-                        updatedOffer.discount = Math.round(
-                          ((updatedOffer.originalCost - calculatedPrice) / updatedOffer.originalCost) * 100
-                        );
+                      if (calculatedPrice !== null) {
+                        const originalCostNum = parseFloat(updatedOffer.originalCost);
+                        const calculatedPriceNum = parseFloat(calculatedPrice);
+                        if (originalCostNum > 0) {
+                          updatedOffer.discount = Math.round(
+                            ((originalCostNum - calculatedPriceNum) / originalCostNum) * 100
+                          );
+                        }
                       }
                     }
                     return updatedOffer;
@@ -360,8 +366,8 @@ export const useOffers = () => {
     product_id: number;
     shop_id: number;
     expires_date: string;
-    original_cost?: number;
-    current_cost?: number | null;
+    original_cost?: string;
+    current_cost?: string | null;
     pricing_strategy_id?: number | null;
     count: number;
     description?: string;
@@ -402,8 +408,8 @@ export const useOffers = () => {
     offerId: number,
     offerData: {
       pricing_strategy_id?: number | null;
-      current_cost?: number | null;
-      original_cost?: number;
+      current_cost?: string | null;
+      original_cost?: string;
       count?: number;
       expires_date?: string;
       description?: string;

@@ -99,10 +99,10 @@ export function CartItem({ item, status, onIncrease, onDecrease, onRemove }: Car
           {item.currentCost !== null && (
             <>
               <Text style={[styles.originalPrice, isInactive && styles.inactiveTextColor]}>
-                {item.originalCost.toFixed(2)} ₽
+                {item.originalCost} ₽
               </Text>
               <Text style={[styles.currentPrice, isInactive && styles.inactiveTextColor]}>
-                {item.currentCost.toFixed(2)} ₽
+                {item.currentCost} ₽
               </Text>
               {item.discount > 0 && (
                 <View style={[styles.itemDiscountBadge, isInactive && styles.inactiveBadge]}>
@@ -160,7 +160,7 @@ export function CartItem({ item, status, onIncrease, onDecrease, onRemove }: Car
       <View style={styles.itemPriceContainer}>
         <Text style={[styles.itemTotal, isInactive && styles.inactiveTextColor]}>
           {item.currentCost !== null 
-            ? (item.currentCost * item.quantity).toFixed(2) + ' ₽'
+            ? (parseFloat(item.currentCost) * item.quantity).toFixed(2) + ' ₽'
             : 'Рассчитывается'
           }
         </Text>

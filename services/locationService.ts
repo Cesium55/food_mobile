@@ -9,24 +9,79 @@ import { getLastLocation, saveLastLocation } from '@/utils/storage';
 import * as Location from 'expo-location';
 
 /**
- * Получает текущее местоположение пользователя
+ * Получает текущее местоположение пользователя с таймаутом
  */
-export async function getCurrentLocation(): Promise<{ latitude: number; longitude: number } | null> {
+export async function getCurrentLocation(timeout: number = 5000): Promise<{ latitude: number; longitude: number } | null> {
   try {
     const { status } = await Location.requestForegroundPermissionsAsync();
     if (status !== 'granted') {
+      console.log('📍 Нет разрешения на геолокацию');
       return null;
     }
 
-    const location = await Location.getCurrentPositionAsync({});
-    return {
-      latitude: location.coords.latitude,
-      longitude: location.coords.longitude,
-    };
+    // Используем Promise.race для таймаута
+    const locationPromise = Location.getCurrentPositionAsync({
+      accuracy: Location.Accuracy.Balanced, // Используем баланс между точностью и скоростью
+    });
+
+    const timeoutPromise = new Promise<null>((resolve) => {
+      setTimeout(() => {
+        console.log('⏱️ Таймаут получения местоположения');
+        resolve(null);
+      }, timeout);
+    });
+
+    const result = await Promise.race([locationPromise, timeoutPromise]);
+    
+    if (result && 'coords' in result) {
+      const location = {
+        latitude: result.coords.latitude,
+        longitude: result.coords.longitude,
+      };
+      console.log('✅ Местоположение получено:', location);
+      return location;
+    }
+    
+    return null;
   } catch (error) {
     console.error('❌ Ошибка получения местоположения:', error);
     return null;
   }
+}
+
+/**
+ * Получает местоположение: сначала из кэша, затем пытается получить текущее
+ */
+export async function getLocationWithCache(): Promise<{ 
+  location: { latitude: number; longitude: number } | null;
+  isFromCache: boolean;
+}> {
+  // Сначала пытаемся получить из кэша
+  const cachedLocation = await getLastLocation();
+  
+  if (cachedLocation) {
+    console.log('📦 Используем местоположение из кэша:', cachedLocation);
+    
+    // Запускаем обновление местоположения в фоне (не ждем)
+    getCurrentLocation(5000).then(newLocation => {
+      if (newLocation) {
+        saveLastLocation(newLocation.latitude, newLocation.longitude);
+        console.log('🔄 Кэш местоположения обновлен');
+      }
+    });
+    
+    return { location: cachedLocation, isFromCache: true };
+  }
+  
+  // Если кэша нет, получаем текущее местоположение
+  const currentLocation = await getCurrentLocation(5000);
+  
+  if (currentLocation) {
+    await saveLastLocation(currentLocation.latitude, currentLocation.longitude);
+    return { location: currentLocation, isFromCache: false };
+  }
+  
+  return { location: null, isFromCache: false };
 }
 
 /**

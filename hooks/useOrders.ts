@@ -7,7 +7,7 @@ export interface OrderItem {
   id: number;
   productName: string;
   quantity: number;
-  price: number;
+  price: string; // decimal формат
   shopName: string;
 }
 
@@ -56,9 +56,10 @@ export const useOrders = () => {
 
     // Вычисляем скидку
     const originalTotal = purchase.purchase_offers.reduce((sum, po) => {
-      return sum + (po.offer.original_cost * po.quantity);
+      return sum + (parseFloat(po.offer.original_cost) * po.quantity);
     }, 0);
-    const discount = originalTotal - purchase.total_cost;
+    const totalCost = parseFloat(purchase.total_cost);
+    const discount = originalTotal - totalCost;
 
     // Определяем статус на основе статуса покупки
     let status: Order['status'] = 'reserved';
@@ -79,7 +80,7 @@ export const useOrders = () => {
       date: new Date(purchase.created_at),
       status,
       items,
-      totalAmount: purchase.total_cost,
+      totalAmount: totalCost,
       discount,
       paymentMethod: 'card', // По умолчанию, можно будет получить из API позже
       shops: Array.from(shopsSet),
@@ -129,9 +130,10 @@ export const useOrders = () => {
         });
 
         const originalTotal = purchase.purchase_offers.reduce((sum, po) => {
-          return sum + (po.offer.original_cost * po.quantity);
+          return sum + (parseFloat(po.offer.original_cost) * po.quantity);
         }, 0);
-        const discount = originalTotal - purchase.total_cost;
+        const totalCost = parseFloat(purchase.total_cost);
+        const discount = originalTotal - totalCost;
 
         // Определяем статус на основе статуса покупки
         let status: Order['status'] = 'reserved';
@@ -152,7 +154,7 @@ export const useOrders = () => {
           date: new Date(purchase.created_at),
           status,
           items,
-          totalAmount: purchase.total_cost,
+          totalAmount: totalCost,
           discount,
           paymentMethod: 'card' as const,
           shops: Array.from(shopsSet),
@@ -205,9 +207,10 @@ export const useOrders = () => {
         });
 
         const originalTotal = purchase.purchase_offers.reduce((sum, po) => {
-          return sum + (po.offer.original_cost * po.quantity);
+          return sum + (parseFloat(po.offer.original_cost) * po.quantity);
         }, 0);
-        const discount = originalTotal - purchase.total_cost;
+        const totalCost = parseFloat(purchase.total_cost);
+        const discount = originalTotal - totalCost;
 
         let status: Order['status'] = 'paid';
         if (purchase.status === 'confirmed') {
@@ -219,7 +222,7 @@ export const useOrders = () => {
           date: new Date(purchase.created_at),
           status,
           items,
-          totalAmount: purchase.total_cost,
+          totalAmount: totalCost,
           discount,
           paymentMethod: 'card' as const,
           shops: Array.from(shopsSet),
@@ -316,9 +319,10 @@ export const useOrders = () => {
         });
 
         const originalTotal = purchase.purchase_offers.reduce((sum, po) => {
-          return sum + (po.offer.original_cost * po.quantity);
+          return sum + (parseFloat(po.offer.original_cost) * po.quantity);
         }, 0);
-        const discount = originalTotal - purchase.total_cost;
+        const totalCost = parseFloat(purchase.total_cost);
+        const discount = originalTotal - totalCost;
 
         let status: Order['status'] = 'paid';
         if (purchase.status === 'confirmed') {
@@ -330,7 +334,7 @@ export const useOrders = () => {
           date: new Date(purchase.created_at),
           status,
           items,
-          totalAmount: purchase.total_cost,
+          totalAmount: totalCost,
           discount,
           paymentMethod: 'card' as const,
           shops: Array.from(shopsSet),

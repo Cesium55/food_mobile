@@ -105,16 +105,17 @@ export default function NewOfferScreen() {
 
         const priceNum = parseFloat(price) || 0;
         const discountNumFinal = parseFloat(discount) || 0;
-        const currentCost = pricingMode === 'fixed' 
+        const currentCostNum = pricingMode === 'fixed' 
             ? priceNum - (priceNum * discountNumFinal / 100)
             : null;
+        const currentCost = currentCostNum !== null ? currentCostNum.toFixed(2) : null;
 
         // Форматируем дату для отображения
         const formattedDate = expiryDate.toISOString().split('T')[0];
         
         const selectedStrategy = strategies.find(s => s.id === selectedStrategyId);
         const pricingInfo = pricingMode === 'fixed'
-            ? `Цена: ${priceNum.toFixed(2)} ₽\nСкидка: ${discountNumFinal}%\nЦена со скидкой: ${currentCost?.toFixed(2)} ₽`
+            ? `Цена: ${priceNum.toFixed(2)} ₽\nСкидка: ${discountNumFinal}%\nЦена со скидкой: ${currentCost} ₽`
             : `Стратегия: ${selectedStrategy?.name || 'Не выбрана'}\nЦена будет рассчитываться автоматически`;
         
         Alert.alert(
@@ -136,7 +137,7 @@ export default function NewOfferScreen() {
                                 product_id: selectedProductId,
                                 shop_id: selectedShopId,
                                 expires_date: expiryDateTime.toISOString(), // Передаем полный datetime с часовым поясом
-                                original_cost: priceNum, // Всегда передаем базовую цену (для динамического ценообразования это базовая цена, от которой считаются скидки)
+                                original_cost: priceNum.toFixed(2), // Всегда передаем базовую цену (для динамического ценообразования это базовая цена, от которой считаются скидки)
                                 current_cost: pricingMode === 'fixed' ? currentCost : null, // Для динамического ценообразования current_cost должен быть null
                                 pricing_strategy_id: pricingMode === 'strategy' ? selectedStrategyId : null,
                                 count: parseInt(quantity),

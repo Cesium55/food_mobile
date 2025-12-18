@@ -3,9 +3,9 @@ import { Offer } from '@/hooks/useOffers';
 /**
  * Вычисляет цену на основе стратегии ценообразования и времени до истечения срока годности
  * @param offer - Оффер с информацией о стратегии и сроке годности
- * @returns Рассчитанная цена или null если стратегия отсутствует или срок истек
+ * @returns Рассчитанная цена (строка decimal) или null если стратегия отсутствует или срок истек
  */
-export function calculateDynamicPrice(offer: Offer): number | null {
+export function calculateDynamicPrice(offer: Offer): string | null {
   // Если нет динамического ценообразования или нет стратегии, возвращаем текущую цену
   if (!offer.isDynamicPricing || !offer.pricingStrategy) {
     console.log('calculateDynamicPrice: No strategy', {
@@ -27,6 +27,9 @@ export function calculateDynamicPrice(offer: Offer): number | null {
     // Если нет шагов, возвращаем оригинальную цену
     return offer.originalCost;
   }
+  
+  // Парсим originalCost как число для расчетов
+  const originalCostNum = parseFloat(offer.originalCost);
 
   // Вычисляем сколько секунд осталось до истечения срока годности
   const now = new Date();
@@ -113,14 +116,15 @@ export function calculateDynamicPrice(offer: Offer): number | null {
   // Если подходящий шаг найден, применяем скидку
   if (applicableStep) {
     const discountPercent = applicableStep.discount_percent;
-    const calculatedPrice = offer.originalCost * (1 - discountPercent / 100);
+    const calculatedPrice = originalCostNum * (1 - discountPercent / 100);
+    const calculatedPriceStr = Math.max(0, calculatedPrice).toFixed(2);
     console.log('calculateDynamicPrice: Calculated price', {
       offerId: offer.id,
       originalCost: offer.originalCost,
       discountPercent,
-      calculatedPrice,
+      calculatedPrice: calculatedPriceStr,
     });
-    return Math.max(0, calculatedPrice); // Не допускаем отрицательную цену
+    return calculatedPriceStr; // Возвращаем строку decimal
   }
 
   // Если нет подходящего шага (время меньше минимального шага), 
@@ -129,14 +133,15 @@ export function calculateDynamicPrice(offer: Offer): number | null {
   if (sortedSteps.length > 0 && timeRemainingSeconds > 0) {
     const maxDiscountStep = sortedSteps[sortedSteps.length - 1];
     const discountPercent = maxDiscountStep.discount_percent;
-    const calculatedPrice = offer.originalCost * (1 - discountPercent / 100);
+    const calculatedPrice = originalCostNum * (1 - discountPercent / 100);
+    const calculatedPriceStr = Math.max(0, calculatedPrice).toFixed(2);
     console.log('calculateDynamicPrice: Using max discount', {
       offerId: offer.id,
       originalCost: offer.originalCost,
       discountPercent,
-      calculatedPrice,
+      calculatedPrice: calculatedPriceStr,
     });
-    return Math.max(0, calculatedPrice);
+    return calculatedPriceStr;
   }
 
   // Если время истекло или нет шагов, возвращаем оригинальную цену
@@ -151,9 +156,9 @@ export function calculateDynamicPrice(offer: Offer): number | null {
 /**
  * Получает текущую цену оффера с учетом динамического ценообразования
  * @param offer - Оффер
- * @returns Текущая цена (рассчитанная или фиксированная)
+ * @returns Текущая цена (строка decimal, рассчитанная или фиксированная)
  */
-export function getCurrentPrice(offer: Offer): number | null {
+export function getCurrentPrice(offer: Offer): string | null {
   console.log('getCurrentPrice called', {
     offerId: offer.id,
     isDynamicPricing: offer.isDynamicPricing,

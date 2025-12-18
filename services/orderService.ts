@@ -14,14 +14,14 @@ export interface CreateOrderRequest {
 export interface PurchaseOffer {
   offer_id: number;
   quantity: number;
-  cost_at_purchase: number;
+  cost_at_purchase: string; // decimal формат
   offer: {
     id: number;
     product_id: number;
     shop_id: number;
     expires_date: string | null;
-    original_cost: number;
-    current_cost: number;
+    original_cost: string; // decimal формат
+    current_cost: string; // decimal формат
     count: number;
     reserved_count: number;
   };
@@ -31,7 +31,7 @@ export interface Purchase {
   id: number;
   user_id: number;
   status: string;
-  total_cost: number;
+  total_cost: string; // decimal формат
   created_at: string;
   updated_at: string;
   purchase_offers: PurchaseOffer[];
@@ -363,14 +363,14 @@ export interface VerifyTokenItem {
   fulfillment_status: string;
   product_name: string;
   shop_point_id: number;
-  cost_at_purchase: number;
+  cost_at_purchase: string; // decimal формат
 }
 
 export interface VerifyTokenResponse {
   purchase_id: number;
   status: string;
   items: VerifyTokenItem[];
-  total_cost: number;
+  total_cost: string; // decimal формат
 }
 
 export interface FulfillItemRequest {
@@ -441,7 +441,7 @@ export async function verifyToken(token: string): Promise<VerifyTokenResponse> {
     purchase_id: rawData.purchase_id || rawData.purchaseId,
     status: rawData.status,
     items: rawData.items || [],
-    total_cost: rawData.total_cost || rawData.totalCost || 0,
+    total_cost: rawData.total_cost || rawData.totalCost || '0.00',
   };
 }
 

@@ -17,7 +17,7 @@ interface OrderItem {
     id: number;
     productName: string;
     quantity: number;
-    price: number;
+    price: string; // decimal формат
 }
 
 interface Order {
@@ -48,8 +48,8 @@ export default function ProcessOrderScreen() {
             totalAmount: 235.80,
             discount: 10,
             items: [
-                { id: 1, productName: 'Молоко пастеризованное 3.2%', quantity: 2, price: 89.90 },
-                { id: 2, productName: 'Хлеб "Бородинский"', quantity: 1, price: 55.00 },
+                { id: 1, productName: 'Молоко пастеризованное 3.2%', quantity: 2, price: '89.90' },
+                { id: 2, productName: 'Хлеб "Бородинский"', quantity: 1, price: '55.00' },
             ],
         },
         {
@@ -59,8 +59,8 @@ export default function ProcessOrderScreen() {
             totalAmount: 569.00,
             discount: 0,
             items: [
-                { id: 3, productName: 'Яйца куриные С1', quantity: 1, price: 119.00 },
-                { id: 4, productName: 'Сыр "Российский"', quantity: 1, price: 450.00 },
+                { id: 3, productName: 'Яйца куриные С1', quantity: 1, price: '119.00' },
+                { id: 4, productName: 'Сыр "Российский"', quantity: 1, price: '450.00' },
             ],
         },
         {
@@ -70,9 +70,9 @@ export default function ProcessOrderScreen() {
             totalAmount: 890.50,
             discount: 15,
             items: [
-                { id: 5, productName: 'Масло сливочное 82.5%', quantity: 1, price: 350.00 },
-                { id: 6, productName: 'Творог 9%', quantity: 2, price: 180.00 },
-                { id: 7, productName: 'Сметана 20%', quantity: 1, price: 95.50 },
+                { id: 5, productName: 'Масло сливочное 82.5%', quantity: 1, price: '350.00' },
+                { id: 6, productName: 'Творог 9%', quantity: 2, price: '180.00' },
+                { id: 7, productName: 'Сметана 20%', quantity: 1, price: '95.50' },
             ],
         },
         {
@@ -82,9 +82,9 @@ export default function ProcessOrderScreen() {
             totalAmount: 1250.00,
             discount: 50,
             items: [
-                { id: 8, productName: 'Филе куриное', quantity: 1, price: 450.00 },
-                { id: 9, productName: 'Говядина для жарки', quantity: 1, price: 650.00 },
-                { id: 10, productName: 'Свинина ошеек', quantity: 1, price: 200.00 },
+                { id: 8, productName: 'Филе куриное', quantity: 1, price: '450.00' },
+                { id: 9, productName: 'Говядина для жарки', quantity: 1, price: '650.00' },
+                { id: 10, productName: 'Свинина ошеек', quantity: 1, price: '200.00' },
             ],
         },
         {
@@ -94,8 +94,8 @@ export default function ProcessOrderScreen() {
             totalAmount: 340.00,
             discount: 0,
             items: [
-                { id: 11, productName: 'Кефир 2.5%', quantity: 2, price: 75.00 },
-                { id: 12, productName: 'Йогурт натуральный', quantity: 3, price: 65.00 },
+                { id: 11, productName: 'Кефир 2.5%', quantity: 2, price: '75.00' },
+                { id: 12, productName: 'Йогурт натуральный', quantity: 3, price: '65.00' },
             ],
         },
     ];
@@ -287,7 +287,7 @@ export default function ProcessOrderScreen() {
                                     <Text style={styles.itemName}>{item.productName}</Text>
                                     <View style={styles.itemDetails}>
                                         <Text style={styles.itemQuantity}>Количество: {item.quantity}</Text>
-                                        <Text style={styles.itemPrice}>{item.price.toFixed(2)} ₽</Text>
+                                        <Text style={styles.itemPrice}>{item.price} ₽</Text>
                                     </View>
                                 </View>
 

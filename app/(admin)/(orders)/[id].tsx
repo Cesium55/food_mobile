@@ -17,7 +17,7 @@ interface OrderItem {
     id: number;
     productName: string;
     quantity: number;
-    price: number;
+    price: string; // decimal формат
     shopName: string;
     status: ItemStatus;
 }
@@ -70,8 +70,8 @@ export default function OrderDetailScreen() {
             id: 1,
             date: new Date('2025-10-21T10:30:00'),
             items: [
-                { id: 1, productName: 'Молоко пастеризованное 3.2%', quantity: 2, price: 89.90, shopName: 'ТЦ "Мега"', status: 'issued' },
-                { id: 2, productName: 'Хлеб "Бородинский"', quantity: 1, price: 55.00, shopName: 'ТЦ "Мега"', status: 'issued' },
+                { id: 1, productName: 'Молоко пастеризованное 3.2%', quantity: 2, price: '89.90', shopName: 'ТЦ "Мега"', status: 'issued' },
+                { id: 2, productName: 'Хлеб "Бородинский"', quantity: 1, price: '55.00', shopName: 'ТЦ "Мега"', status: 'issued' },
             ],
             totalAmount: 235.80,
             discount: 10,
@@ -85,8 +85,8 @@ export default function OrderDetailScreen() {
             id: 2,
             date: new Date('2025-10-21T11:15:00'),
             items: [
-                { id: 3, productName: 'Яйца куриные С1', quantity: 1, price: 119.00, shopName: 'ул. Ленина', status: 'issued' },
-                { id: 4, productName: 'Сыр "Российский"', quantity: 1, price: 450.00, shopName: 'ул. Ленина', status: 'issued' },
+                { id: 3, productName: 'Яйца куриные С1', quantity: 1, price: '119.00', shopName: 'ул. Ленина', status: 'issued' },
+                { id: 4, productName: 'Сыр "Российский"', quantity: 1, price: '450.00', shopName: 'ул. Ленина', status: 'issued' },
             ],
             totalAmount: 569.00,
             discount: 0,
@@ -100,7 +100,7 @@ export default function OrderDetailScreen() {
             id: 3,
             date: new Date('2025-10-20T14:20:00'),
             items: [
-                { id: 5, productName: 'Кофе молотый "Жокей"', quantity: 1, price: 320.00, shopName: 'пр. Мира', status: 'issued' },
+                { id: 5, productName: 'Кофе молотый "Жокей"', quantity: 1, price: '320.00', shopName: 'пр. Мира', status: 'issued' },
             ],
             totalAmount: 320.00,
             discount: 0,
@@ -114,7 +114,7 @@ export default function OrderDetailScreen() {
             id: 4,
             date: new Date('2025-10-20T16:45:00'),
             items: [
-                { id: 6, productName: 'Йогурт "Активия"', quantity: 3, price: 75.00, shopName: 'ТЦ "Мега"', status: 'returned' },
+                { id: 6, productName: 'Йогурт "Активия"', quantity: 3, price: '75.00', shopName: 'ТЦ "Мега"', status: 'returned' },
             ],
             totalAmount: 225.00,
             discount: 10,
@@ -128,8 +128,8 @@ export default function OrderDetailScreen() {
             id: 5,
             date: new Date('2025-10-15T09:00:00'),
             items: [
-                { id: 7, productName: 'Масло сливочное 82.5%', quantity: 1, price: 180.00, shopName: 'ТЦ "Мега"', status: 'issued' },
-                { id: 8, productName: 'Вода минеральная', quantity: 2, price: 45.00, shopName: 'ул. Ленина', status: 'returned' },
+                { id: 7, productName: 'Масло сливочное 82.5%', quantity: 1, price: '180.00', shopName: 'ТЦ "Мега"', status: 'issued' },
+                { id: 8, productName: 'Вода минеральная', quantity: 2, price: '45.00', shopName: 'ул. Ленина', status: 'returned' },
             ],
             totalAmount: 270.00,
             discount: 0,
@@ -143,7 +143,7 @@ export default function OrderDetailScreen() {
             id: 6,
             date: new Date('2025-10-21T14:00:00'),
             items: [
-                { id: 9, productName: 'Сметана 20%', quantity: 1, price: 95.00, shopName: 'ТЦ "Мега"', status: 'issued' },
+                { id: 9, productName: 'Сметана 20%', quantity: 1, price: '95.00', shopName: 'ТЦ "Мега"', status: 'issued' },
             ],
             totalAmount: 95.00,
             discount: 0,
@@ -209,7 +209,7 @@ export default function OrderDetailScreen() {
         return status === 'issued' ? '#4CAF50' : '#FF3B30';
     };
 
-    const subtotal = order.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    const subtotal = order.items.reduce((sum, item) => sum + (parseFloat(item.price) * item.quantity), 0);
     const discountAmount = subtotal * (order.discount / 100);
 
     return (
@@ -298,12 +298,12 @@ export default function OrderDetailScreen() {
                                 </View>
                             </View>
                             <View style={styles.itemRight}>
-                                <Text style={styles.itemPrice}>{item.price.toFixed(2)} ₽</Text>
+                                <Text style={styles.itemPrice}>{item.price} ₽</Text>
                                 <Text style={[
                                     styles.itemTotal,
                                     item.status === 'returned' && styles.itemTotalReturned
                                 ]}>
-                                    {(item.price * item.quantity).toFixed(2)} ₽
+                                    {(parseFloat(item.price) * item.quantity).toFixed(2)} ₽
                                 </Text>
                             </View>
                         </View>

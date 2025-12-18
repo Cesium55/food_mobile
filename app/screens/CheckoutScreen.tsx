@@ -19,8 +19,8 @@ interface CheckoutItem {
   productName: string;
   quantity: number;
   requestedQuantity: number;
-  currentCost: number;
-  originalCost: number;
+  currentCost: string; // decimal формат
+  originalCost: string; // decimal формат
   expiresDate: Date | null;
   shopId: number;
   shopName: string;
@@ -229,8 +229,8 @@ export default function CheckoutScreen() {
       
       // Определяем количество и стоимость
       let quantity = result.processed_quantity || 0;
-      let currentCost = offer?.currentCost || 0;
-      let originalCost = offer?.originalCost || 0;
+      let currentCost = offer?.currentCost || '0.00';
+      let originalCost = offer?.originalCost || '0.00';
       let expiresDate: Date | null = offer?.expiresDate ? new Date(offer.expiresDate) : null;
       let productName = offer?.productName || 'Товар';
 
@@ -311,14 +311,14 @@ export default function CheckoutScreen() {
   // Расчеты
   const originalTotal = shopGroups.reduce((sum, group) => {
     return sum + group.items.reduce((itemSum, item) => {
-      return itemSum + (item.originalCost * item.quantity);
+      return itemSum + (parseFloat(item.originalCost) * item.quantity);
     }, 0);
   }, 0);
 
   const availableTotal = shopGroups.reduce((sum, group) => {
     return sum + group.items.reduce((itemSum, item) => {
       if (item.status === 'success') {
-        return itemSum + (item.currentCost * item.quantity);
+        return itemSum + (parseFloat(item.currentCost) * item.quantity);
       }
       return itemSum;
     }, 0);
@@ -759,13 +759,13 @@ export default function CheckoutScreen() {
                             )}
                             {item.status === 'success' && item.quantity === item.requestedQuantity && (
                               <Text style={styles.itemQuantity}>
-                                {item.quantity} шт. × {item.currentCost.toFixed(2)} ₽
+                                {item.quantity} шт. × {item.currentCost} ₽
                               </Text>
                             )}
                           </View>
                         ) : (
                           <Text style={styles.itemQuantity}>
-                            {item.quantity} шт. × {item.currentCost.toFixed(2)} ₽
+                            {item.quantity} шт. × {item.currentCost} ₽
                           </Text>
                         )}
 
@@ -804,7 +804,7 @@ export default function CheckoutScreen() {
                           !isAvailable && styles.itemTotalDisabled
                         ]}>
                           {isAvailable 
-                            ? `${(item.currentCost * item.quantity).toFixed(2)} ₽`
+                            ? `${(parseFloat(item.currentCost) * item.quantity).toFixed(2)} ₽`
                             : '—'
                           }
                         </Text>
@@ -955,7 +955,7 @@ export default function CheckoutScreen() {
               Ваш заказ #{purchase.id} успешно оплачен.
             </Text>
             <Text style={styles.successSubtext}>
-              Сумма оплаты: {purchase.total_cost.toFixed(2)} ₽
+              Сумма оплаты: {purchase.total_cost} ₽
             </Text>
             <TouchableOpacity
               style={styles.successCloseButton}

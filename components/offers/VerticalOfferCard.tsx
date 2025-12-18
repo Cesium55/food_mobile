@@ -112,17 +112,19 @@ export default function VerticalOfferCard({ offer }: VerticalOfferCardProps) {
         <View style={styles.priceContainer}>
           {(() => {
             const currentPrice = getCurrentPrice(offer);
-            const hasDiscount = currentPrice !== null && currentPrice < offer.originalCost;
+            const currentPriceNum = currentPrice !== null ? parseFloat(currentPrice) : null;
+            const originalCostNum = parseFloat(offer.originalCost);
+            const hasDiscount = currentPriceNum !== null && currentPriceNum < originalCostNum;
             
             return (
               <>
                 {hasDiscount && (
-                  <Text style={styles.originalPrice}>{offer.originalCost.toFixed(0)} ₽</Text>
+                  <Text style={styles.originalPrice}>{originalCostNum.toFixed(0)} ₽</Text>
                 )}
                 <View style={styles.currentPriceContainer}>
-                  {currentPrice !== null ? (
+                  {currentPrice !== null && currentPriceNum !== null ? (
                     <>
-                      <Text style={styles.currentPrice}>{currentPrice.toFixed(0)} ₽</Text>
+                      <Text style={styles.currentPrice}>{currentPriceNum.toFixed(0)} ₽</Text>
                       {offer.isDynamicPricing && (
                         <IconSymbol name="chart.line.uptrend.xyaxis" size={12} color="#007AFF" />
                       )}

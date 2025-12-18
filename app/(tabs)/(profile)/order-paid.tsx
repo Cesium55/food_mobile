@@ -53,8 +53,8 @@ export default function OrderPaidScreen() {
               offer_id: po.offer_id,
               status: 'success' as const,
               quantity: po.quantity,
-              current_cost: po.offer?.current_cost || po.cost_at_purchase || 0,
-              original_cost: po.offer?.original_cost || po.cost_at_purchase || 0,
+              current_cost: po.offer?.current_cost || po.cost_at_purchase || '0.00',
+              original_cost: po.offer?.original_cost || po.cost_at_purchase || '0.00',
               requested_quantity: po.quantity,
               message: '',
             })) || [],
@@ -106,8 +106,8 @@ export default function OrderPaidScreen() {
             offer_id: po.offer_id,
             status: 'success' as const,
             quantity: po.quantity,
-            current_cost: po.offer?.current_cost || po.cost_at_purchase || 0,
-            original_cost: po.offer?.original_cost || po.cost_at_purchase || 0,
+            current_cost: po.offer?.current_cost || po.cost_at_purchase || '0.00',
+            original_cost: po.offer?.original_cost || po.cost_at_purchase || '0.00',
             requested_quantity: po.quantity,
             message: '',
           })) || [],
@@ -212,8 +212,8 @@ export default function OrderPaidScreen() {
       offerId: po.offer_id,
       productName: offer.productName || 'Неизвестный товар',
       quantity: po.quantity,
-      currentCost: po.offer?.current_cost || po.cost_at_purchase || 0,
-      originalCost: po.offer?.original_cost || po.cost_at_purchase || 0,
+      currentCost: po.offer?.current_cost || po.cost_at_purchase || '0.00',
+      originalCost: po.offer?.original_cost || po.cost_at_purchase || '0.00',
       shopId: shop.id,
       shopName: shop.name,
       fulfilledQuantity: po.fulfilled_quantity || 0,
@@ -221,18 +221,18 @@ export default function OrderPaidScreen() {
     });
 
     return groups;
-  }, {} as Record<number, { shopId: number; shopName: string; shopAddress?: string; items: Array<{ offerId: number; productName: string; quantity: number; currentCost: number; originalCost: number; shopId: number; shopName: string; fulfilledQuantity: number; fulfillmentStatus?: string }> }>);
+  }, {} as Record<number, { shopId: number; shopName: string; shopAddress?: string; items: Array<{ offerId: number; productName: string; quantity: number; currentCost: string; originalCost: string; shopId: number; shopName: string; fulfilledQuantity: number; fulfillmentStatus?: string }> }>);
 
   const shopGroupsArray = Object.values(shopGroups);
 
   const totalAmount = purchase.purchase_offers.reduce((sum, po) => {
-    const cost = po.offer?.current_cost || po.cost_at_purchase || 0;
-    return sum + (cost * po.quantity);
+    const cost = po.offer?.current_cost || po.cost_at_purchase || '0.00';
+    return sum + (parseFloat(cost) * po.quantity);
   }, 0);
 
   const originalTotal = purchase.purchase_offers.reduce((sum, po) => {
-    const cost = po.offer?.original_cost || po.cost_at_purchase || 0;
-    return sum + (cost * po.quantity);
+    const cost = po.offer?.original_cost || po.cost_at_purchase || '0.00';
+    return sum + (parseFloat(cost) * po.quantity);
   }, 0);
 
   const totalDiscount = originalTotal - totalAmount;
@@ -330,7 +330,7 @@ export default function OrderPaidScreen() {
                   <View style={styles.itemInfo}>
                     <Text style={styles.itemName}>{item.productName}</Text>
                     <Text style={styles.itemQuantity}>
-                      {item.quantity} шт. × {item.currentCost.toFixed(2)} ₽
+                      {item.quantity} шт. × {item.currentCost} ₽
                     </Text>
                     {/* Статус выдачи */}
                     <View style={styles.fulfillmentStatus}>
@@ -340,7 +340,7 @@ export default function OrderPaidScreen() {
                     </View>
                   </View>
                   <Text style={styles.itemTotal}>
-                    {(item.currentCost * item.quantity).toFixed(2)} ₽
+                    {(parseFloat(item.currentCost) * item.quantity).toFixed(2)} ₽
                   </Text>
                 </View>
               );

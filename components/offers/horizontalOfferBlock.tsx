@@ -126,20 +126,22 @@ export default function HorizontalOfferBlock({ offer, onPress }: HorizontalOffer
               <View style={styles.priceContainer}>
                 {(() => {
                   const currentPrice = getCurrentPrice(offer);
-                  const hasDiscount = currentPrice !== null && currentPrice < offer.originalCost;
+                  const currentPriceNum = currentPrice !== null ? parseFloat(currentPrice) : null;
+                  const originalCostNum = parseFloat(offer.originalCost);
+                  const hasDiscount = currentPriceNum !== null && currentPriceNum < originalCostNum;
                   
                   return (
                     <>
                       {hasDiscount && (
                         <Text style={styles.originalPrice}>
-                          {offer.originalCost.toFixed(2)} ₽
+                          {originalCostNum.toFixed(2)} ₽
                         </Text>
                       )}
                       <View style={styles.currentPriceContainer}>
-                        {currentPrice !== null ? (
+                        {currentPrice !== null && currentPriceNum !== null ? (
                           <>
                             <Text style={styles.currentPrice}>
-                              {currentPrice.toFixed(2)} ₽
+                              {currentPriceNum.toFixed(2)} ₽
                             </Text>
                             {offer.isDynamicPricing && (
                               <IconSymbol name="chart.line.uptrend.xyaxis" size={12} color="#007AFF" />

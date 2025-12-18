@@ -41,15 +41,16 @@ export default function PriceChart({ offer }: PriceChartProps) {
     if (currentPrice !== null) {
       points.push({
         timeRemaining: totalSeconds,
-        price: currentPrice,
+        price: parseFloat(currentPrice),
         label: 'Сейчас',
       });
     }
 
     // Добавляем точки для каждого шага стратегии
+    const originalCostNum = parseFloat(offer.originalCost);
     sortedSteps.forEach((step) => {
       if (step.time_remaining_seconds <= totalSeconds) {
-        const price = offer.originalCost * (1 - step.discount_percent / 100);
+        const price = originalCostNum * (1 - step.discount_percent / 100);
         const hours = Math.floor(step.time_remaining_seconds / 3600);
         const days = Math.floor(hours / 24);
         
@@ -74,7 +75,7 @@ export default function PriceChart({ offer }: PriceChartProps) {
     // Добавляем финальную точку (истечение срока)
     if (sortedSteps.length > 0) {
       const lastStep = sortedSteps[sortedSteps.length - 1];
-      const finalPrice = offer.originalCost * (1 - lastStep.discount_percent / 100);
+      const finalPrice = originalCostNum * (1 - lastStep.discount_percent / 100);
       points.push({
         timeRemaining: 0,
         price: finalPrice,
