@@ -41,7 +41,7 @@ export default function ProductDetailScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
     const productId = Number(id);
     const { categories, getCategoryById, getCategoryPath } = useCategories();
-    const { fetchProductById } = useProducts();
+    const { fetchProductById } = useProducts(); // fetchProductById не требует seller_id, так как загружает конкретный товар по ID
 
     // Режим редактирования
     const [isEditing, setIsEditing] = useState(false);

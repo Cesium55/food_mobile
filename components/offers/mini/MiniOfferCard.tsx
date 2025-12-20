@@ -98,7 +98,7 @@ export function MiniOfferCard({ offer, distance, onPress }: MiniOfferCardProps) 
       <View style={styles.content}>
         <OfferInfo 
           productName={offer.productName}
-          weight="150г"
+          weight={offer.productWeight || ""}
         />
         
         <OfferActions

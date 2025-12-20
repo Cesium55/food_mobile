@@ -9,122 +9,120 @@ export interface Category {
   parent_category_id: number | null;
 }
 
+export interface CategoryWithOffers extends Category {
+  offers?: any[]; // Офферы для категории
+}
+
 export const useCategories = () => {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Функция для загрузки категорий с сервера
   const fetchCategories = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
       
-      // Используем endpoint для получения всех категорий (плоский список)
-      const response = await authFetch(getApiUrl(API_ENDPOINTS.CATEGORIES.BASE), {
+      const url = getApiUrl(API_ENDPOINTS.CATEGORIES.BASE);
+      console.log('🚀 API FETCH Categories:', url);
+
+      const response = await authFetch(url, {
         method: 'GET',
-        requireAuth: false, // Категории - публичные данные
+        requireAuth: false,
       });
 
       if (response.ok) {
         const data = await response.json();
-        // Ожидаем структуру ответа: { data: Category[] } или просто Category[]
         const categoriesData = data.data || data;
+        
+        console.log('📦 API RESPONSE Categories (RAW):', JSON.stringify(categoriesData, null, 2));
         
         if (Array.isArray(categoriesData)) {
           setCategories(categoriesData);
         } else {
-          console.error('❌ Неверный формат данных категорий:', categoriesData);
           setError('Неверный формат данных категорий');
-          setCategories([]);
         }
-      } else if (response.status === 404) {
-        setError('Категории не найдены');
-        setCategories([]);
       } else {
         const errorText = await response.text();
-        console.error('❌ Ошибка загрузки категорий:', response.status, errorText);
+        console.error('❌ API ERROR Categories:', response.status, errorText);
         setError('Ошибка загрузки категорий');
-        setCategories([]);
       }
     } catch (err) {
-      console.error('❌ Ошибка подключения к серверу при загрузке категорий:', err);
+      console.error('❌ API CRASH Categories:', err);
       setError('Ошибка подключения к серверу');
-      setCategories([]);
     } finally {
       setLoading(false);
     }
-  }, []); // Зависимости пустые, так как функция не зависит от внешних переменных
+  }, []);
+
+  // Получить офферы для конкретной категории
+  const fetchCategoryOffers = useCallback(async (categoryId: number) => {
+    try {
+      const url = getApiUrl(`${API_ENDPOINTS.CATEGORIES.BASE}/${categoryId}/offers`);
+      console.log('🚀 API FETCH Category Offers:', url);
+
+      const response = await authFetch(url, {
+        method: 'GET',
+        requireAuth: false,
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const offersData = data.data || data;
+        
+        console.log(`📦 API RESPONSE Offers for category ${categoryId}:`, Array.isArray(offersData) ? offersData.length : 'not array');
+        
+        return Array.isArray(offersData) ? offersData : [];
+      } else {
+        console.error('❌ API ERROR Category Offers:', response.status);
+        return [];
+      }
+    } catch (err) {
+      console.error('❌ API CRASH Category Offers:', err);
+      return [];
+    }
+  }, []);
 
   useEffect(() => {
     fetchCategories();
   }, [fetchCategories]);
 
-  // Получить категорию по ID
-  const getCategoryById = (id: number): Category | undefined => {
-    return categories.find((category) => category.id === id);
+  const getTopLevelCategories = () => 
+    categories.filter(c => !c.parent_category_id || c.parent_category_id === 0);
+
+  const getSubCategories = (parentId: number) => 
+    categories.filter(c => Number(c.parent_category_id) === Number(parentId));
+
+  const getCategoryById = (categoryId: number): Category | undefined => {
+    return categories.find(c => Number(c.id) === Number(categoryId));
   };
 
-  // Получить категории верхнего уровня (без родителя)
-  const getTopLevelCategories = (): Category[] => {
-    return categories.filter((category) => category.parent_category_id === null);
-  };
-
-  // Получить подкатегории для категории
-  const getSubCategories = (parentId: number): Category[] => {
-    return categories.filter((category) => category.parent_category_id === parentId);
-  };
-
-  // Проверить, есть ли у категории подкатегории
-  const hasSubCategories = (categoryId: number): boolean => {
-    return categories.some((category) => category.parent_category_id === categoryId);
-  };
-
-  // Получить путь от корня до категории (для breadcrumbs)
   const getCategoryPath = (categoryId: number): Category[] => {
     const path: Category[] = [];
-    let currentCategory = getCategoryById(categoryId);
-
-    while (currentCategory) {
-      path.unshift(currentCategory);
-      currentCategory = currentCategory.parent_category_id
-        ? getCategoryById(currentCategory.parent_category_id)
-        : undefined;
+    let currentId: number | null = categoryId;
+    
+    while (currentId !== null) {
+      const category = getCategoryById(currentId);
+      if (category) {
+        path.unshift(category);
+        currentId = category.parent_category_id;
+      } else {
+        break;
+      }
     }
-
+    
     return path;
   };
-
-  // Получить все категории для конкретной ветки (родитель + все дочерние)
-  const getCategoryBranch = (categoryId: number): Category[] => {
-    const branch: Category[] = [];
-    const category = getCategoryById(categoryId);
-    
-    if (category) {
-      branch.push(category);
-      const subCategories = getSubCategories(categoryId);
-      branch.push(...subCategories);
-    }
-
-    return branch;
-  };
-
-  // Функция для повторной загрузки категорий
-  const refetch = useCallback(async () => {
-    await fetchCategories();
-  }, [fetchCategories]);
 
   return {
     categories,
     loading,
     error,
-    refetch,
-    getCategoryById,
+    refetch: fetchCategories,
     getTopLevelCategories,
     getSubCategories,
-    hasSubCategories,
+    getCategoryById,
     getCategoryPath,
-    getCategoryBranch,
+    fetchCategoryOffers,
   };
 };
-

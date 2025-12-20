@@ -1,214 +1,364 @@
-import { TabScreen } from "@/components/TabScreen";
-import { useCategories } from "@/hooks/useCategories";
-import { useRouter } from "expo-router";
-import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { TabScreen } from '@/components/TabScreen';
+import { MiniOfferCard } from '@/components/offers/mini/MiniOfferCard';
+import { Category, useCategories } from '@/hooks/useCategories';
+import { Offer, useOffers } from '@/hooks/useOffers';
+import { router, useSegments } from 'expo-router';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-export default function Catalog() {
-  const router = useRouter();
-  const { getTopLevelCategories, getSubCategories, loading, error } = useCategories();
-  const topCategories = getTopLevelCategories();
+// Компонент для отрисовки одной категории верхнего уровня с фильтрацией по подкатегориям
+const CategorySection = ({ 
+  category, 
+  getSubCategories,
+  fetchOffersByCategory
+}: { 
+  category: Category;
+  getSubCategories: (parentId: number) => Category[];
+  fetchOffersByCategory: (categoryId: number) => Promise<Offer[]>;
+}) => {
+  // Путь выбранных подкатегорий (от корня к текущей)
+  const [selectedCategoryPath, setSelectedCategoryPath] = useState<Category[]>([]);
+  const [offers, setOffers] = useState<Offer[]>([]);
+  const [loading, setLoading] = useState(true);
+  const segments = useSegments();
+  const scrollViewRef = useRef<ScrollView>(null);
+  const offersScrollViewRef = useRef<ScrollView>(null);
+  
+  // Кэш товаров по категориям (categoryId -> Offer[])
+  const offersCacheRef = useRef<Map<number, Offer[]>>(new Map());
 
-  const getCategoryIcon = (categoryId: number): string => {
-    const icons: { [key: number]: string } = {
-      1: '🥛', // Молочные продукты
-      2: '🥩', // Мясо и птица
-      3: '🥗', // Овощи и фрукты
-      4: '🍞', // Хлеб и выпечка
-      5: '🥤', // Напитки
-      6: '🌾', // Бакалея
-      7: '❄️', // Замороженные продукты
-      8: '🍰', // Кондитерские изделия
+  // Текущая активная категория для загрузки товаров (последняя в пути или корневая)
+  const activeCategoryId = useMemo(() => {
+    return selectedCategoryPath.length > 0 
+      ? selectedCategoryPath[selectedCategoryPath.length - 1].id 
+      : category.id;
+  }, [selectedCategoryPath, category.id]);
+
+  // Подкатегории для отображения: весь путь выбранных (n-1, n-2...) + подкатегории следующего уровня
+  const displaySubcategories = useMemo(() => {
+    if (selectedCategoryPath.length === 0) {
+      // Если ничего не выбрано - показываем подкатегории первого уровня
+      return getSubCategories(category.id);
+    } else {
+      // Если выбрана подкатегория - показываем весь путь (все выбранные) + подкатегории следующего уровня
+      const lastSelected = selectedCategoryPath[selectedCategoryPath.length - 1];
+      const nextLevel = getSubCategories(lastSelected.id);
+      // Возвращаем весь путь выбранных + дочерние последней выбранной
+      return [...selectedCategoryPath, ...nextLevel];
+    }
+  }, [selectedCategoryPath, category.id, getSubCategories]);
+
+  // ID выбранной подкатегории (последняя в пути)
+  const selectedSubcategoryId = useMemo(() => {
+    return selectedCategoryPath.length > 0
+      ? selectedCategoryPath[selectedCategoryPath.length - 1].id
+      : null;
+  }, [selectedCategoryPath]);
+
+  // Загружаем товары при изменении активной категории
+  useEffect(() => {
+    const loadOffers = async () => {
+      // Проверяем кэш
+      const cachedOffers = offersCacheRef.current.get(activeCategoryId);
+      
+      if (cachedOffers !== undefined) {
+        // Используем данные из кэша
+        setOffers(cachedOffers);
+        setLoading(false);
+        return;
+      }
+      
+      // Если нет в кэше - загружаем с сервера
+      setLoading(true);
+      const data = await fetchOffersByCategory(activeCategoryId);
+      
+      // Сохраняем в кэш
+      offersCacheRef.current.set(activeCategoryId, data);
+      
+      setOffers(data);
+      setLoading(false);
     };
-    return icons[categoryId] || '📦';
+    loadOffers();
+  }, [activeCategoryId, fetchOffersByCategory]);
+
+  const handleProductPress = (offerId: number) => {
+    const currentTab = segments[0] === '(tabs)' ? segments[1] : '(catalog)';
+    router.push(`/(tabs)/${currentTab}/product/${offerId}`);
   };
 
-  if (loading) {
+  const handleSubcategoryPress = (subcategory: Category) => {
+    // Проверяем, находится ли эта подкатегория в пути
+    const indexInPath = selectedCategoryPath.findIndex(cat => Number(cat.id) === Number(subcategory.id));
+    
+    if (indexInPath >= 0) {
+      // Если подкатегория уже в пути - обрезаем путь до этой позиции (убираем её и всех детей)
+      setSelectedCategoryPath(prev => prev.slice(0, indexInPath));
+    } else {
+      // Если подкатегории нет в пути - добавляем в конец
+      setSelectedCategoryPath(prev => [...prev, subcategory]);
+    }
+    // Возвращаем прокрутку в начало
+    setTimeout(() => {
+      scrollViewRef.current?.scrollTo({ x: 0, animated: true });
+    }, 100);
+  };
+
+  // Возвращаем прокрутку в начало при изменении пути
+  useEffect(() => {
+    scrollViewRef.current?.scrollTo({ x: 0, animated: true });
+  }, [selectedCategoryPath]);
+
+  // Возвращаем прокрутку товаров в начало при изменении активной категории
+  useEffect(() => {
+    offersScrollViewRef.current?.scrollTo({ x: 0, animated: true });
+  }, [activeCategoryId]);
+
+  if (loading && offers.length === 0) {
     return (
-      <TabScreen title="Каталог">
-        <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color="#007AFF" />
-          <Text style={styles.loadingText}>Загрузка категорий...</Text>
-        </View>
-      </TabScreen>
+      <View style={styles.sectionContainer}>
+        <Text style={styles.categoryTitle}>
+          {category.name}
+          {offers.length > 0 && (
+            <Text style={styles.productCount}> ({offers.length})</Text>
+          )}
+        </Text>
+        <ActivityIndicator size="small" color="#FF6B00" style={styles.loader} />
+      </View>
     );
   }
 
-  if (error) {
-    return (
-      <TabScreen title="Каталог">
-        <View style={styles.centerContainer}>
-          <Text style={styles.errorText}>Ошибка: {error}</Text>
-        </View>
-      </TabScreen>
-    );
-  }
-
-  if (topCategories.length === 0) {
-    return (
-      <TabScreen title="Каталог">
-        <View style={styles.centerContainer}>
-          <Text style={styles.errorText}>Категории не найдены</Text>
-        </View>
-      </TabScreen>
-    );
-  }
-
+  // Всегда показываем категорию верхнего уровня
   return (
-    <TabScreen title="Каталог">
-      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
-        <View style={styles.container}>
-          <Text style={styles.title}>Категории товаров</Text>
-          
-          {topCategories.map((category) => {
-            const subCategories = getSubCategories(category.id);
+    <View style={styles.sectionContainer}>
+      {/* Заголовок категории (название не меняется) */}
+      <View style={styles.categoryHeader}>
+        <Text style={styles.categoryTitle}>
+          {category.name}
+          {offers.length > 0 && (
+            <Text style={styles.productCount}> ({offers.length})</Text>
+          )}
+        </Text>
+      </View>
+
+      {/* Горизонтальный список подкатегорий (весь путь + текущий уровень) */}
+      {displaySubcategories.length > 0 && (
+        <ScrollView 
+          ref={scrollViewRef}
+          horizontal 
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.subcategoriesScroll}
+        >
+          {displaySubcategories.map(subcat => {
+            // Выбранная - это любая подкатегория из пути (все в пути должны быть оранжевыми)
+            const isSelected = selectedCategoryPath.some(cat => Number(cat.id) === Number(subcat.id));
             
             return (
-              <View key={category.id} style={styles.categoryGroup}>
-                {/* Заголовок категории верхнего уровня - просто текст, не кнопка */}
-                <View style={styles.categoryHeader}>
-                  <View style={styles.iconContainer}>
-                    <Text style={styles.icon}>{getCategoryIcon(category.id)}</Text>
-                  </View>
-                  <Text style={styles.categoryTitle}>{category.name}</Text>
-                </View>
-                
-                {/* Подкатегории как кнопки под заголовком */}
-                {subCategories.length > 0 ? (
-                  <View style={styles.subCategoriesContainer}>
-                    {subCategories.map((subCategory) => (
-                      <TouchableOpacity
-                        key={subCategory.id}
-                        style={styles.subCategoryButton}
-                        activeOpacity={0.7}
-                        onPress={() => router.push(`/(tabs)/(catalog)/${subCategory.id}`)}
-                      >
-                        <View style={styles.subCategoryIconContainer}>
-                          <Text style={styles.subCategoryIcon}>📦</Text>
-                        </View>
-                        <Text style={styles.subCategoryText}>{subCategory.name}</Text>
-                        <Text style={styles.arrow}>›</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                ) : (
-                  // Если подкатегорий нет, показываем кнопку для перехода к товарам категории
-                  <TouchableOpacity
-                    style={styles.subCategoryButton}
-                    activeOpacity={0.7}
-                    onPress={() => router.push(`/(tabs)/(catalog)/${category.id}`)}
-                  >
-                    <Text style={styles.subCategoryText}>Показать товары</Text>
-                    <Text style={styles.arrow}>›</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
+              <TouchableOpacity
+                key={subcat.id}
+                style={isSelected ? [styles.subcategoryChip, styles.subcategoryChipSelected] : styles.subcategoryChip}
+                onPress={() => handleSubcategoryPress(subcat)}
+                activeOpacity={0.7}
+              >
+                <Text style={isSelected ? [styles.subcategoryText, styles.subcategoryTextSelected] : styles.subcategoryText}>
+                  {subcat.name}
+                </Text>
+              </TouchableOpacity>
             );
           })}
+        </ScrollView>
+      )}
+
+      {/* Горизонтальный список товаров */}
+      {offers.length > 0 && (
+        <ScrollView 
+          ref={offersScrollViewRef}
+          horizontal 
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.offersScroll}
+        >
+          {offers.map(offer => (
+            <View key={offer.id} style={styles.cardWrapper}>
+              <MiniOfferCard 
+                offer={offer} 
+                onPress={() => handleProductPress(offer.id)}
+              />
+            </View>
+          ))}
+        </ScrollView>
+      )}
+    </View>
+  );
+};
+
+export default function CatalogScreen() {
+  const { 
+    categories, 
+    getTopLevelCategories,
+    getSubCategories,
+    loading: categoriesLoading, 
+    refetch: refetchCategories
+  } = useCategories();
+
+  const { fetchOffersByCategory } = useOffers();
+
+  const onRefresh = async () => {
+    await refetchCategories();
+  };
+
+  if (categoriesLoading && categories.length === 0) {
+    return (
+      <TabScreen title="Каталог">
+        <View style={styles.center}>
+          <ActivityIndicator size="large" color="#FF6B00" />
+          <Text style={styles.loadingText}>Загрузка каталога...</Text>
         </View>
-      </ScrollView>
+      </TabScreen>
+    );
+  }
+
+  const topCategories = getTopLevelCategories();
+
+  return (
+    <TabScreen 
+      title="Каталог"
+      onRefresh={onRefresh}
+    >
+      <View style={styles.content}>
+        {/* Сводка по каталогу */}
+        <View style={styles.summaryContainer}>
+          <View style={styles.summaryItem}>
+            <Text style={styles.summaryNumber}>{topCategories.length}</Text>
+            <Text style={styles.summaryLabel}>
+              {topCategories.length === 1 ? 'категория' : topCategories.length < 5 ? 'категории' : 'категорий'}
+            </Text>
+          </View>
+        </View>
+
+        {topCategories.length > 0 ? (
+          topCategories.map(cat => (
+            <CategorySection 
+              key={cat.id} 
+              category={cat}
+              getSubCategories={getSubCategories}
+              fetchOffersByCategory={fetchOffersByCategory}
+            />
+          ))
+        ) : (
+          <View style={styles.center}>
+            <Text style={styles.emptyText}>Категории не найдены</Text>
+          </View>
+        )}
+      </View>
     </TabScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  scrollView: {
-    flex: 1,
+  content: {
+    paddingVertical: 8,
   },
-  scrollContent: {
-    paddingBottom: 20,
-  },
-  container: {
-    padding: 16,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    marginBottom: 24,
-    color: '#333',
-  },
-  centerContainer: {
-    flex: 1,
+  summaryContainer: {
+    flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 16,
+    backgroundColor: '#FFF',
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    marginHorizontal: 16,
+    marginBottom: 20,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 16,
+  summaryItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  summaryNumber: {
+    fontSize: 32,
+    fontWeight: '700',
+    color: '#FF6B00',
+    marginBottom: 4,
+  },
+  summaryLabel: {
+    fontSize: 14,
     color: '#666',
+    fontWeight: '500',
   },
-  errorText: {
-    fontSize: 16,
-    color: '#FF3B30',
-    textAlign: 'center',
-  },
-  categoryGroup: {
-    marginBottom: 32,
+  sectionContainer: {
+    marginBottom: 24,
   },
   categoryHeader: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
+    paddingHorizontal: 16,
     marginBottom: 12,
   },
-  iconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#F5F5F5',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  icon: {
-    fontSize: 24,
-  },
   categoryTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#000',
     flex: 1,
-    fontSize: 22,
+  },
+  productCount: {
+    fontSize: 16,
+    color: '#FF6B00',
     fontWeight: '600',
-    color: '#333',
   },
-  subCategoriesContainer: {
-    gap: 10,
-  },
-  subCategoryButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    height: 56,
-    backgroundColor: '#fff',
-    borderRadius: 12,
+  subcategoriesScroll: {
     paddingHorizontal: 16,
-    marginBottom: 8,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    paddingBottom: 12,
   },
-  subCategoryIconContainer: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+  subcategoryChip: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
     backgroundColor: '#F5F5F5',
-    justifyContent: 'center',
-    alignItems: 'center',
+    borderRadius: 20,
+    marginRight: 8,
+  },
+  subcategoryChipSelected: {
+    backgroundColor: '#FF6B00',
+  },
+  subcategoryText: {
+    fontSize: 14,
+    color: '#666',
+    fontWeight: '500',
+  },
+  subcategoryTextSelected: {
+    color: '#FFF',
+    fontWeight: '600',
+  },
+  offersScroll: {
+    paddingHorizontal: 16,
+    paddingBottom: 8,
+    paddingTop: 8,
+  },
+  cardWrapper: {
+    width: 180,
     marginRight: 12,
   },
-  subCategoryIcon: {
-    fontSize: 20,
+  loader: {
+    marginVertical: 20,
   },
-  subCategoryText: {
+  center: {
     flex: 1,
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#333',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+    minHeight: 200,
   },
-  arrow: {
-    fontSize: 20,
+  loadingText: {
+    marginTop: 12,
+    color: '#666',
+    fontSize: 16,
+  },
+  emptyText: {
+    textAlign: 'center',
     color: '#999',
-    fontWeight: '300',
+    fontSize: 16,
   },
 });

@@ -2,6 +2,7 @@ import { TabScreen } from "@/components/TabScreen";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useCategories } from "@/hooks/useCategories";
 import { Product, useProducts } from "@/hooks/useProducts";
+import { useSellerMe } from "@/hooks/useSeller";
 import { getImageUrl } from "@/utils/imageUtils";
 import { router } from "expo-router";
 import { useState } from "react";
@@ -17,8 +18,9 @@ import {
 } from "react-native";
 
 export default function ProductsScreen() {
+    const { seller } = useSellerMe();
     const { categories, getCategoryById } = useCategories();
-    const { products, loading: productsLoading, error: productsError } = useProducts();
+    const { products, loading: productsLoading, error: productsError } = useProducts(seller?.id);
     const [searchQuery, setSearchQuery] = useState("");
     const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
 

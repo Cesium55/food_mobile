@@ -38,7 +38,7 @@ export interface Product {
   characteristics: { [key: string]: string }; // Преобразованные из attributes
 }
 
-export const useProducts = () => {
+export const useProducts = (sellerId?: number, options?: { requireAuth?: boolean }) => {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -65,15 +65,32 @@ export const useProducts = () => {
   }, []);
 
   // Функция для загрузки товаров с сервера
-  const fetchProducts = useCallback(async () => {
+  const fetchProducts = useCallback(async (filters?: { categoryIds?: number[] }) => {
     try {
       setLoading(true);
       setError(null);
       
-      // Используем endpoint для получения всех товаров (для админки)
-      const response = await authFetch(getApiUrl(API_ENDPOINTS.PRODUCTS.BASE), {
+      // Формируем URL с параметрами фильтрации
+      const params = new URLSearchParams();
+      
+      if (sellerId !== undefined) {
+        params.append('seller_id', sellerId.toString());
+      }
+
+      if (filters?.categoryIds && filters.categoryIds.length > 0) {
+        filters.categoryIds.forEach(id => {
+          params.append('category_ids', id.toString());
+        });
+      }
+      
+      let url = getApiUrl(API_ENDPOINTS.PRODUCTS.BASE);
+      if (params.toString()) {
+        url += `?${params.toString()}`;
+      }
+      
+      const response = await authFetch(url, {
         method: 'GET',
-        requireAuth: true, // Товары требуют авторизации для админки
+        requireAuth: options?.requireAuth ?? true, // По умолчанию как было (для админки), но можно переопределить
       });
 
       if (response.ok) {
@@ -106,7 +123,7 @@ export const useProducts = () => {
     } finally {
       setLoading(false);
     }
-  }, [transformProduct]);
+  }, [transformProduct, sellerId]);
 
   useEffect(() => {
     fetchProducts();

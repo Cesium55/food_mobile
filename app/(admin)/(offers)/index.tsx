@@ -3,6 +3,7 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useCategories } from "@/hooks/useCategories";
 import { Offer, useOffers } from "@/hooks/useOffers";
 import { useProducts } from "@/hooks/useProducts";
+import { useSellerMe } from "@/hooks/useSeller";
 import { useShops } from "@/hooks/useShops";
 import { getCurrentPrice } from "@/utils/pricingUtils";
 import { router } from "expo-router";
@@ -10,15 +11,18 @@ import { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 export default function OffersScreen() {
-    const { shops, loading: shopsLoading, error: shopsError, refetch: refetchShops } = useShops();
+    const { seller } = useSellerMe();
+    const { shops, loading: shopsLoading, error: shopsError, refetch: refetchShops } = useShops(seller?.id);
     const { categories, getCategoryById, loading: categoriesLoading, refetch: refetchCategories } = useCategories();
-    const { offers, loading: offersLoading, error: offersError, refetch: refetchOffers } = useOffers();
+    const { offers, loading: offersLoading, error: offersError, fetchOffersForAdmin } = useOffers();
+    const { products, refetch: refetchProducts } = useProducts(seller?.id); // Получаем список товаров для категорий текущего продавца
     
     // Загружаем offers при монтировании компонента (для админки)
     useEffect(() => {
-        refetchOffers();
-    }, [refetchOffers]);
-    const { products, refetch: refetchProducts } = useProducts(); // Получаем список товаров для категорий
+        if (seller?.id) {
+            fetchOffersForAdmin(seller.id);
+        }
+    }, [seller?.id, fetchOffersForAdmin]);
     const [expandedItems, setExpandedItems] = useState<number[]>([]);
     const [showFilters, setShowFilters] = useState(false);
     const [selectedShopIds, setSelectedShopIds] = useState<number[]>([]);
@@ -47,10 +51,12 @@ export default function OffersScreen() {
 
     // Функция для обновления всех данных
     const handleRefresh = async () => {
+        if (!seller?.id) return;
+        
         await Promise.all([
-            refetchShops(),
+            refetchShops(seller.id),
             refetchCategories(),
-            refetchOffers(),
+            fetchOffersForAdmin(seller.id),
             refetchProducts(), // Обновляем товары для получения актуальных категорий
         ]);
     };

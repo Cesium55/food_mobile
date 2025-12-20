@@ -19,7 +19,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 export default function OfferDetailScreen() {
     const { id } = useLocalSearchParams();
     const offerId = typeof id === 'string' ? parseInt(id) : 0;
-    const { shops, loading: shopsLoading } = useShops();
+    const { shops, loading: shopsLoading } = useShops(); // Shops уже фильтруются, так как useOffers возвращает только офферы текущего продавца
     const { getOfferById, loading: offersLoading, updateOffer } = useOffers();
     const { strategies, loading: strategiesLoading } = usePricingStrategies();
     

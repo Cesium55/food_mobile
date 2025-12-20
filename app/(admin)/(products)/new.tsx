@@ -3,6 +3,7 @@ import { API_ENDPOINTS } from "@/constants/api";
 import { getApiUrl } from "@/constants/env";
 import { useCategories } from "@/hooks/useCategories";
 import { useProducts } from "@/hooks/useProducts";
+import { useSellerMe } from "@/hooks/useSeller";
 import { authFetch } from "@/utils/authFetch";
 import { ImageFile, uploadProductImagesBatch } from "@/utils/imageUpload";
 import * as ImagePicker from 'expo-image-picker';
@@ -22,8 +23,9 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function NewProductScreen() {
+    const { seller } = useSellerMe();
     const { categories, getCategoryById, getCategoryPath } = useCategories();
-    const { refetch } = useProducts();
+    const { refetch } = useProducts(seller?.id);
 
     const [name, setName] = useState("");
     const [description, setDescription] = useState("");

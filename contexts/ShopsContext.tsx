@@ -20,7 +20,7 @@ interface ShopsContextType {
   shops: Shop[];
   loading: boolean;
   error: string | null;
-  refetch: () => Promise<void>;
+  refetch: (sellerId?: number) => Promise<void>;
   getShopById: (id: number) => Shop | undefined;
   getShopsBySeller: (sellerId: number) => Shop[];
 }
@@ -32,11 +32,26 @@ export const ShopsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [isInitialized, setIsInitialized] = useState<boolean>(false);
+  const [currentSellerId, setCurrentSellerId] = useState<number | undefined>(undefined);
 
   // Функция для загрузки всех точек продаж с сервера
-  const fetchShops = useCallback(async () => {
-    // Если уже загружаем или уже загружено, не делаем повторный запрос
-    if (loading || isInitialized) {
+  const fetchShops = useCallback(async (sellerId?: number) => {
+    // Если sellerId не передан, не загружаем магазины
+    if (sellerId === undefined) {
+      setShops([]);
+      setLoading(false);
+      setIsInitialized(false);
+      setCurrentSellerId(undefined);
+      return;
+    }
+
+    // Если уже загружаем, не делаем повторный запрос
+    if (loading) {
+      return;
+    }
+    
+    // Если уже загружено для этого продавца, не делаем повторный запрос
+    if (isInitialized && currentSellerId === sellerId) {
       return;
     }
 
@@ -44,7 +59,12 @@ export const ShopsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       setLoading(true);
       setError(null);
       
-      const response = await authFetch(getApiUrl(API_ENDPOINTS.SHOP_POINTS.BASE), {
+      // Формируем URL с параметрами фильтрации по продавцу (для админки)
+      const params = new URLSearchParams();
+      params.append('seller_id', sellerId.toString());
+      const url = `${getApiUrl(API_ENDPOINTS.SHOP_POINTS.BASE)}?${params.toString()}`;
+      
+      const response = await authFetch(url, {
         method: 'GET',
         requireAuth: true,
       });
@@ -69,32 +89,37 @@ export const ShopsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           
           setShops(transformedShops);
           setIsInitialized(true);
+          setCurrentSellerId(sellerId);
         } else {
           console.error('❌ Неверный формат данных точек продаж:', shopPointsData);
           setError('Неверный формат данных точек продаж');
           setShops([]);
           setIsInitialized(true);
+          setCurrentSellerId(sellerId);
         }
       } else if (response.status === 404) {
         setError('Точки продаж не найдены');
         setShops([]);
         setIsInitialized(true);
+        setCurrentSellerId(sellerId);
       } else {
         const errorText = await response.text();
         console.error('❌ Ошибка загрузки точек продаж:', response.status, errorText);
         setError('Ошибка загрузки точек продаж');
         setShops([]);
         setIsInitialized(true);
+        setCurrentSellerId(sellerId);
       }
     } catch (err) {
       console.error('❌ Ошибка подключения к серверу при загрузке точек продаж:', err);
       setError('Ошибка подключения к серверу');
       setShops([]);
       setIsInitialized(true);
+      setCurrentSellerId(sellerId);
     } finally {
       setLoading(false);
     }
-  }, [loading, isInitialized]);
+  }, [loading, isInitialized, currentSellerId]);
 
   const getShopById = useCallback((id: number): Shop | undefined => {
     return shops.find((shop) => shop.id === id);
@@ -116,18 +141,23 @@ export const ShopsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   return <ShopsContext.Provider value={value}>{children}</ShopsContext.Provider>;
 };
 
-export const useShops = () => {
+export const useShops = (sellerId?: number) => {
   const context = useContext(ShopsContext);
   if (context === undefined) {
     throw new Error('useShops must be used within a ShopsProvider');
   }
   
-  // Ленивая загрузка - загружаем только когда хук используется
+  // Загружаем магазины при изменении sellerId
   React.useEffect(() => {
-    if (!context.loading && context.shops.length === 0 && !context.error) {
-      context.refetch();
+    // Если sellerId изменился или еще не загружено, делаем запрос
+    if (sellerId !== undefined) {
+      context.refetch(sellerId);
+    } else {
+      // Если sellerId не передан, очищаем список
+      context.refetch(undefined);
     }
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sellerId]);
   
   return context;
 };

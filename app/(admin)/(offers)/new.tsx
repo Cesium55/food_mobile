@@ -2,6 +2,7 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useOffers } from "@/hooks/useOffers";
 import { usePricingStrategies } from "@/hooks/usePricingStrategies";
 import { useProducts } from "@/hooks/useProducts";
+import { useSellerMe } from "@/hooks/useSeller";
 import { useShops } from "@/hooks/useShops";
 import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
@@ -21,8 +22,9 @@ import { SafeAreaView } from "react-native-safe-area-context";
 export default function NewOfferScreen() {
     const { shopId } = useLocalSearchParams();
     const selectedShopId = typeof shopId === 'string' ? parseInt(shopId) : 0;
-    const { shops } = useShops();
-    const { products, loading: productsLoading } = useProducts();
+    const { seller } = useSellerMe();
+    const { shops } = useShops(seller?.id);
+    const { products, loading: productsLoading } = useProducts(seller?.id);
     const { createOffer, refetch } = useOffers();
     const { strategies, loading: strategiesLoading } = usePricingStrategies();
 

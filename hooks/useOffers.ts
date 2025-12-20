@@ -85,6 +85,7 @@ export interface Offer {
   pricingStrategyId?: number | null;
   pricingStrategy?: PricingStrategy;
   isDynamicPricing: boolean; // Вычисляемое поле - есть ли динамическое ценообразование
+  productWeight?: string; // Вес товара
 }
 
 export const useOffers = () => {
@@ -140,6 +141,12 @@ export const useOffers = () => {
       ? Math.round(((originalCostNum - finalCurrentCostNum) / originalCostNum) * 100)
       : 0;
 
+    // Извлекаем вес из атрибутов
+    const weightAttr = apiOffer.product?.attributes?.find(attr => 
+      attr.slug === 'weight' || attr.name.toLowerCase().includes('вес')
+    );
+    const productWeight = weightAttr?.value;
+
     return {
       id: apiOffer.id,
       productId: apiOffer.product_id,
@@ -159,6 +166,7 @@ export const useOffers = () => {
       pricingStrategyId: apiOffer.pricing_strategy_id ?? null,
       pricingStrategy: apiOffer.pricing_strategy,
       isDynamicPricing,
+      productWeight,
     };
   }, []);
 
@@ -169,6 +177,8 @@ export const useOffers = () => {
     minLongitude?: number;
     maxLongitude?: number;
     skipDefaultFilters?: boolean; // Новый параметр для пропуска дефолтных фильтров
+    sellerId?: number; // Новый параметр для фильтрации по продавцу (для админки)
+    categoryIds?: number[]; // Фильтр по ID категорий (OR логика)
   }) => {
     try {
       setLoading(true);
@@ -190,6 +200,18 @@ export const useOffers = () => {
         params.append('max_longitude', filters.maxLongitude.toString());
       }
       
+      // Фильтрация по продавцу (для админки)
+      if (filters?.sellerId !== undefined) {
+        params.append('seller_id', filters.sellerId.toString());
+      }
+
+      // Фильтрация по категориям (OR логика)
+      if (filters?.categoryIds && filters.categoryIds.length > 0) {
+        filters.categoryIds.forEach(id => {
+          params.append('category_ids', id.toString());
+        });
+      }
+      
       // Добавляем дефолтные фильтры, если не указано skipDefaultFilters
       // Это нужно для главной страницы, чтобы показывать только годные товары в наличии
       if (!filters?.skipDefaultFilters) {
@@ -209,14 +231,21 @@ export const useOffers = () => {
         url += `?${params.toString()}`;
       }
       
+      console.log('🚀 API FETCH Offers:', url);
+
       const response = await authFetch(url, {
         method: 'GET',
-        requireAuth: true,
+        requireAuth: false, // Получение офферов - публичное действие
       });
 
       if (response.ok) {
         const data = await response.json();
         const offersData = data.data || data;
+        
+        console.log('📦 API RESPONSE Offers (RAW count):', Array.isArray(offersData) ? offersData.length : 'not an array');
+        if (Array.isArray(offersData) && offersData.length > 0) {
+          console.log('📦 API RESPONSE Offers (Sample):', JSON.stringify(offersData[0], null, 2));
+        }
         
         if (Array.isArray(offersData)) {
           // Сначала трансформируем офферы
@@ -324,6 +353,50 @@ export const useOffers = () => {
     await fetchOffers(filters);
   }, [fetchOffers]);
 
+  // Функция для получения офферов по категории (возвращает результат без сохранения в состояние)
+  const fetchOffersByCategory = useCallback(async (categoryId: number): Promise<Offer[]> => {
+    try {
+      const params = new URLSearchParams();
+      params.append('category_ids', categoryId.toString());
+      
+      // Дефолтные фильтры (годность и наличие)
+      const now = new Date();
+      const minExpiresDate = now.toISOString();
+      params.append('min_expires_date', minExpiresDate);
+      params.append('min_count', '1');
+      
+      let url = getApiUrl(API_ENDPOINTS.OFFERS.WITH_PRODUCTS);
+      if (params.toString()) {
+        url += `?${params.toString()}`;
+      }
+      
+      console.log('🚀 API FETCH Offers by Category:', url);
+
+      const response = await authFetch(url, {
+        method: 'GET',
+        requireAuth: false,
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const offersData = data.data || data;
+        
+        if (Array.isArray(offersData)) {
+          // Трансформируем офферы
+          const transformedOffers = offersData.map(transformOffer);
+          return transformedOffers;
+        }
+        return [];
+      } else {
+        console.error('❌ API ERROR Offers by Category:', response.status);
+        return [];
+      }
+    } catch (err) {
+      console.error('❌ API CRASH Offers by Category:', err);
+      return [];
+    }
+  }, [transformOffer]);
+
   const getOfferById = (id: number): Offer | undefined => {
     return offers.find((offer) => offer.id === id);
   };
@@ -336,20 +409,26 @@ export const useOffers = () => {
     return offers.filter((offer) => offer.sellerId === sellerId);
   };
 
-  const getOffersByCategory = (categoryId: number): Offer[] => {
+  const getOffersByCategoryLocal = (categoryId: number): Offer[] => {
     return offers.filter((offer) => offer.productCategoryIds.includes(categoryId));
   };
 
   // Функция для повторной загрузки офферов
   // Можно передать skipExpiredFilter=true, чтобы загрузить все offers включая просроченные
-  const refetch = useCallback(async (skipExpiredFilter?: boolean) => {
-    if (skipExpiredFilter) {
+  // Можно передать sellerId для фильтрации по продавцу (для админки)
+  const refetch = useCallback(async (options?: { skipExpiredFilter?: boolean; sellerId?: number }) => {
+    if (options?.skipExpiredFilter) {
       // Загружаем без дефолтных фильтров (для checkout, где нужны все offers)
-      await fetchOffers({ skipDefaultFilters: true });
+      await fetchOffers({ skipDefaultFilters: true, sellerId: options?.sellerId });
     } else {
       // Загружаем с фильтрами по умолчанию (только годные товары в наличии)
-      await fetchOffers();
+      await fetchOffers({ sellerId: options?.sellerId });
     }
+  }, [fetchOffers]);
+  
+  // Специальная функция для админки - загружает все офферы текущего продавца (включая просроченные)
+  const fetchOffersForAdmin = useCallback(async (sellerId: number) => {
+    await fetchOffers({ skipDefaultFilters: true, sellerId });
   }, [fetchOffers]);
 
   // Функция для создания нового оффера
@@ -445,11 +524,13 @@ export const useOffers = () => {
     error,
     refetch,
     fetchOffers,
+    fetchOffersForAdmin,
     fetchOffersWithLocation,
+    fetchOffersByCategory,
     getOfferById,
     getOffersByShop,
     getOffersBySeller,
-    getOffersByCategory,
+    getOffersByCategory: getOffersByCategoryLocal,
     createOffer,
     updateOffer,
   };
