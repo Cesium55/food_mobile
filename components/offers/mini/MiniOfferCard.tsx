@@ -118,7 +118,7 @@ export function MiniOfferCard({ offer, distance, onPress }: MiniOfferCardProps) 
 }
 
 const createStyles = (tokens: any) => {
-  const { colors, borderRadius, spacing, shadows } = tokens;
+  const { colors, borderRadius, spacing } = tokens;
   
   return StyleSheet.create({
     card: {
@@ -126,7 +126,6 @@ const createStyles = (tokens: any) => {
       borderRadius: borderRadius.lg,
       overflow: 'hidden',
       width: '100%',
-      ...shadows.sm,
     },
     content: {
       padding: spacing.md,

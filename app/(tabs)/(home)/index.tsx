@@ -106,13 +106,16 @@ export default function HomeScreen() {
 
 const createStyles = (colors: any) => StyleSheet.create({
   blockContainer: {
-    // alignSelf: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 28,
+    marginBottom: spacing.lg,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
   },
   blockTitle: {
     fontSize: typography.fontSize.xxl,
     fontFamily: typography.fontFamily.bold,
     textAlign: 'left',
-    paddingHorizontal: spacing.lg,
     paddingBottom: spacing.md,
     color: colors.text.primary,
   },

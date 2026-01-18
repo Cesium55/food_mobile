@@ -8,7 +8,7 @@ interface SearchProps {
 }
 
 export default function Search({ 
-    placeholder = "Поиск...", 
+    placeholder = "Поиск в SaveFood", 
     value,
     onChangeText 
 }: SearchProps) {
@@ -17,7 +17,7 @@ export default function Search({
             <Ionicons 
                 name="search" 
                 size={20} 
-                color="#666" 
+                color="#999" 
                 style={styles.icon} 
             />
             <TextInput
@@ -36,7 +36,7 @@ const styles = StyleSheet.create({
         flexDirection: "row",
         alignItems: "center",
         backgroundColor: "#f5f5f5",
-        borderRadius: 30,
+        borderRadius: 18,
         paddingHorizontal: 12,
         // paddingVertical: 10,
         borderWidth: 1,
@@ -47,7 +47,7 @@ const styles = StyleSheet.create({
     },
     input: {
         flex: 1,
-        fontSize: 16,
+        fontSize: 17,
         color: "#333",
     },
 });

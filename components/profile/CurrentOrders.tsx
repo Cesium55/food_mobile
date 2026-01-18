@@ -52,62 +52,61 @@ export function CurrentOrders({ orders }: CurrentOrdersProps) {
   };
 
   if (orders.length === 0) {
-    return (
-      <View style={styles.emptyContainer}>
-        <Text style={styles.emptyText}>Нет текущих заказов</Text>
-      </View>
-    );
+    return null;
   }
 
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Текущие заказы</Text>
-      {orders.map((order) => {
+      {orders.map((order, index) => {
         const statusInfo = getStatusInfo(order.status, order.timeLeft);
+        const isLast = index === orders.length - 1;
         return (
-          <TouchableOpacity 
-            key={order.id} 
-            style={styles.orderCard} 
-            activeOpacity={0.7}
-            onPress={() => {
-              // Если заказ оплачен, переходим на экран оплаченного заказа
-              if (order.status === 'paid' || order.status === 'completed') {
-                router.push({
-                  pathname: '/(tabs)/(profile)/order-paid',
-                  params: {
-                    purchaseId: order.id.toString(),
-                  },
-                });
-              } else {
-                // Иначе на экран оплаты
-                router.push({
-                  pathname: '/(tabs)/(profile)/checkout',
-                  params: {
-                    purchaseId: order.id.toString(),
-                  },
-                });
-              }
-            }}
-          >
-            <View style={styles.orderHeader}>
-              <View style={styles.orderInfo}>
-                <Text style={styles.orderNumber}>Заказ #{order.id}</Text>
-                <Text style={styles.dateTime}>
-                  {formatDateTime(order.date)}
-                </Text>
+          <View key={order.id}>
+            <TouchableOpacity 
+              style={styles.orderCard} 
+              activeOpacity={0.7}
+              onPress={() => {
+                // Если заказ оплачен, переходим на экран оплаченного заказа
+                if (order.status === 'paid' || order.status === 'completed') {
+                  router.push({
+                    pathname: '/(tabs)/(profile)/order-paid',
+                    params: {
+                      purchaseId: order.id.toString(),
+                    },
+                  });
+                } else {
+                  // Иначе на экран оплаты
+                  router.push({
+                    pathname: '/(tabs)/(profile)/checkout',
+                    params: {
+                      purchaseId: order.id.toString(),
+                    },
+                  });
+                }
+              }}
+            >
+              <View style={styles.orderHeader}>
+                <View style={styles.orderInfo}>
+                  <Text style={styles.orderNumber}>Заказ #{order.id}</Text>
+                  <Text style={styles.dateTime}>
+                    {formatDateTime(order.date)}
+                  </Text>
+                </View>
+                <View style={[styles.statusBadge, { backgroundColor: statusInfo.bg }]}>
+                  <Text style={[styles.statusText, { color: statusInfo.color }]}>
+                    {statusInfo.text}
+                  </Text>
+                </View>
               </View>
-              <View style={[styles.statusBadge, { backgroundColor: statusInfo.bg }]}>
-                <Text style={[styles.statusText, { color: statusInfo.color }]}>
-                  {statusInfo.text}
-                </Text>
-              </View>
-            </View>
 
-            <View style={styles.orderFooter}>
-              <Text style={styles.totalLabel}>Итого:</Text>
-              <Text style={styles.totalAmount}>{order.totalAmount.toFixed(2)} ₽</Text>
-            </View>
-          </TouchableOpacity>
+              <View style={styles.orderFooter}>
+                <Text style={styles.totalLabel}>Итого:</Text>
+                <Text style={styles.totalAmount}>{order.totalAmount.toFixed(2)} ₽</Text>
+              </View>
+            </TouchableOpacity>
+            {!isLast && <View style={styles.divider} />}
+          </View>
         );
       })}
     </View>
@@ -116,14 +115,15 @@ export function CurrentOrders({ orders }: CurrentOrdersProps) {
 
 const styles = StyleSheet.create({
   container: {
-    marginBottom: 16,
+    paddingVertical: 8,
   },
   title: {
     fontSize: 18,
     fontWeight: '700',
     color: '#333',
-    marginBottom: 8,
+    marginBottom: 12,
     paddingHorizontal: 16,
+    paddingTop: 8,
   },
   emptyContainer: {
     padding: 16,
@@ -134,19 +134,13 @@ const styles = StyleSheet.create({
     color: '#999',
   },
   orderCard: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 12,
+    backgroundColor: 'transparent',
+    padding: 16,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: '#E0E0E0',
     marginHorizontal: 16,
-    marginBottom: 8,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
   },
   orderHeader: {
     flexDirection: 'row',

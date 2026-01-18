@@ -9,9 +9,9 @@ import { useShops } from "@/hooks/useShops";
 import { CreateOrderResponse, OfferResult, PurchaseOffer, getCurrentPendingPurchase, updatePurchaseStatus } from "@/services/orderService";
 import { checkPaymentStatus, getPaymentByPurchaseId } from "@/services/paymentService";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Alert, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, AppState, BackHandler, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from "react-native-safe-area-context";
 
 const PAYMENT_ID_STORAGE_KEY = '@current_payment_id';
@@ -49,7 +49,7 @@ export default function CheckoutScreen() {
   const params = useLocalSearchParams<{ purchaseId?: string; orderData?: string }>();
   const { shops, getShopById } = useShops();
   const { getOfferById, fetchOffers } = useOffers();
-  const { clearCart } = useCart();
+  const { clearCart, getCachedOrder, clearCachedOrder, restoreItemsFromOrder } = useCart();
   
   // Загружаем offers при монтировании без фильтров (для работы getOfferById)
   useEffect(() => {
@@ -139,23 +139,101 @@ export default function CheckoutScreen() {
     }
   }, [params.purchaseId, orderDataFromParams, loadedOrderData, router]);
 
-  // Проверяем статус заказа при загрузке данных из параметров
+  // Проверяем статус заказа при загрузке данных из параметров и при каждом обновлении
   useEffect(() => {
-    if (orderData && orderData.purchase) {
-      // Если заказ не pending, перенаправляем на экран оплаченного заказа
-      if (orderData.purchase.status !== 'pending') {
-        router.replace({
-          pathname: '/(tabs)/(profile)/order-paid',
-          params: {
-            purchaseId: orderData.purchase.id.toString(),
-          },
-        });
+    const checkOrderStatus = async () => {
+      if (!orderData?.purchase?.id) return;
+      
+      try {
+        // Всегда проверяем актуальный статус на сервере
+        const pending = await getCurrentPendingPurchase();
+        
+        // Если заказ не найден как pending или статус не pending, перенаправляем
+        if (!pending || !pending.purchase || pending.purchase.id !== orderData.purchase.id || pending.purchase.status !== 'pending') {
+          // Заказ отменен или оплачен - перенаправляем
+          router.replace({
+            pathname: '/(tabs)/(profile)/order-paid',
+            params: {
+              purchaseId: orderData.purchase.id.toString(),
+            },
+          });
+        } else {
+          // Обновляем данные заказа если они изменились
+          if (pending.purchase.status === 'pending') {
+            setLoadedOrderData(pending);
+          }
+        }
+      } catch (error) {
+        // Если ошибка при проверке, проверяем локальный статус
+        if (orderData.purchase.status !== 'pending') {
+          router.replace({
+            pathname: '/(tabs)/(profile)/order-paid',
+            params: {
+              purchaseId: orderData.purchase.id.toString(),
+            },
+          });
+        }
       }
+    };
+    
+    if (orderData?.purchase) {
+      checkOrderStatus();
     }
-  }, [orderData, router]);
+  }, [orderData?.purchase?.id, router]); // Проверяем при изменении ID заказа
 
   const purchase = orderData?.purchase;
   const offerResults = orderData?.offer_results || [];
+
+  // Проверяем статус заказа при каждом фокусе на экране
+  useFocusEffect(
+    useCallback(() => {
+      const checkStatus = async () => {
+        if (!params.purchaseId) return;
+        
+        try {
+          const pending = await getCurrentPendingPurchase();
+          // Если заказ не найден как pending или статус не pending, перенаправляем
+          if (!pending || !pending.purchase || pending.purchase.id.toString() !== params.purchaseId || pending.purchase.status !== 'pending') {
+            router.replace('/(tabs)/(cart)');
+          } else {
+            // Обновляем данные заказа
+            setLoadedOrderData(pending);
+          }
+        } catch (error) {
+          // Если ошибка, проверяем локальный статус
+          if (orderData?.purchase && orderData.purchase.status !== 'pending') {
+            router.replace('/(tabs)/(cart)');
+          }
+        }
+      };
+      
+      checkStatus();
+    }, [params.purchaseId, router, orderData?.purchase?.status])
+  );
+
+  // Блокируем кнопку назад если заказ отменен или оплачен
+  useEffect(() => {
+    const backHandler = BackHandler.addEventListener('hardwareBackPress', async () => {
+      // Всегда проверяем актуальный статус на сервере
+      try {
+        const pending = await getCurrentPendingPurchase();
+        if (!pending || !pending.purchase || (params.purchaseId && pending.purchase.id.toString() !== params.purchaseId) || pending.purchase.status !== 'pending') {
+          // Заказ не pending - блокируем кнопку назад и переходим в корзину
+          router.replace('/(tabs)/(cart)');
+          return true; // Блокируем стандартное поведение
+        }
+      } catch (error) {
+        // Если ошибка, проверяем локальный статус
+        if (purchase && purchase.status !== 'pending') {
+          router.replace('/(tabs)/(cart)');
+          return true;
+        }
+      }
+      return false; // Разрешаем стандартное поведение
+    });
+
+    return () => backHandler.remove();
+  }, [purchase?.id, params.purchaseId, router]);
 
   // Создаем маппинг результатов по offer_id для быстрого поиска
   const offerResultsMap = useMemo(() => {
@@ -270,38 +348,74 @@ export default function CheckoutScreen() {
     return offerResults.some(result => result.status !== 'success');
   }, [offerResults]);
 
-  // Таймер на основе ttl из ответа сервера
-  const initialTimeLeft = purchase?.ttl ? purchase.ttl : 300; // В секундах
-  const [timeLeft, setTimeLeft] = useState(initialTimeLeft);
+  // Вычисляем оставшееся время на основе created_at и ttl (не зависит от интервала)
+  const calculateTimeLeft = useCallback((): number => {
+    if (!purchase || purchase.status !== 'pending' || !purchase.created_at || !purchase.ttl) {
+      return 300; // Fallback значение
+    }
 
-  // Таймер
+    try {
+      const createdAt = new Date(purchase.created_at);
+      const expiresAt = new Date(createdAt.getTime() + purchase.ttl * 1000);
+      const now = new Date();
+      const secondsLeft = Math.max(0, Math.floor((expiresAt.getTime() - now.getTime()) / 1000));
+      return secondsLeft;
+    } catch (error) {
+      console.error('Ошибка вычисления времени:', error);
+      return 300;
+    }
+  }, [purchase?.created_at, purchase?.ttl, purchase?.status]);
+
+  const [timeLeft, setTimeLeft] = useState<number>(calculateTimeLeft);
+
+  // Обновляем таймер когда purchase меняется
+  useEffect(() => {
+    const newTimeLeft = calculateTimeLeft();
+    setTimeLeft(newTimeLeft);
+  }, [purchase?.id, purchase?.created_at, purchase?.ttl, calculateTimeLeft]);
+
+  // Обновляем таймер при возврате из фона
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextAppState) => {
+      if (nextAppState === 'active') {
+        // Приложение вернулось в активное состояние - пересчитываем время
+        const newTimeLeft = calculateTimeLeft();
+        setTimeLeft(newTimeLeft);
+      }
+    });
+
+    return () => subscription.remove();
+  }, [calculateTimeLeft]);
+
+  // Таймер для обновления UI (не влияет на вычисление времени)
   useEffect(() => {
     if (!purchase || purchase.status !== 'pending') {
       return; // Таймер не нужен для оплаченных/завершенных заказов
     }
 
+    const currentPurchaseId = purchase.id; // Сохраняем ID текущего заказа
+
     const timer = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 1) {
-          clearInterval(timer);
-          // Автоматически возвращаемся в корзину при истечении времени
-          // Пытаемся отменить заказ на сервере (если он еще существует)
-          if (purchase && purchase.id) {
-            updatePurchaseStatus(purchase.id, 'cancelled').catch((error) => {
-              console.error('Ошибка при автоматической отмене истекшего заказа:', error);
-              // Игнорируем ошибку, так как заказ мог быть уже отменен или изменен
-            });
-          }
-          // Возвращаемся в корзину без показа Alert
-          router.back();
-          return 0;
+      const newTimeLeft = calculateTimeLeft();
+      setTimeLeft(newTimeLeft);
+
+      if (newTimeLeft <= 0) {
+        clearInterval(timer);
+        // Автоматически возвращаемся в корзину при истечении времени
+        // Пытаемся отменить заказ на сервере (если он еще существует)
+        if (currentPurchaseId) {
+          updatePurchaseStatus(currentPurchaseId, 'cancelled').catch((error) => {
+            console.error('Ошибка при автоматической отмене истекшего заказа:', error);
+            // Игнорируем ошибку, так как заказ мог быть уже отменен или изменен
+          });
         }
-        return prev - 1;
-      });
+        // Возвращаемся в корзину без показа Alert
+        router.replace('/(tabs)/(cart)');
+      }
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [purchase, router]);
+  }, [purchase?.id, purchase?.status, purchase?.created_at, purchase?.ttl, calculateTimeLeft, router]);
 
   // Форматирование времени
   const formatTime = (seconds: number) => {
@@ -488,7 +602,6 @@ export default function CheckoutScreen() {
         // Перенаправляем на экран оплаченного заказа
         if (purchase && purchase.id) {
           // Используем replace чтобы не оставлять экран оплаты в стеке навигации
-          // handleBackPress в order-paid.tsx обработает правильную навигацию назад
           router.replace({
             pathname: '/(tabs)/(profile)/order-paid',
             params: {
@@ -569,8 +682,33 @@ export default function CheckoutScreen() {
     }
   };
 
-  const handleCancelOrder = () => {
-    if (!purchase || !purchase.id) {
+  const handleCancelOrder = async () => {
+    // Всегда получаем актуальный заказ с сервера перед отменой
+    let purchaseIdToCancel: number | null = null;
+    
+    try {
+      // Пробуем получить актуальный заказ с сервера
+      const pending = await getCurrentPendingPurchase();
+      if (pending?.purchase?.id) {
+        purchaseIdToCancel = pending.purchase.id;
+      } else if (orderData?.purchase?.id) {
+        // Если нет на сервере, используем из orderData
+        purchaseIdToCancel = orderData.purchase.id;
+      } else if (params.purchaseId) {
+        // Если нет в orderData, используем из параметров
+        purchaseIdToCancel = parseInt(params.purchaseId);
+      }
+    } catch (error) {
+      console.error('Ошибка получения заказа:', error);
+      // Используем fallback
+      if (orderData?.purchase?.id) {
+        purchaseIdToCancel = orderData.purchase.id;
+      } else if (params.purchaseId) {
+        purchaseIdToCancel = parseInt(params.purchaseId);
+      }
+    }
+    
+    if (!purchaseIdToCancel) {
       Alert.alert('Ошибка', 'Не удалось определить ID заказа');
       return;
     }
@@ -586,10 +724,18 @@ export default function CheckoutScreen() {
           onPress: async () => {
             setIsCancelling(true);
             try {
-              await updatePurchaseStatus(purchase.id, 'cancelled');
-              Alert.alert('Успешно', 'Заказ отменен', [
-                { text: 'OK', onPress: () => router.replace('/(tabs)/(cart)') }
-              ]);
+              console.log('Отмена заказа, purchaseId:', purchaseIdToCancel);
+              await updatePurchaseStatus(purchaseIdToCancel, 'cancelled');
+              
+              // Очищаем кэш заказа и восстанавливаем товары в корзину
+              const cachedOrder = await getCachedOrder();
+              if (cachedOrder && cachedOrder.purchaseId === purchaseIdToCancel) {
+                await restoreItemsFromOrder(cachedOrder.reservedItems);
+                await clearCachedOrder();
+              }
+              
+              // Переходим в корзину, заменяя текущий экран
+              router.replace('/(tabs)/(cart)');
             } catch (error: any) {
               console.error('Ошибка отмены заказа:', error);
               Alert.alert(

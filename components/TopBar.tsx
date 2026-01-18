@@ -53,7 +53,7 @@ export function TopBar({
         {showSearch && (
           <View style={styles.searchContainer}>
             <Search
-              placeholder="Поиск..."
+              placeholder="Поиск в SaveFood"
               value={localSearchValue}
               onChangeText={handleSearchChange}
             />
@@ -73,11 +73,11 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         paddingHorizontal: spacing.lg,
         paddingBottom: spacing.lg,
-        paddingTop: spacing.sm,
+        paddingTop: spacing.xl,
         borderBottomLeftRadius: 28,
         borderBottomRightRadius: 28,
         gap: spacing.md,
-        marginBottom: spacing.md,
+        marginBottom: 0,
       },
   searchContainer: {
     flex: 1,

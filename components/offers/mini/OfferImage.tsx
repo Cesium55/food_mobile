@@ -61,18 +61,21 @@ export function OfferImage({ imageUri, shopImageUri, shopInitial, timeLeftText }
 }
 
 const createStyles = (tokens: any) => {
-  const { colors, spacing, borderRadius, typography, shadows } = tokens;
+  const { colors, spacing, borderRadius, typography } = tokens;
   
   return StyleSheet.create({
     imageContainer: {
       position: 'relative',
       width: '100%',
-      height: 160,
+      aspectRatio: 1,
       backgroundColor: colors.gray[100],
+      borderRadius: borderRadius.lg,
+      overflow: 'hidden',
     },
     image: {
       width: '100%',
       height: '100%',
+      borderRadius: borderRadius.lg,
     },
     placeholderImage: {
       width: '100%',
@@ -80,6 +83,7 @@ const createStyles = (tokens: any) => {
       backgroundColor: colors.gray[200],
       justifyContent: 'center',
       alignItems: 'center',
+      borderRadius: borderRadius.lg,
     },
     placeholderText: {
       fontSize: typography.fontSize.massive,
@@ -98,7 +102,6 @@ const createStyles = (tokens: any) => {
       backgroundColor: colors.primary[500],
       justifyContent: 'center',
       alignItems: 'center',
-      ...shadows.sm,
     },
     shopAvatarImage: {
       position: 'absolute',
@@ -107,7 +110,6 @@ const createStyles = (tokens: any) => {
       width: 32,
       height: 32,
       borderRadius: 16,
-      ...shadows.sm,
     },
     shopAvatarText: {
       fontSize: typography.fontSize.md,

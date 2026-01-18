@@ -76,13 +76,10 @@ const styles = StyleSheet.create({
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    paddingHorizontal: spacing.lg,
     gap: spacing.md,
+    justifyContent: 'space-between',
   },
   gridItem: {
-    width: `calc(50% - ${spacing.md / 2}px)`,
-    // Для React Native нужно вычислить ширину
-    flex: 0,
-    flexBasis: '48%',
+    width: '48%',
   },
 });

@@ -5,11 +5,13 @@ export interface CartItem {
   productName: string;
   shopId: number;
   shopName: string;
+  sellerId?: number; // ID продавца
   originalCost: string; // Цена без скидки (decimal формат)
   currentCost: string | null; // Цена со скидкой (может быть null для динамического ценообразования, decimal формат)
   discount: number; // Процент скидки
   quantity: number;
   expiresDate: Date;
+  selected?: boolean; // Выбран ли товар для покупки
 }
 
 export interface CartGroup {

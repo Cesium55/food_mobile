@@ -1,8 +1,8 @@
-import { TabScreen } from "@/components/TabScreen";
+import { ProfileScreenWrapper } from "@/components/profile/ProfileScreenWrapper";
 import { useOrders } from "@/hooks/useOrders";
 import { useFocusEffect, useRouter } from "expo-router";
 import React, { useCallback } from "react";
-import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 export default function History() {
   const router = useRouter();
@@ -53,7 +53,11 @@ export default function History() {
   );
 
   return (
-    <TabScreen title="История заказов" showBackButton={true}>
+    <ProfileScreenWrapper 
+      title="История заказов"
+      onRefresh={refetchOrders}
+      refreshing={loading}
+    >
       <View style={styles.container}>
         {/* Статистика */}
         <View style={styles.statsSection}>
@@ -70,84 +74,71 @@ export default function History() {
         </View>
 
         {/* Список заказов */}
-        <ScrollView 
-          style={styles.ordersList} 
-          showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl
-              refreshing={loading}
-              onRefresh={refetchOrders}
-              tintColor="#4CAF50"
-              colors={['#4CAF50']}
-            />
-          }
-        >
-          {loading && orders.length === 0 ? (
-            <View style={styles.emptyContainer}>
-              <ActivityIndicator size="large" color="#4CAF50" />
-              <Text style={styles.emptyText}>Загрузка заказов...</Text>
-            </View>
-          ) : orders.length === 0 ? (
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyIcon}>📦</Text>
-              <Text style={styles.emptyText}>Заказов пока нет</Text>
-              <Text style={styles.emptySubtext}>
-                Оформите первый заказ и он появится здесь
-              </Text>
-            </View>
-          ) : (
-            orders.map((order) => {
-              const statusColor = getStatusColor(order.status);
-              return (
-                <TouchableOpacity
-                  key={order.id}
-                  style={[styles.orderCard, { borderLeftWidth: 4, borderLeftColor: statusColor }]}
-                  activeOpacity={0.7}
-                        onPress={() => {
-                          // Если заказ отменен, показываем его на экране просмотра (но без QR и платежа)
-                          if (order.status === 'cancelled') {
-                            router.push({
-                              pathname: '/(tabs)/(profile)/order-paid',
-                              params: {
-                                purchaseId: order.id.toString(),
-                              },
-                            });
-                            return;
-                          }
-                          
-                          // Если заказ оплачен, подтвержден или завершен, переходим на экран оплаченного заказа
-                          if (order.status === 'paid' || order.status === 'confirmed' || order.status === 'completed') {
-                            router.push({
-                              pathname: '/(tabs)/(profile)/order-paid',
-                              params: {
-                                purchaseId: order.id.toString(),
-                              },
-                            });
-                          } else {
-                            // Иначе на экран оплаты (только для reserved/pending)
-                            router.push({
-                              pathname: '/(tabs)/(profile)/checkout',
-                              params: {
-                                purchaseId: order.id.toString(),
-                              },
-                            });
-                          }
-                        }}
-                >
-                  {/* Информация о заказе в одну строку */}
-                  <View style={styles.orderRow}>
-                    <Text style={styles.orderDate}>{formatDate(order.date)}</Text>
-                    <Text style={styles.totalAmount}>
-                      {order.totalAmount.toFixed(2)} ₽
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-              );
-            })
-          )}
-        </ScrollView>
+        {loading && orders.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <ActivityIndicator size="large" color="#4CAF50" />
+            <Text style={styles.emptyText}>Загрузка заказов...</Text>
+          </View>
+        ) : orders.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyIcon}>📦</Text>
+            <Text style={styles.emptyText}>Заказов пока нет</Text>
+            <Text style={styles.emptySubtext}>
+              Оформите первый заказ и он появится здесь
+            </Text>
+          </View>
+        ) : (
+          orders.map((order) => {
+            const statusColor = getStatusColor(order.status);
+            return (
+              <TouchableOpacity
+                key={order.id}
+                style={[styles.orderCard, { borderLeftWidth: 4, borderLeftColor: statusColor }]}
+                activeOpacity={0.7}
+                onPress={() => {
+                  // Если заказ отменен, показываем его на экране просмотра (но без QR и платежа)
+                  if (order.status === 'cancelled') {
+                    router.push({
+                      pathname: '/(tabs)/(profile)/order-paid',
+                      params: {
+                        purchaseId: order.id.toString(),
+                      },
+                    });
+                    return;
+                  }
+                  
+                  // Если заказ оплачен, подтвержден или завершен, переходим на экран оплаченного заказа
+                  if (order.status === 'paid' || order.status === 'confirmed' || order.status === 'completed') {
+                    router.push({
+                      pathname: '/(tabs)/(profile)/order-paid',
+                      params: {
+                        purchaseId: order.id.toString(),
+                      },
+                    });
+                  } else {
+                    // Иначе на экран оплаты (только для reserved/pending)
+                    router.push({
+                      pathname: '/(tabs)/(profile)/checkout',
+                      params: {
+                        purchaseId: order.id.toString(),
+                      },
+                    });
+                  }
+                }}
+              >
+                {/* Информация о заказе в одну строку */}
+                <View style={styles.orderRow}>
+                  <Text style={styles.orderDate}>{formatDate(order.date)}</Text>
+                  <Text style={styles.totalAmount}>
+                    {order.totalAmount.toFixed(2)} ₽
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            );
+          })
+        )}
       </View>
-    </TabScreen>
+    </ProfileScreenWrapper>
   );
 }
 
@@ -155,6 +146,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 16,
+    paddingTop: 20,
   },
   statsSection: {
     flexDirection: 'row',
@@ -187,9 +179,6 @@ const styles = StyleSheet.create({
   },
   statValueSaved: {
     color: '#4CAF50',
-  },
-  ordersList: {
-    flex: 1,
   },
   emptyContainer: {
     alignItems: 'center',

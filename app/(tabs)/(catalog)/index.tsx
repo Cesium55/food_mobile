@@ -205,16 +205,6 @@ export default function CatalogScreen() {
       onRefresh={onRefresh}
     >
       <View style={styles.content}>
-        {/* Сводка по каталогу */}
-        <View style={styles.summaryContainer}>
-          <View style={styles.summaryItem}>
-            <Text style={styles.summaryNumber}>{topCategories.length}</Text>
-            <Text style={styles.summaryLabel}>
-              {topCategories.length === 1 ? 'категория' : topCategories.length < 5 ? 'категории' : 'категорий'}
-            </Text>
-          </View>
-        </View>
-
         {topCategories.length > 0 ? (
           topCategories.map(cat => (
             <CategorySection 
@@ -245,14 +235,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFF',
     paddingVertical: 16,
     paddingHorizontal: 24,
-    marginHorizontal: 16,
     marginBottom: 20,
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+    borderRadius: 28,
   },
   summaryItem: {
     flex: 1,
@@ -270,7 +254,11 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   sectionContainer: {
+    backgroundColor: '#fff',
+    borderRadius: 28,
     marginBottom: 24,
+    paddingVertical: 16,
+    overflow: 'hidden',
   },
   categoryHeader: {
     flexDirection: 'row',
@@ -278,6 +266,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
     marginBottom: 12,
+    paddingTop: 4,
   },
   categoryTitle: {
     fontSize: 20,

@@ -6,25 +6,29 @@ import { ItemStatusValidator } from "./types";
 interface ShopGroupProps {
   group: CartGroup;
   statusValidators: ItemStatusValidator[];
+  selectedItems?: Set<number>;
   onIncrease: (itemId: number) => void;
   onDecrease: (itemId: number) => void;
   onRemove: (itemId: number) => void;
+  onToggleSelection?: (itemId: number) => void;
 }
 
 export function ShopGroup({ 
   group, 
-  statusValidators, 
+  statusValidators,
+  selectedItems,
   onIncrease, 
   onDecrease, 
-  onRemove 
+  onRemove,
+  onToggleSelection
 }: ShopGroupProps) {
   return (
     <View style={styles.shopGroup}>
       {/* Заголовок магазина */}
       <View style={styles.shopHeader}>
         <View style={styles.shopInfo}>
-          <Text style={styles.shopName}>🏪 {group.shopName}</Text>
-          <Text style={styles.shopAddress}>📍 {group.shopAddress}</Text>
+          <Text style={styles.shopName}>{group.shopName}</Text>
+          <Text style={styles.shopAddress}>{group.shopAddress}</Text>
         </View>
         <Text style={styles.shopTotal}>{group.total.toFixed(2)} ₽</Text>
       </View>
@@ -46,9 +50,11 @@ export function ShopGroup({
             key={item.id}
             item={item}
             status={itemStatus}
+            selected={selectedItems?.has(item.id) ?? true}
             onIncrease={onIncrease}
             onDecrease={onDecrease}
             onRemove={onRemove}
+            onToggleSelection={onToggleSelection}
           />
         );
       })}
@@ -58,7 +64,10 @@ export function ShopGroup({
 
 const styles = StyleSheet.create({
   shopGroup: {
-    marginBottom: 20,
+    backgroundColor: '#fff',
+    borderRadius: 28,
+    padding: 16,
+    marginBottom: 16,
   },
   shopHeader: {
     flexDirection: 'row',

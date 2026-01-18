@@ -77,8 +77,8 @@ export function TabScreen({
             </View>
           )}
           <ScrollView 
-            style={styles.content} 
-            contentContainerStyle={styles.scrollContent}
+            style={[styles.content, showTopBar && styles.contentWithTopBar]} 
+            contentContainerStyle={[styles.scrollContent, showTopBar && styles.scrollContentWithTopBar]}
             showsVerticalScrollIndicator={false}
             refreshControl={
               onRefresh ? (
@@ -170,8 +170,14 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
   },
+  contentWithTopBar: {
+    marginTop: -spacing.md,
+  },
   scrollContent: {
     flexGrow: 1,
+  },
+  scrollContentWithTopBar: {
+    paddingTop: spacing.xxxl,
   },
   title: {
     fontSize: typography.fontSize.xxl,

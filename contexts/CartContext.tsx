@@ -11,6 +11,7 @@ interface CartItemStorage {
   productName: string;
   shopId: number;
   shopName: string;
+  sellerId?: number;
   originalCost: string; // decimal формат
   currentCost: string | null; // decimal формат
   discount: number;
@@ -19,6 +20,7 @@ interface CartItemStorage {
 }
 
 const CART_STORAGE_KEY = '@cart_items';
+const ORDER_CACHE_KEY = '@cached_order'; // Кэш заказа: { purchaseId, reservedItems: CartItem[] }
 
 // Временный маппинг адресов магазинов (можно расширить через API)
 const shopAddresses: { [key: number]: string } = {
@@ -99,6 +101,7 @@ const loadCartFromStorage = async (): Promise<CartItem[]> => {
           return {
             ...item,
             expiresDate: date,
+            sellerId: item.sellerId, // Сохраняем sellerId при загрузке
           };
         } catch {
           return {
@@ -120,11 +123,19 @@ const loadCartFromStorage = async (): Promise<CartItem[]> => {
   }
 };
 
+interface CachedOrder {
+  purchaseId: number;
+  reservedItems: CartItem[];
+  selectedItemIds?: number[]; // Сохраняем ID выбранных товаров
+}
+
 interface CartContextType {
   cartItems: CartItem[];
   isLoading: boolean;
+  selectedItems: Set<number>; // Set of item IDs that are selected
   getCartByShops: () => CartGroup[];
   getTotalAmount: () => number;
+  getTotalAmountSelected: () => number; // Сумма только выбранных товаров
   getTotalItems: () => number;
   getShopsCount: () => number;
   addToCart: (offer: Offer) => void;
@@ -132,12 +143,20 @@ interface CartContextType {
   decreaseQuantity: (itemId: number) => void;
   removeItem: (itemId: number) => void;
   clearCart: () => Promise<void>;
+  toggleItemSelection: (itemId: number) => void;
+  selectAllItems: () => void;
+  deselectAllItems: () => void;
+  cacheOrder: (purchaseId: number, items: CartItem[]) => Promise<void>;
+  getCachedOrder: () => Promise<CachedOrder | null>;
+  clearCachedOrder: () => Promise<void>;
+  restoreItemsFromOrder: (items: CartItem[]) => Promise<void>;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
 export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
+  const [selectedItems, setSelectedItems] = useState<Set<number>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
 
   // Загружаем корзину при инициализации
@@ -146,6 +165,10 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsLoading(true);
       const loadedItems = await loadCartFromStorage();
       setCartItems(loadedItems);
+      
+      // НЕ выбираем товары автоматически - только пользователь может управлять галочками
+      setSelectedItems(new Set());
+      
       setIsLoading(false);
     };
     
@@ -159,6 +182,8 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [cartItems, isLoading]);
 
+  // НЕ выбираем товары автоматически - только пользователь может управлять галочками
+
   // Группировка товаров по магазинам
   const getCartByShops = (): CartGroup[] => {
     const grouped = cartItems.reduce((acc, item) => {
@@ -166,7 +191,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
         acc[item.shopId] = {
           shopId: item.shopId,
           shopName: item.shopName,
-          shopAddress: shopAddresses[item.shopId] || 'Адрес не указан',
+          shopAddress: shopAddresses[item.shopId] || '', // Пустая строка, адрес будет получен в компоненте
           items: [],
           total: 0,
         };
@@ -227,6 +252,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
           productName: offer.productName,
           shopId: offer.shopId,
           shopName: offer.shopShortName || 'Магазин',
+          sellerId: offer.sellerId,
           originalCost: offer.originalCost,
           currentCost: finalPrice,
           discount: finalDiscount,
@@ -277,6 +303,15 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }, 0);
   };
 
+  // Сумма только выбранных товаров
+  const getTotalAmountSelected = (): number => {
+    return cartItems.reduce((sum, item) => {
+      if (!selectedItems.has(item.id)) return sum;
+      const itemCost = item.currentCost ? parseFloat(item.currentCost) : 0;
+      return sum + itemCost * item.quantity;
+    }, 0);
+  };
+
   // Общее количество товаров
   const getTotalItems = (): number => {
     return cartItems.reduce((sum, item) => sum + item.quantity, 0);
@@ -291,14 +326,160 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Очистить корзину
   const clearCart = async () => {
     setCartItems([]);
+    setSelectedItems(new Set());
     await AsyncStorage.removeItem(CART_STORAGE_KEY);
+  };
+
+  // Переключить выбор товара
+  const toggleItemSelection = (itemId: number) => {
+    setSelectedItems(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(itemId)) {
+        newSet.delete(itemId);
+      } else {
+        newSet.add(itemId);
+      }
+      return newSet;
+    });
+  };
+
+  // Выбрать все товары
+  const selectAllItems = () => {
+    setSelectedItems(new Set(cartItems.map(item => item.id)));
+  };
+
+  // Снять выбор со всех товаров
+  const deselectAllItems = () => {
+    setSelectedItems(new Set());
+  };
+
+  // Кэшировать заказ (изъять товары из корзины)
+  const cacheOrder = async (purchaseId: number, items: CartItem[]) => {
+    try {
+      // Сохраняем состояние выбора ДО удаления товаров
+      const selectedIds = Array.from(selectedItems).filter(id => 
+        items.some(item => item.id === id)
+      );
+      
+      const cacheData: CachedOrder = {
+        purchaseId,
+        reservedItems: items,
+        selectedItemIds: selectedIds, // Сохраняем ID выбранных товаров
+      };
+      await AsyncStorage.setItem(ORDER_CACHE_KEY, JSON.stringify(cacheData));
+      
+      // Удаляем изъятые товары из корзины
+      const itemIds = new Set(items.map(item => item.id));
+      setCartItems(prev => prev.filter(item => !itemIds.has(item.id)));
+      setSelectedItems(prev => {
+        const newSet = new Set(prev);
+        items.forEach(item => newSet.delete(item.id));
+        return newSet;
+      });
+    } catch (error) {
+      console.error('Ошибка кэширования заказа:', error);
+    }
+  };
+
+  // Получить кэшированный заказ
+  const getCachedOrder = async (): Promise<CachedOrder | null> => {
+    try {
+      const cachedData = await AsyncStorage.getItem(ORDER_CACHE_KEY);
+      if (!cachedData) return null;
+      return JSON.parse(cachedData) as CachedOrder;
+    } catch (error) {
+      console.error('Ошибка получения кэшированного заказа:', error);
+      return null;
+    }
+  };
+
+  // Очистить кэш заказа
+  const clearCachedOrder = async () => {
+    try {
+      await AsyncStorage.removeItem(ORDER_CACHE_KEY);
+    } catch (error) {
+      console.error('Ошибка очистки кэша заказа:', error);
+    }
+  };
+
+  // Восстановить товары из заказа в корзину
+  const restoreItemsFromOrder = async (items: CartItem[]) => {
+    if (!items || items.length === 0) return;
+    
+    // Получаем кэш заказа чтобы восстановить состояние выбора
+    let selectedItemIds: number[] = [];
+    try {
+      const cachedData = await AsyncStorage.getItem(ORDER_CACHE_KEY);
+      if (cachedData) {
+        const cachedOrder: CachedOrder = JSON.parse(cachedData);
+        selectedItemIds = cachedOrder.selectedItemIds || [];
+      }
+    } catch (error) {
+      // Игнорируем ошибку
+    }
+    
+    setCartItems(prev => {
+      // Объединяем существующие товары с восстановленными, избегая дубликатов по offerId
+      const existingOfferIds = new Set(prev.map(item => `${item.offerId}-${item.shopId}`));
+      
+      // Сохраняем маппинг старых ID к новым для сохранения состояния выбора
+      const idMapping = new Map<number, number>();
+      
+      const newItems = items
+        .filter(item => !existingOfferIds.has(`${item.offerId}-${item.shopId}`))
+        .map(item => {
+          // Убеждаемся, что expiresDate является Date объектом
+          let expiresDate: Date;
+          if (item.expiresDate instanceof Date && !isNaN(item.expiresDate.getTime())) {
+            expiresDate = item.expiresDate;
+          } else if (typeof item.expiresDate === 'string') {
+            expiresDate = new Date(item.expiresDate);
+            if (isNaN(expiresDate.getTime())) {
+              expiresDate = new Date();
+            }
+          } else {
+            expiresDate = new Date();
+          }
+          
+          const oldId = item.id;
+          const newId = Date.now() + Math.random(); // Генерируем новый ID для восстановленных товаров
+          idMapping.set(oldId, newId);
+          
+          return {
+            ...item,
+            id: newId,
+            expiresDate, // Используем нормализованный Date объект
+          };
+        });
+      
+      const restored = [...prev, ...newItems];
+      
+      // Восстанавливаем состояние выбора из кэша заказа
+      setSelectedItems(prevSelected => {
+        const newSelected = new Set(prevSelected);
+        // Восстанавливаем выбор для товаров которые были выбраны
+        items.forEach(item => {
+          if (selectedItemIds.includes(item.id)) {
+            const newId = idMapping.get(item.id);
+            if (newId) {
+              newSelected.add(newId);
+            }
+          }
+        });
+        return newSelected;
+      });
+      
+      return restored;
+    });
   };
 
   const value: CartContextType = {
     cartItems,
     isLoading,
+    selectedItems,
     getCartByShops,
     getTotalAmount,
+    getTotalAmountSelected,
     getTotalItems,
     getShopsCount,
     addToCart,
@@ -306,6 +487,13 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     decreaseQuantity,
     removeItem,
     clearCart,
+    toggleItemSelection,
+    selectAllItems,
+    deselectAllItems,
+    cacheOrder,
+    getCachedOrder,
+    clearCachedOrder,
+    restoreItemsFromOrder,
   };
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;

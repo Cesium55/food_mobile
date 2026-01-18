@@ -26,6 +26,7 @@ export default function TabLayout() {
           ? { display: 'none' }
           : {
               backgroundColor: Colors.light.background,
+              paddingTop: 8,
             },
       }}>
       <Tabs.Screen

@@ -6,12 +6,18 @@ interface FullWidthLinkProps {
   href: string;
   iconName: string;
   text: string;
+  isFirst?: boolean;
+  isLast?: boolean;
 }
 
-export function FullWidthLink({ href, iconName, text }: FullWidthLinkProps) {
+export function FullWidthLink({ href, iconName, text, isFirst, isLast }: FullWidthLinkProps) {
   return (
     <Link href={href as any} style={styles.link}>
-      <View style={styles.container}>
+      <View style={[
+        styles.container,
+        isFirst && styles.containerFirst,
+        isLast && styles.containerLast,
+      ]}>
         <IconSymbol 
           name={iconName}
           color="#333"
@@ -30,7 +36,7 @@ const styles = StyleSheet.create({
   link: {
     borderLeftWidth: 0,
     borderRightWidth: 0,
-    borderWidth: 1,
+    borderWidth: 0,
   },
   container: {
     flexDirection: 'row',
@@ -40,6 +46,16 @@ const styles = StyleSheet.create({
     textAlignVertical: 'center',
     padding: 16,
     width: '100%',
+    backgroundColor: 'transparent',
+  },
+  containerFirst: {
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+  },
+  containerLast: {
+    borderBottomLeftRadius: 28,
+    borderBottomRightRadius: 28,
+    marginBottom: 0,
   },
   icon: {
     position: 'absolute',

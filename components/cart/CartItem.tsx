@@ -9,12 +9,14 @@ import { ItemStatus } from "./types";
 interface CartItemProps {
   item: CartItemType;
   status: ItemStatus;
+  selected?: boolean;
   onIncrease: (itemId: number) => void;
   onDecrease: (itemId: number) => void;
   onRemove: (itemId: number) => void;
+  onToggleSelection?: (itemId: number) => void;
 }
 
-export function CartItem({ item, status, onIncrease, onDecrease, onRemove }: CartItemProps) {
+export function CartItem({ item, status, selected = true, onIncrease, onDecrease, onRemove, onToggleSelection }: CartItemProps) {
   const router = useRouter();
   const segments = useSegments();
   const { getOfferById } = useOffers();
@@ -58,7 +60,20 @@ export function CartItem({ item, status, onIncrease, onDecrease, onRemove }: Car
   };
 
   return (
-    <View style={[styles.cartItem, isInactive && styles.inactiveItem]}>
+    <View style={[styles.cartItem, isInactive && styles.inactiveItem, !selected && styles.unselectedItem]}>
+      {/* Чекбокс */}
+      {onToggleSelection && (
+        <TouchableOpacity
+          style={styles.checkbox}
+          onPress={() => onToggleSelection(item.id)}
+          activeOpacity={0.7}
+        >
+          <View style={[styles.checkboxInner, selected && styles.checkboxChecked]}>
+            {selected && <Text style={styles.checkmark}>✓</Text>}
+          </View>
+        </TouchableOpacity>
+      )}
+      
       <TouchableOpacity 
         style={styles.imageButton}
         onPress={handleProductPress}
@@ -185,6 +200,31 @@ const styles = StyleSheet.create({
   inactiveItem: {
     backgroundColor: '#F5F5F5',
     opacity: 0.7,
+  },
+  unselectedItem: {
+    opacity: 0.5,
+  },
+  checkbox: {
+    marginRight: 12,
+    justifyContent: 'center',
+  },
+  checkboxInner: {
+    width: 24,
+    height: 24,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: '#4CAF50',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+  },
+  checkboxChecked: {
+    backgroundColor: '#4CAF50',
+  },
+  checkmark: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
   imageButton: {
     marginRight: 12,

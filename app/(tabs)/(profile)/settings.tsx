@@ -1,4 +1,4 @@
-import { TabScreen } from "@/components/TabScreen";
+import { ProfileScreenWrapper } from "@/components/profile/ProfileScreenWrapper";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { configureNotifications, getFCMToken, initializeFirebase, sendFCMTokenToServer } from "@/services/firebaseService";
 import { useState } from "react";
@@ -67,7 +67,7 @@ export default function Settings() {
     };
 
     return (
-        <TabScreen title="Settings" showBackButton={true}>
+        <ProfileScreenWrapper title="Settings">
             <View style={styles.container}>
                 <View style={styles.section}>
                     <Text style={styles.sectionTitle}>Debug</Text>
@@ -93,7 +93,7 @@ export default function Settings() {
                     </TouchableOpacity>
                 </View>
             </View>
-        </TabScreen>
+        </ProfileScreenWrapper>
     );
 }
 
@@ -101,6 +101,7 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         padding: 16,
+        paddingTop: 20,
     },
     section: {
         marginBottom: 24,

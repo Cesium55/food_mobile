@@ -1,4 +1,4 @@
-import { TabScreen } from "@/components/TabScreen";
+import { ProfileScreenWrapper } from "@/components/profile/ProfileScreenWrapper";
 import { QRCodeDisplay } from "@/components/qr/QRCodeDisplay";
 import { useOffers } from "@/hooks/useOffers";
 import { useShops } from "@/hooks/useShops";
@@ -6,7 +6,7 @@ import { CreateOrderResponse, getPurchaseById } from "@/services/orderService";
 import { getPaymentByPurchaseId, getPurchaseToken } from "@/services/paymentService";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 
 export default function OrderPaidScreen() {
   const router = useRouter();
@@ -138,29 +138,29 @@ export default function OrderPaidScreen() {
 
   if (loading) {
     return (
-      <TabScreen title="Заказ оплачен" showBackButton={true}>
+      <ProfileScreenWrapper title="Заказ оплачен">
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#4CAF50" />
           <Text style={styles.loadingText}>Загрузка заказа...</Text>
         </View>
-      </TabScreen>
+      </ProfileScreenWrapper>
     );
   }
 
   if (!orderData || !orderData.purchase) {
     return (
-      <TabScreen title="Заказ оплачен" showBackButton={true}>
+      <ProfileScreenWrapper title="Заказ оплачен">
         <View style={styles.container}>
           <Text style={styles.errorText}>Заказ не найден</Text>
         </View>
-      </TabScreen>
+      </ProfileScreenWrapper>
     );
   }
 
   // Если заказ отменен, показываем специальное сообщение
   if (orderData.purchase.status === 'cancelled') {
     return (
-      <TabScreen title="Заказ отменен" showBackButton={true}>
+      <ProfileScreenWrapper title="Заказ отменен">
         <View style={styles.container}>
           <View style={styles.cancelledSection}>
             <Text style={styles.cancelledIcon}>❌</Text>
@@ -183,7 +183,7 @@ export default function OrderPaidScreen() {
             </View>
           </View>
         </View>
-      </TabScreen>
+      </ProfileScreenWrapper>
     );
   }
 
@@ -237,17 +237,9 @@ export default function OrderPaidScreen() {
 
   const totalDiscount = originalTotal - totalAmount;
 
-  const handleBackPress = () => {
-    router.replace('/(tabs)/(profile)');
-  };
-
   return (
-    <TabScreen 
-      title="Заказ оплачен" 
-      showBackButton={true}
-      onBackPress={handleBackPress}
-    >
-      <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
+    <ProfileScreenWrapper title="Заказ оплачен">
+      <View style={styles.container}>
         {/* Информация о времени оплаты */}
         {paymentDate && (
           <View style={styles.paymentInfoSection}>
@@ -369,18 +361,16 @@ export default function OrderPaidScreen() {
             <Text style={styles.finalValue}>{totalAmount.toFixed(2)} ₽</Text>
           </View>
         </View>
-      </ScrollView>
-    </TabScreen>
+      </View>
+    </ProfileScreenWrapper>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
-  },
-  scrollContent: {
     padding: 16,
+    paddingTop: 20,
   },
   loadingContainer: {
     flex: 1,

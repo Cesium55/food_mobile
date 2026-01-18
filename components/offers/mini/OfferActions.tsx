@@ -167,7 +167,7 @@ export function OfferActions({
 }
 
 const createStyles = (tokens: any) => {
-  const { colors, spacing, borderRadius, typography, shadows } = tokens;
+  const { colors, spacing, borderRadius, typography } = tokens;
   
   return StyleSheet.create({
     container: {
@@ -224,7 +224,6 @@ const createStyles = (tokens: any) => {
       backgroundColor: colors.gray[200],
       justifyContent: 'center',
       alignItems: 'center',
-      ...shadows.xs,
     },
     addButtonText: {
       fontSize: typography.fontSize.xl,

@@ -1,25 +1,23 @@
 import { FullWidthLink } from "@/components/FullWidthLink";
 import { UserCard } from "@/components/UserCard";
 import { CurrentOrders } from "@/components/profile/CurrentOrders";
-import { IconSymbol } from "@/components/ui/icon-symbol";
+import { ProfileScreenWrapper } from "@/components/profile/ProfileScreenWrapper";
 import { log } from "@/constants/config";
-import { spacing, typography } from "@/constants/tokens";
-import { useColors } from "@/contexts/ThemeContext";
 import { useOrders } from "@/hooks/useOrders";
 import { useUser } from "@/hooks/useUser";
 import { authService } from "@/services/autoAuthService";
 import { clearTokens } from "@/utils/storage";
 import { useNavigation } from "@react-navigation/native";
 import { router, useFocusEffect } from "expo-router";
-import { useCallback } from "react";
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { useCallback, useRef } from "react";
+import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 export default function Profile() {
     const user = useUser();
     const navigation = useNavigation();
     const { getCurrentOrders, loading, refetchCurrentPending, refetchPaidOrders } = useOrders();
     const currentOrders = getCurrentOrders();
+    const isInitialMount = useRef(true);
 
     // Скрываем таббар при фокусе на профиле
     useFocusEffect(
@@ -30,26 +28,29 @@ export default function Profile() {
                     tabBarStyle: { display: 'none' },
                 });
             }
-            
-            return () => {
-                // Восстанавливаем таббар при уходе
-                if (parent) {
-                    parent.setOptions({
-                        tabBarStyle: { display: 'flex' },
-                    });
-                }
-            };
+            // Не восстанавливаем таббар в cleanup - он останется скрытым для всех экранов профиля
         }, [navigation])
     );
 
-    // Обновляем текущий заказ и оплаченные заказы при фокусе на экране
+    // Обновляем данные только при первом монтировании или при явном обновлении
     useFocusEffect(
         useCallback(() => {
-            refetchCurrentPending();
-            refetchPaidOrders();
-            // eslint-disable-next-line react-hooks/exhaustive-deps
-        }, [])
+            // Обновляем только при первом входе в профиль, не при возврате из дочерних страниц
+            if (isInitialMount.current) {
+                isInitialMount.current = false;
+                refetchCurrentPending();
+                refetchPaidOrders();
+            }
+        }, [refetchCurrentPending, refetchPaidOrders])
     );
+
+    // Обработчик обновления через pull-to-refresh
+    const handleRefresh = useCallback(async () => {
+        await Promise.all([
+            refetchCurrentPending(),
+            refetchPaidOrders(),
+        ]);
+    }, [refetchCurrentPending, refetchPaidOrders]);
 
     const handleSwitchToAdmin = () => {
         router.replace('/(admin)/(admin-profile)');
@@ -86,36 +87,24 @@ export default function Profile() {
         );
     };
 
-    const colors = useColors();
-    const stylesWithColors = createStyles(colors);
-
     return (
-        <SafeAreaView style={[stylesWithColors.container, { backgroundColor: '#ffffff' }]} edges={[]}>
-            {/* Верхняя панель с заголовком и кнопкой назад */}
-            <View style={stylesWithColors.topBarWrapper}>
-                <View style={stylesWithColors.topBar}>
-                    <TouchableOpacity 
-                        style={stylesWithColors.backButton}
-                        onPress={() => router.replace('/(tabs)/(home)')}
-                    >
-                        <IconSymbol 
-                            name="arrow.left" 
-                            color={colors.text.primary}
-                            size={24}
-                        />
-                    </TouchableOpacity>
-                    <Text style={[stylesWithColors.title, { color: colors.text.primary }]}>Профиль</Text>
-                    <View style={stylesWithColors.spacer} />
-                </View>
-            </View>
-
-            <View style={stylesWithColors.contentWrapper}>
-                <ScrollView 
-                    style={stylesWithColors.content} 
-                    contentContainerStyle={stylesWithColors.scrollContent}
-                    showsVerticalScrollIndicator={false}
-                >
-                <View style={styles.container}>
+        <ProfileScreenWrapper 
+            title="Профиль" 
+            showBackButton={true}
+            onBackPress={() => {
+                // Восстанавливаем таббар перед переходом
+                const parent = navigation.getParent();
+                if (parent) {
+                    parent.setOptions({
+                        tabBarStyle: { display: 'flex' },
+                    });
+                }
+                router.replace('/(tabs)/(home)');
+            }}
+            onRefresh={handleRefresh}
+            refreshing={loading}
+        >
+            <View style={styles.container}>
                 <UserCard user={user} />
                 
                 {/* Текущие заказы */}
@@ -124,20 +113,27 @@ export default function Profile() {
                         <ActivityIndicator size="small" color="#4CAF50" />
                         <Text style={styles.loadingText}>Загрузка заказов...</Text>
                     </View>
-                ) : (
-                    <CurrentOrders orders={currentOrders} />
-                )}
+                ) : currentOrders.length > 0 ? (
+                    <View style={styles.ordersSection}>
+                        <CurrentOrders orders={currentOrders} />
+                    </View>
+                ) : null}
                 
-                <FullWidthLink 
-                    href="/(tabs)/(profile)/settings"
-                    iconName="gear"
-                    text="Settings"
-                />
-                <FullWidthLink 
-                    href="/(tabs)/(profile)/history"
-                    iconName="history"
-                    text="History"
-                />
+                <View style={styles.menuSection}>
+                    <FullWidthLink 
+                        href="/(tabs)/(profile)/settings"
+                        iconName="gear"
+                        text="Settings"
+                        isFirst={true}
+                    />
+                    <View style={styles.divider} />
+                    <FullWidthLink 
+                        href="/(tabs)/(profile)/history"
+                        iconName="history"
+                        text="History"
+                        isLast={true}
+                    />
+                </View>
                 
                 {/* Кнопка перехода в режим администратора - только для продавцов */}
                 {user.is_seller && (
@@ -150,63 +146,10 @@ export default function Profile() {
                 <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
                     <Text style={styles.logoutButtonText}>Выйти из аккаунта</Text>
                 </TouchableOpacity>
-                </View>
-                </ScrollView>
             </View>
-        </SafeAreaView>
+        </ProfileScreenWrapper>
     );
 }
-
-const createStyles = (colors: any) => StyleSheet.create({
-    container: {
-        flex: 1,
-        paddingTop: 20,
-    },
-    topBarWrapper: {
-        overflow: 'hidden',
-        zIndex: 10,
-    },
-    topBar: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingHorizontal: spacing.lg,
-        paddingBottom: spacing.md,
-        paddingTop: spacing.sm,
-        borderBottomLeftRadius: 28,
-        borderBottomRightRadius: 28,
-        backgroundColor: colors.background.default,
-    },
-    contentWrapper: {
-        flex: 1,
-        backgroundColor: '#eeeeee',
-        borderTopLeftRadius: 28,
-        borderTopRightRadius: 28,
-        marginTop: -28,
-        paddingTop: 28,
-    },
-    backButton: {
-        width: 40,
-        height: 40,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    title: {
-        fontSize: typography.fontSize.xxl,
-        fontFamily: typography.fontFamily.bold,
-        flex: 1,
-        textAlign: 'center',
-    },
-    spacer: {
-        width: 40,
-    },
-    content: {
-        flex: 1,
-    },
-    scrollContent: {
-        flexGrow: 1,
-    },
-});
 
 const styles = StyleSheet.create({
     container: {
@@ -215,9 +158,8 @@ const styles = StyleSheet.create({
     },
     adminButton: {
         backgroundColor: '#007AFF',
-        borderRadius: 8,
+        borderRadius: 28,
         padding: 16,
-        marginHorizontal: 16,
         marginTop: 10,
         alignItems: 'center',
     },
@@ -228,9 +170,8 @@ const styles = StyleSheet.create({
     },
     logoutButton: {
         backgroundColor: '#ff3b30',
-        borderRadius: 8,
+        borderRadius: 28,
         padding: 16,
-        marginHorizontal: 16,
         marginTop: 10,
         alignItems: 'center',
     },
@@ -248,5 +189,22 @@ const styles = StyleSheet.create({
         marginTop: 8,
         fontSize: 14,
         color: '#666',
+    },
+    ordersSection: {
+        backgroundColor: '#fff',
+        borderRadius: 28,
+        marginBottom: 12,
+        overflow: 'hidden',
+    },
+    menuSection: {
+        backgroundColor: '#fff',
+        borderRadius: 28,
+        marginBottom: 12,
+        overflow: 'hidden',
+    },
+    divider: {
+        height: 1,
+        backgroundColor: '#E0E0E0',
+        marginHorizontal: 16,
     },
 });

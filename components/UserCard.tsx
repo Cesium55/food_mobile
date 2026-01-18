@@ -16,12 +16,14 @@ interface UserCardProps {
 export function UserCard({ user }: UserCardProps) {
   return (
     <View style={styles.userCard}>
-      <IconSymbol 
-        name="person.circle.fill" 
-        size={60} 
-        color="#007AFF" 
-        style={styles.userIcon}
-      />
+      <View style={styles.userIconContainer}>
+        <IconSymbol 
+          name="person.circle.fill" 
+          size={60} 
+          color="#007AFF" 
+          style={styles.userIcon}
+        />
+      </View>
       <Text style={styles.userEmail}>
         {user.phone || user.email || 'Не указан'}
       </Text>
@@ -43,22 +45,19 @@ export function UserCard({ user }: UserCardProps) {
 
 const styles = StyleSheet.create({
   userCard: {
-    backgroundColor: '#f8f9fa',
-    borderRadius: 12,
+    backgroundColor: '#ffffff',
+    borderRadius: 28,
     padding: 20,
-    marginHorizontal: 16,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
+    marginBottom: 12,
+  },
+  userIconContainer: {
+    alignSelf: 'center',
+    marginBottom: 15,
+    borderRadius: 28,
+    overflow: 'hidden',
   },
   userIcon: {
     alignSelf: 'center',
-    marginBottom: 15,
   },
   userEmail: {
     fontSize: 18,
