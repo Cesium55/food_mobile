@@ -53,7 +53,6 @@ export function PaymentWebView({
         }
       }
     } catch (error) {
-      console.error('Ошибка парсинга сообщения от WebView:', error);
     }
   };
 

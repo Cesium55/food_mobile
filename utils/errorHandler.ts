@@ -28,21 +28,12 @@ export const processAuthResponse = (response: any): {
 } => {
   const status = response.status;
   
-  // Отладочная информация
-  console.log('🔍 Processing auth response:', {
-    status,
-    data: response.data,
-    dataType: typeof response.data,
-    dataKeys: response.data ? Object.keys(response.data) : null,
-  });
-  
   // Успешный ответ (200-299)
   if (status >= 200 && status < 300) {
     const data = response.data;
     
     // Проверяем разные возможные структуры ответа
     if (data && data.access_token && data.refresh_token) {
-      console.log('✅ Found tokens in data.access_token/data.refresh_token');
       return {
         success: true,
         data: {
@@ -54,7 +45,6 @@ export const processAuthResponse = (response: any): {
     
     // Проверяем, может быть токены в data.data
     if (data && data.data && data.data.access_token && data.data.refresh_token) {
-      console.log('✅ Found tokens in data.data.access_token/data.data.refresh_token');
       return {
         success: true,
         data: {
@@ -66,7 +56,6 @@ export const processAuthResponse = (response: any): {
     
     // Проверяем, может быть токены в корне ответа
     if (data && data.token && data.refreshToken) {
-      console.log('✅ Found tokens in data.token/data.refreshToken');
       return {
         success: true,
         data: {
@@ -78,7 +67,6 @@ export const processAuthResponse = (response: any): {
     
     // Проверяем, может быть токены в других полях
     if (data && data.accessToken && data.refreshToken) {
-      console.log('✅ Found tokens in data.accessToken/data.refreshToken');
       return {
         success: true,
         data: {
@@ -90,7 +78,6 @@ export const processAuthResponse = (response: any): {
     
     // Проверяем, может быть токены в других полях
     if (data && data.access_token && data.refreshToken) {
-      console.log('✅ Found tokens in data.access_token/data.refreshToken');
       return {
         success: true,
         data: {
@@ -102,7 +89,6 @@ export const processAuthResponse = (response: any): {
     
     // Проверяем, может быть токены в других полях
     if (data && data.token && data.refresh_token) {
-      console.log('✅ Found tokens in data.token/data.refresh_token');
       return {
         success: true,
         data: {
@@ -112,12 +98,7 @@ export const processAuthResponse = (response: any): {
       };
     }
     
-    // Если ничего не найдено, показываем отладочную информацию
-    console.log('❌ No tokens found in response:', {
-      data,
-      availableKeys: data ? Object.keys(data) : null,
-    });
-    
+    // Если ничего не найдено
     return {
       success: false,
       error: {

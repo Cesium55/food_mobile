@@ -1,7 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native';
 
 import { GridOfferList } from '@/components/offers/GridOfferList';
-import Search from '@/components/search/search';
 import HorizontalSellersList from '@/components/sellers/horizontalSellersList';
 import { TabScreen } from '@/components/TabScreen';
 import { spacing, typography } from '@/constants/tokens';
@@ -20,28 +19,21 @@ export default function HomeScreen() {
 
   // Функция загрузки данных
   const loadData = useCallback(async (forceRefresh: boolean = false) => {
-    console.log('🔄 Загрузка данных для главной страницы...');
-    
     let location = null;
     
     if (forceRefresh) {
       // При принудительном обновлении пытаемся получить свежее местоположение
-      console.log('🔄 Обновление: запрашиваем свежее местоположение...');
       location = await getCurrentLocation(3000);
       
       if (!location) {
         // Если не получили свежее, берем из кэша
-        console.log('⚠️ Не удалось получить свежее местоположение, используем кэш');
         const cached = await getLocationWithCache();
         location = cached.location;
-      } else {
-        console.log('✅ Получено свежее местоположение');
       }
     } else {
       // При обычной загрузке используем кэш
-      const { location: cachedLocation, isFromCache } = await getLocationWithCache();
+      const { location: cachedLocation } = await getLocationWithCache();
       location = cachedLocation;
-      console.log(`📍 Местоположение ${isFromCache ? 'из кэша' : 'получено'}`);
     }
     
     // Загружаем данные с учетом местоположения (если есть)
@@ -49,7 +41,6 @@ export default function HomeScreen() {
       const boundingBox = getBoundingBox(location.latitude, location.longitude, 1000);
       await fetchOffersWithLocation(boundingBox);
     } else {
-      console.log('📍 Местоположение недоступно, загружаем все офферы');
       await fetchOffers();
     }
   }, [fetchOffersWithLocation, fetchOffers]);
@@ -82,18 +73,14 @@ export default function HomeScreen() {
   }, [loadData]);
 
   return (
+    
     <TabScreen 
-      title="Home"
+    
       onRefresh={onRefresh}
       refreshing={refreshing}
+      searchValue={searchText}
+      onSearchChange={setSearchText}
     >
-      <View style={styles.searchContainer}>
-        <Search
-          placeholder="Поиск..."
-          value={searchText}
-          onChangeText={setSearchText}
-        />
-      </View>
 
       <View style={styles.blockContainer}>
         <Text style={styles.blockTitle}>Популярные продавцы</Text>
@@ -118,10 +105,6 @@ export default function HomeScreen() {
 }
 
 const createStyles = (colors: any) => StyleSheet.create({
-  searchContainer: {
-    width: '80%',
-    alignSelf: 'center',
-  },
   blockContainer: {
     // alignSelf: 'center',
   },

@@ -19,10 +19,28 @@ interface PricingStrategyApi {
   steps: PricingStrategyStepApi[];
 }
 
+// Интерфейс для кэшированной стратегии с временем создания
+interface CachedStrategy {
+  strategy: PricingStrategy;
+  timestamp: number;
+}
+
+// Интерфейс для кэшированного списка стратегий
+interface CachedStrategiesList {
+  strategies: PricingStrategy[];
+  timestamp: number;
+}
+
+// Время жизни кэша в миллисекундах (10 минут)
+const CACHE_TTL = 10 * 60 * 1000;
+
 // ГЛОБАЛЬНЫЙ кэш для стратегий (вне хука, чтобы был общим для всех инстансов)
-const strategyCache = new Map<number, PricingStrategy>();
+const strategyCache = new Map<number, CachedStrategy>();
+// ГЛОБАЛЬНЫЙ кэш для списка всех стратегий
+let cachedStrategiesList: CachedStrategiesList | null = null;
 // ГЛОБАЛЬНЫЙ кэш для промисов загрузки (чтобы избежать дублирующихся запросов)
 const loadingPromises = new Map<number, Promise<PricingStrategy | null>>();
+let loadingListPromise: Promise<PricingStrategy[]> | null = null;
 
 export const usePricingStrategies = () => {
   const [strategies, setStrategies] = useState<PricingStrategy[]>([]);
@@ -43,56 +61,99 @@ export const usePricingStrategies = () => {
     };
   }, []);
 
+  // Функция для проверки валидности кэша
+  const isCacheValid = useCallback((timestamp: number): boolean => {
+    return Date.now() - timestamp < CACHE_TTL;
+  }, []);
+
   // Функция для загрузки всех стратегий
   const fetchStrategies = useCallback(async () => {
+    // Проверяем кэш списка стратегий
+    if (cachedStrategiesList && isCacheValid(cachedStrategiesList.timestamp)) {
+      setStrategies(cachedStrategiesList.strategies);
+      return;
+    }
+
+    // Проверяем, не идет ли уже загрузка списка
+    if (loadingListPromise) {
+      try {
+        const strategies = await loadingListPromise;
+        setStrategies(strategies);
+        return;
+      } catch (err) {
+        // Если загрузка не удалась, продолжаем с новым запросом
+      }
+    }
+
     try {
       setLoading(true);
       setError(null);
 
-      const url = getApiUrl(API_ENDPOINTS.OFFERS.PRICING_STRATEGIES);
-      const response = await authFetch(url, {
-        method: 'GET',
-        requireAuth: true,
-      });
+      // Создаем промис загрузки
+      const loadPromise = (async () => {
+        const url = getApiUrl(API_ENDPOINTS.OFFERS.PRICING_STRATEGIES);
+        const response = await authFetch(url, {
+          method: 'GET',
+          requireAuth: true,
+        });
 
-      if (response.ok) {
-        const data = await response.json();
-        const strategiesData = data.data || data;
+        if (response.ok) {
+          const data = await response.json();
+          const strategiesData = data.data || data;
 
-        if (Array.isArray(strategiesData)) {
-          const transformedStrategies = strategiesData.map(transformStrategy);
-          setStrategies(transformedStrategies);
-          
-          // Обновляем глобальный кэш
-          transformedStrategies.forEach(strategy => {
-            strategyCache.set(strategy.id, strategy);
-          });
+          if (Array.isArray(strategiesData)) {
+            const transformedStrategies = strategiesData.map(transformStrategy);
+            
+            // Сохраняем в кэш списка
+            cachedStrategiesList = {
+              strategies: transformedStrategies,
+              timestamp: Date.now(),
+            };
+            
+            // Обновляем глобальный кэш отдельных стратегий
+            transformedStrategies.forEach(strategy => {
+              strategyCache.set(strategy.id, {
+                strategy,
+                timestamp: Date.now(),
+              });
+            });
+            
+            return transformedStrategies;
+          } else {
+            throw new Error('Неверный формат данных стратегий');
+          }
+        } else if (response.status === 404) {
+          throw new Error('Стратегии не найдены');
         } else {
-          setError('Неверный формат данных стратегий');
-          setStrategies([]);
+          throw new Error('Ошибка загрузки стратегий');
         }
-      } else if (response.status === 404) {
-        setError('Стратегии не найдены');
-        setStrategies([]);
-      } else {
-        const errorText = await response.text();
-        setError('Ошибка загрузки стратегий');
-        setStrategies([]);
-      }
+      })();
+
+      loadingListPromise = loadPromise;
+      const transformedStrategies = await loadPromise;
+      loadingListPromise = null;
+      
+      setStrategies(transformedStrategies);
     } catch (err) {
-      setError('Ошибка подключения к серверу');
+      loadingListPromise = null;
+      setError(err instanceof Error ? err.message : 'Ошибка подключения к серверу');
       setStrategies([]);
     } finally {
       setLoading(false);
     }
-  }, [transformStrategy]);
+  }, [transformStrategy, isCacheValid]);
 
   // Функция для получения конкретной стратегии по ID
   const getStrategyById = useCallback(async (id: number): Promise<PricingStrategy | null> => {
-    // Проверяем глобальный кэш
+    // Проверяем глобальный кэш с проверкой времени жизни
     const cached = strategyCache.get(id);
+    if (cached && isCacheValid(cached.timestamp)) {
+      return cached.strategy;
+    }
+    
+    // Если кэш устарел, удаляем его
     if (cached) {
-      return cached;
+      strategyCache.delete(id);
     }
     
     // Проверяем, не идет ли уже загрузка этой стратегии
@@ -115,8 +176,11 @@ export const usePricingStrategies = () => {
           const strategyData = data.data || data;
           const strategy = transformStrategy(strategyData as PricingStrategyApi);
           
-          // Сохраняем в глобальный кэш
-          strategyCache.set(id, strategy);
+          // Сохраняем в глобальный кэш с временем создания
+          strategyCache.set(id, {
+            strategy,
+            timestamp: Date.now(),
+          });
           
           return strategy;
         } else if (response.status === 404) {
@@ -136,12 +200,14 @@ export const usePricingStrategies = () => {
     loadingPromises.set(id, loadingPromise);
     
     return loadingPromise;
-  }, [transformStrategy]);
+  }, [transformStrategy, isCacheValid]);
 
   // Функция для очистки глобального кэша (на случай если нужно обновить данные)
   const clearCache = useCallback(() => {
     strategyCache.clear();
+    cachedStrategiesList = null;
     loadingPromises.clear();
+    loadingListPromise = null;
   }, []);
 
   // Загружаем стратегии при монтировании компонента

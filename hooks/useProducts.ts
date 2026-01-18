@@ -103,7 +103,6 @@ export const useProducts = (sellerId?: number, options?: { requireAuth?: boolean
           const transformedProducts = productsData.map(transformProduct);
           setProducts(transformedProducts);
         } else {
-          console.error('❌ Неверный формат данных товаров:', productsData);
           setError('Неверный формат данных товаров');
           setProducts([]);
         }
@@ -112,12 +111,10 @@ export const useProducts = (sellerId?: number, options?: { requireAuth?: boolean
         setProducts([]);
       } else {
         const errorText = await response.text();
-        console.error('❌ Ошибка загрузки товаров:', response.status, errorText);
         setError('Ошибка загрузки товаров');
         setProducts([]);
       }
     } catch (err) {
-      console.error('❌ Ошибка подключения к серверу при загрузке товаров:', err);
       setError('Ошибка подключения к серверу');
       setProducts([]);
     } finally {
@@ -153,15 +150,12 @@ export const useProducts = (sellerId?: number, options?: { requireAuth?: boolean
         // Преобразуем данные с сервера в локальный формат
         return transformProduct(productData as ProductApi);
       } else if (response.status === 404) {
-        console.error('❌ Товар не найден:', productId);
         return null;
       } else {
         const errorText = await response.text();
-        console.error('❌ Ошибка загрузки товара:', response.status, errorText);
         return null;
       }
     } catch (err) {
-      console.error('❌ Ошибка подключения к серверу при загрузке товара:', err);
       return null;
     }
   }, [transformProduct]);

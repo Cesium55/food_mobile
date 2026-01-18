@@ -81,14 +81,6 @@ export const config: AppConfig = {
   endpoints: API_ENDPOINTS,
 };
 
-// Отладочная информация
-console.log('🔧 Config Debug Info:', {
-  'env.API_BASE_URL': env.API_BASE_URL,
-  'currentEnv.apiBaseUrl': currentEnv.apiBaseUrl,
-  'config.apiBaseUrl': config.apiBaseUrl,
-  'process.env.API_BASE_URL': process.env.API_BASE_URL,
-});
-
 // Экспортируем функции для удобства
 export const getConfig = (): AppConfig => config;
 export const getApiUrl = (endpoint: string = ''): string => getEndpointUrl(endpoint);

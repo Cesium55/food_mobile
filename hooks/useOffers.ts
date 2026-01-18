@@ -231,7 +231,6 @@ export const useOffers = () => {
         url += `?${params.toString()}`;
       }
       
-      console.log('🚀 API FETCH Offers:', url);
 
       const response = await authFetch(url, {
         method: 'GET',
@@ -242,10 +241,6 @@ export const useOffers = () => {
         const data = await response.json();
         const offersData = data.data || data;
         
-        console.log('📦 API RESPONSE Offers (RAW count):', Array.isArray(offersData) ? offersData.length : 'not an array');
-        if (Array.isArray(offersData) && offersData.length > 0) {
-          console.log('📦 API RESPONSE Offers (Sample):', JSON.stringify(offersData[0], null, 2));
-        }
         
         if (Array.isArray(offersData)) {
           // Сначала трансформируем офферы
@@ -270,7 +265,6 @@ export const useOffers = () => {
                     const strategy = await getStrategyById(offer.pricingStrategyId);
                     return { offerId: offer.id, strategy };
                   } catch (err) {
-                    console.warn(`⚠️ Ошибка загрузки стратегии ${offer.pricingStrategyId} для оффера ${offer.id}`);
                     return { offerId: offer.id, strategy: null };
                   }
                 }
@@ -369,8 +363,6 @@ export const useOffers = () => {
       if (params.toString()) {
         url += `?${params.toString()}`;
       }
-      
-      console.log('🚀 API FETCH Offers by Category:', url);
 
       const response = await authFetch(url, {
         method: 'GET',
@@ -388,11 +380,9 @@ export const useOffers = () => {
         }
         return [];
       } else {
-        console.error('❌ API ERROR Offers by Category:', response.status);
         return [];
       }
     } catch (err) {
-      console.error('❌ API CRASH Offers by Category:', err);
       return [];
     }
   }, [transformOffer]);

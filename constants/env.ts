@@ -9,11 +9,9 @@ import Constants from 'expo-constants';
 const getAppConfigVar = (key: string, defaultValue?: string): string | undefined => {
   const value = Constants.expoConfig?.extra?.env?.[key];
   if (value !== undefined && value !== '') {
-    console.log(`✅ Found app.json ${key}:`, value);
     return value;
   }
   
-  console.log(`⚠️ Using default for ${key}:`, defaultValue);
   return defaultValue;
 };
 
@@ -99,10 +97,3 @@ export const log = (level: 'debug' | 'info' | 'warn' | 'error', message: string,
     console[level](`[${env.APP_NAME}] ${message}`, data || '');
   }
 };
-
-// Отладочная информация
-console.log('🔧 App Config Debug Info:', {
-  '1. app.json API_BASE_URL': Constants.expoConfig?.extra?.env?.API_BASE_URL,
-  '2. Final result (env.API_BASE_URL)': env.API_BASE_URL,
-  '3. All app.json env keys': Object.keys(Constants.expoConfig?.extra?.env || {}),
-});

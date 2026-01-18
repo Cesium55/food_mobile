@@ -78,7 +78,7 @@
         "projectId": "ee563766-ca8e-45e3-9cd7-1933d5f2813b"
       },
       "env": {
-        "API_BASE_URL": "https://gembos.ru",
+        "API_BASE_URL": "https://foodtest.gembos.ru",
         "API_TIMEOUT": "10000",
         "AUTH_TOKEN_KEY": "auth_token",
         "REFRESH_TOKEN_KEY": "refresh_token",
@@ -90,7 +90,7 @@
         "ENABLE_ANIMATIONS": "true",
         "ANIMATION_DURATION": "300",
         "NODE_ENV": "development",
-        "S3_BUCKET_PREFIX": "https://gembos.ru/images/food-link-images"
+        "S3_BUCKET_PREFIX": "https://foodtest.gembos.ru/images/food-link-images"
       }
     }
   }

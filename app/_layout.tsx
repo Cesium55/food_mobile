@@ -89,7 +89,7 @@ export default function RootLayout() {
             }} 
           />
           </Stack>
-          <StatusBar style="auto" />
+          <StatusBar style="dark" backgroundColor="#ffffff" translucent={false} />
           </ShopsProvider>
         </CartProvider>
       </ThemeProvider>

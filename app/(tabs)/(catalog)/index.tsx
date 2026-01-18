@@ -23,9 +23,6 @@ const CategorySection = ({
   const segments = useSegments();
   const scrollViewRef = useRef<ScrollView>(null);
   const offersScrollViewRef = useRef<ScrollView>(null);
-  
-  // Кэш товаров по категориям (categoryId -> Offer[])
-  const offersCacheRef = useRef<Map<number, Offer[]>>(new Map());
 
   // Текущая активная категория для загрузки товаров (последняя в пути или корневая)
   const activeCategoryId = useMemo(() => {
@@ -58,23 +55,8 @@ const CategorySection = ({
   // Загружаем товары при изменении активной категории
   useEffect(() => {
     const loadOffers = async () => {
-      // Проверяем кэш
-      const cachedOffers = offersCacheRef.current.get(activeCategoryId);
-      
-      if (cachedOffers !== undefined) {
-        // Используем данные из кэша
-        setOffers(cachedOffers);
-        setLoading(false);
-        return;
-      }
-      
-      // Если нет в кэше - загружаем с сервера
       setLoading(true);
       const data = await fetchOffersByCategory(activeCategoryId);
-      
-      // Сохраняем в кэш
-      offersCacheRef.current.set(activeCategoryId, data);
-      
       setOffers(data);
       setLoading(false);
     };
@@ -207,7 +189,7 @@ export default function CatalogScreen() {
 
   if (categoriesLoading && categories.length === 0) {
     return (
-      <TabScreen title="Каталог">
+      <TabScreen>
         <View style={styles.center}>
           <ActivityIndicator size="large" color="#FF6B00" />
           <Text style={styles.loadingText}>Загрузка каталога...</Text>
@@ -220,7 +202,6 @@ export default function CatalogScreen() {
 
   return (
     <TabScreen 
-      title="Каталог"
       onRefresh={onRefresh}
     >
       <View style={styles.content}>

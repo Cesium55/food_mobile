@@ -95,7 +95,6 @@ export const useOrders = () => {
       const pending = await getCurrentPendingPurchase();
       setCurrentPending(pending);
     } catch (error) {
-      console.error('Ошибка загрузки текущего заказа:', error);
       setCurrentPending(null);
     } finally {
       setLoading(false);
@@ -163,7 +162,6 @@ export const useOrders = () => {
       });
       setOrders(ordersList);
     } catch (error) {
-      console.error('Ошибка загрузки истории заказов:', error);
       setOrders([]);
     } finally {
       setLoading(false);
@@ -232,7 +230,6 @@ export const useOrders = () => {
       
       setPaidOrders(ordersList);
     } catch (error) {
-      console.error('Ошибка загрузки оплаченных заказов:', error);
       setPaidOrders([]);
     }
   }, [getOfferById, getShopById]);
@@ -344,7 +341,6 @@ export const useOrders = () => {
       
       setPaidOrders(ordersList);
     } catch (error) {
-      console.error('Ошибка загрузки оплаченных заказов:', error);
       setPaidOrders([]);
     }
   }, [getOfferById, getShopById]);

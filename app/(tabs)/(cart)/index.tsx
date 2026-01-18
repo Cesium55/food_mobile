@@ -93,7 +93,6 @@ export default function Cart() {
           return;
         }
       } catch (error) {
-        console.error('Ошибка проверки pending заказа:', error);
       } finally {
         if (isMounted) setIsCheckingForPendingOrder(false);
       }
@@ -146,7 +145,6 @@ export default function Cart() {
           await AsyncStorage.removeItem(PAYMENT_ID_STORAGE_KEY);
         }
       } catch (error) {
-        console.error('Ошибка проверки статуса платежа:', error);
         // В случае ошибки очищаем сохраненный paymentId
         await AsyncStorage.removeItem(PAYMENT_ID_STORAGE_KEY).catch(() => {});
       } finally {
@@ -186,7 +184,6 @@ export default function Cart() {
           }
         } catch (error) {
           if (!isCancelled) {
-            console.error('Ошибка проверки pending заказа:', error);
           }
         }
       };
@@ -241,7 +238,6 @@ export default function Cart() {
           }
         } catch (error) {
           if (!isCancelled) {
-            console.error('Ошибка проверки статуса платежа:', error);
             // В случае ошибки очищаем сохраненный paymentId
             await AsyncStorage.removeItem(PAYMENT_ID_STORAGE_KEY).catch(() => {});
           }
@@ -259,7 +255,7 @@ export default function Cart() {
   // Показываем индикатор загрузки во время проверки pending заказа, статуса платежа или загрузки корзины
   if (isCheckingForPendingOrder || isCheckingPending || isLoading) {
     return (
-      <TabScreen title="Корзина">
+      <TabScreen>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#007AFF" />
         </View>
@@ -269,7 +265,7 @@ export default function Cart() {
 
   if (cartByShops.length === 0) {
     return (
-      <TabScreen title="Корзина">
+      <TabScreen>
         <EmptyCart />
       </TabScreen>
     );
@@ -329,8 +325,6 @@ export default function Cart() {
               },
             });
     } catch (error: any) {
-      console.error('Ошибка создания заказа:', error);
-      
       // Если получили 409, значит появился pending платеж - получаем его и открываем
       if (error.status === 409 || (error instanceof Error && error.message.includes('409'))) {
         try {
@@ -347,7 +341,6 @@ export default function Cart() {
             return;
           }
         } catch (fetchError) {
-          console.error('Ошибка получения текущего платежа:', fetchError);
         }
       }
       
@@ -363,7 +356,7 @@ export default function Cart() {
   // Показываем загрузку пока проверяем pending заказ
   if (isCheckingForPendingOrder) {
     return (
-      <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]} edges={['top']}>
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: '#EEEEEE' }]} edges={['top']}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#007AFF" />
         </View>
@@ -372,12 +365,7 @@ export default function Cart() {
   }
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]} edges={['top']}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>Корзина</Text>
-      </View>
-
+    <TabScreen>
       <View style={styles.container}>
         <ScrollView 
           style={styles.scrollView} 
@@ -448,24 +436,11 @@ export default function Cart() {
           </TouchableOpacity>
         </View>
       </View>
-    </SafeAreaView>
+    </TabScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-  },
-  header: {
-    paddingHorizontal: 16,
-    paddingBottom: 16,
-    paddingTop: 8,
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: '700',
-  },
   container: {
     flex: 1,
   },

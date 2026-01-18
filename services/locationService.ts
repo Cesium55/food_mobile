@@ -15,7 +15,6 @@ export async function getCurrentLocation(timeout: number = 5000): Promise<{ lati
   try {
     const { status } = await Location.requestForegroundPermissionsAsync();
     if (status !== 'granted') {
-      console.log('📍 Нет разрешения на геолокацию');
       return null;
     }
 
@@ -26,7 +25,6 @@ export async function getCurrentLocation(timeout: number = 5000): Promise<{ lati
 
     const timeoutPromise = new Promise<null>((resolve) => {
       setTimeout(() => {
-        console.log('⏱️ Таймаут получения местоположения');
         resolve(null);
       }, timeout);
     });
@@ -38,13 +36,11 @@ export async function getCurrentLocation(timeout: number = 5000): Promise<{ lati
         latitude: result.coords.latitude,
         longitude: result.coords.longitude,
       };
-      console.log('✅ Местоположение получено:', location);
       return location;
     }
     
     return null;
   } catch (error) {
-    console.error('❌ Ошибка получения местоположения:', error);
     return null;
   }
 }
@@ -60,13 +56,10 @@ export async function getLocationWithCache(): Promise<{
   const cachedLocation = await getLastLocation();
   
   if (cachedLocation) {
-    console.log('📦 Используем местоположение из кэша:', cachedLocation);
-    
     // Запускаем обновление местоположения в фоне (не ждем)
     getCurrentLocation(5000).then(newLocation => {
       if (newLocation) {
         saveLastLocation(newLocation.latitude, newLocation.longitude);
-        console.log('🔄 Кэш местоположения обновлен');
       }
     });
     
@@ -112,7 +105,6 @@ export async function sendLocationToServer(
 
     return false;
   } catch (error) {
-    console.error('❌ Ошибка отправки местоположения:', error);
     return false;
   }
 }

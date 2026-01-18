@@ -1,5 +1,6 @@
-import { Tabs } from 'expo-router';
+import { Tabs, usePathname } from 'expo-router';
 import React from 'react';
+import { Text } from 'react-native';
 
 import { HapticTab } from '@/components/haptic-tab';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -8,53 +9,83 @@ import { Colors } from '@/constants/theme';
 export default function TabLayout() {
   // Принудительно используем светлую тему
   const colorScheme = 'light';
+  const pathname = usePathname();
+  const isProfileScreen = pathname?.includes('(profile)');
 
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: Colors.light.tint,
+        tabBarActiveTintColor: '#FF6B00', // Оранжевый цвет для активных иконок
         tabBarInactiveTintColor: Colors.light.tabIconDefault,
+        tabBarLabelStyle: {
+          color: '#000000', // Черный цвет для текста (всегда)
+        },
         headerShown: false,
         tabBarButton: HapticTab,
-        tabBarStyle: {
-          backgroundColor: Colors.light.background,
-        },
+        tabBarStyle: isProfileScreen
+          ? { display: 'none' }
+          : {
+              backgroundColor: Colors.light.background,
+            },
       }}>
       <Tabs.Screen
         name="(home)"
         options={{
           title: 'Home',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
+          tabBarIcon: ({ focused }) => (
+            <IconSymbol size={28} name="house.fill" color={focused ? '#FF6B00' : Colors.light.tabIconDefault} />
+          ),
+          tabBarLabel: ({ focused }) => (
+            <Text style={{ color: focused ? '#000000' : Colors.light.tabIconDefault, fontSize: 12 }}>Home</Text>
+          ),
         }}
       />
       <Tabs.Screen
         name="(catalog)"
         options={{
           title: 'Catalog',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="list.bullet" color={color} />,
+          tabBarIcon: ({ focused }) => (
+            <IconSymbol size={28} name="list.bullet" color={focused ? '#FF6B00' : Colors.light.tabIconDefault} />
+          ),
+          tabBarLabel: ({ focused }) => (
+            <Text style={{ color: focused ? '#000000' : Colors.light.tabIconDefault, fontSize: 12 }}>Catalog</Text>
+          ),
         }}
       />
       <Tabs.Screen
         name="(map)"
         options={{
           title: 'Map',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="map.fill" color={color} />,
+          tabBarIcon: ({ focused }) => (
+            <IconSymbol size={28} name="map.fill" color={focused ? '#FF6B00' : Colors.light.tabIconDefault} />
+          ),
+          tabBarLabel: ({ focused }) => (
+            <Text style={{ color: focused ? '#000000' : Colors.light.tabIconDefault, fontSize: 12 }}>Map</Text>
+          ),
         }}
       />
       <Tabs.Screen
         name="(cart)"
         options={{
           title: 'Cart',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="shopping-cart.fill" color={color} />,
+          tabBarIcon: ({ focused }) => (
+            <IconSymbol size={28} name="shopping-cart.fill" color={focused ? '#FF6B00' : Colors.light.tabIconDefault} />
+          ),
+          tabBarLabel: ({ focused }) => (
+            <Text style={{ color: focused ? '#000000' : Colors.light.tabIconDefault, fontSize: 12 }}>Cart</Text>
+          ),
         }}
       />
-
-
       <Tabs.Screen
         name="(profile)"
         options={{
-          title: 'Profile',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="person.fill" color={color} />,
+          href: null, // Скрываем из таббара, но оставляем доступным через роутинг
+          tabBarStyle: { display: 'none' },
+        }}
+        listeners={{
+          focus: () => {
+            // Скрываем таббар при фокусе на профиле
+          },
         }}
       />
       <Tabs.Screen

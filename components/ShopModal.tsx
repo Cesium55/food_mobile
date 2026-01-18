@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
   ActivityIndicator,
   ScrollView,
@@ -9,13 +9,15 @@ import {
 } from 'react-native';
 import Modal from 'react-native-modal';
 import { useOffers } from '@/hooks/useOffers';
-import HorizontalOfferBlock from './offers/horizontalOfferBlock';
+import { GridOfferList } from './offers/GridOfferList';
 import { IconSymbol } from './ui/icon-symbol';
 
 interface Shop {
   id: number;
   name: string;
   address: string;
+  latitude?: number;
+  longitude?: number;
 }
 
 interface ShopModalProps {
@@ -25,9 +27,23 @@ interface ShopModalProps {
 }
 
 export default function ShopModal({ visible, shop, onClose }: ShopModalProps) {
-  const { getOffersByShop, loading } = useOffers();
+  const { getOffersByShop, loading, fetchOffersWithLocation } = useOffers();
   
-  // Получаем офферы для данного магазина из API
+  // Загружаем офферы по координатам торговой точки при открытии модалки
+  useEffect(() => {
+    if (visible && shop?.latitude !== undefined && shop?.longitude !== undefined) {
+      // Загружаем офферы в небольшой области вокруг торговой точки (±0.01 градуса ≈ 1 км)
+      const offset = 0.01;
+      fetchOffersWithLocation({
+        minLatitude: shop.latitude - offset,
+        maxLatitude: shop.latitude + offset,
+        minLongitude: shop.longitude - offset,
+        maxLongitude: shop.longitude + offset,
+      });
+    }
+  }, [visible, shop?.id, shop?.latitude, shop?.longitude, fetchOffersWithLocation]);
+  
+  // Получаем офферы для данного магазина из загруженных данных
   const shopOffers = shop ? getOffersByShop(shop.id) : [];
 
   if (!shop) return null;
@@ -74,7 +90,7 @@ export default function ShopModal({ visible, shop, onClose }: ShopModalProps) {
                  Предложения ({shopOffers.length})
                </Text>
                
-               {loading ? (
+               {loading && shopOffers.length === 0 ? (
                  <View style={styles.loadingContainer}>
                    <ActivityIndicator size="small" color="#007AFF" />
                    <Text style={styles.loadingText}>Загрузка предложений...</Text>
@@ -84,11 +100,7 @@ export default function ShopModal({ visible, shop, onClose }: ShopModalProps) {
                    <Text style={styles.emptyText}>Нет доступных предложений</Text>
                  </View>
                ) : (
-                 <View style={styles.offersList}>
-                   {shopOffers.map((offer) => (
-                     <HorizontalOfferBlock key={offer.id} offer={offer} />
-                   ))}
-                 </View>
+                 <GridOfferList offers={shopOffers} />
                )}
              </View>
 
@@ -175,7 +187,6 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   offersSection: {
-    padding: 16,
     backgroundColor: '#fff',
     marginTop: 8,
   },
@@ -184,9 +195,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#333',
     marginBottom: 16,
-  },
-  offersList: {
-    gap: 12,
   },
   bottomSpacer: {
     height: 20,

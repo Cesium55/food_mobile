@@ -1,6 +1,29 @@
+import { useNavigation } from '@react-navigation/native';
 import { Stack } from 'expo-router';
+import { useEffect } from 'react';
 
 export default function ProfileLayout() {
+  const navigation = useNavigation();
+
+  useEffect(() => {
+    // Скрываем таббар при входе в профиль
+    const parent = navigation.getParent();
+    if (parent) {
+      parent.setOptions({
+        tabBarStyle: { display: 'none' },
+      });
+    }
+
+    return () => {
+      // Восстанавливаем таббар при выходе
+      if (parent) {
+        parent.setOptions({
+          tabBarStyle: { display: 'flex' },
+        });
+      }
+    };
+  }, [navigation]);
+
   return (
     <Stack>
       <Stack.Screen name="index" options={{ headerShown: false }} />

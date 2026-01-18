@@ -24,7 +24,6 @@ export function decodeJWT(token: string): JWTPayload | null {
     const parts = token.split('.');
     
     if (parts.length !== 3) {
-      console.error('❌ Невалидный формат JWT токена');
       return null;
     }
 
@@ -46,7 +45,6 @@ export function decodeJWT(token: string): JWTPayload | null {
     
     return parsed as JWTPayload;
   } catch (error) {
-    console.error('❌ Ошибка декодирования JWT токена:', error);
     return null;
   }
 }

@@ -62,7 +62,6 @@ async function refreshAccessToken(): Promise<{ success: boolean; accessToken?: s
       const refreshToken = await getRefreshToken();
 
       if (!refreshToken) {
-        console.error('❌ Refresh токен не найден');
         await clearTokens();
         return { success: false, accessToken: null };
       }
@@ -92,17 +91,14 @@ async function refreshAccessToken(): Promise<{ success: boolean; accessToken?: s
         // Стандартная структура ответа: {data: {access_token, refresh_token}}
         if (responseData.data && responseData.data.access_token && responseData.data.refresh_token) {
           await saveTokens(responseData.data.access_token, responseData.data.refresh_token);
-          console.log('✅ Токены успешно обновлены');
           return { success: true, accessToken: responseData.data.access_token };
         }
       }
 
-      console.error('❌ Не удалось обновить токены');
       await clearTokens();
       return { success: false, accessToken: null };
 
     } catch (error) {
-      console.error('❌ Ошибка при обновлении токенов:', error);
       await clearTokens();
       return { success: false, accessToken: null };
     } finally {
@@ -188,7 +184,6 @@ export async function authFetch(
       accessToken = await getAccessToken();
 
       if (!accessToken) {
-        console.warn('⚠️ Токен доступа не найден, но запрос требует авторизацию');
       }
     }
 
@@ -217,16 +212,11 @@ export async function authFetch(
 
       // Если получили 401 и у нас есть токен, пробуем обновить
       if (response.status === HTTP_STATUS.UNAUTHORIZED && requireAuth && retryCount < maxRetries) {
-        console.log('🔄 Получен 401, обновляем токены и повторяем запрос...');
-
         // Обновляем токены
         const refreshResult = await refreshAccessToken();
 
         if (refreshResult.success && refreshResult.accessToken) {
           retryCount++;
-
-          // Повторяем запрос с новым токеном
-          console.log('🔄 Повторяем запрос с новым токеном');
 
           const newHeaders = createAuthHeaders(customHeaders, refreshResult.accessToken);
           const newController = new AbortController();
@@ -249,11 +239,8 @@ export async function authFetch(
           }
         } else {
           // Не удалось обновить токены
-          console.error('❌ Не удалось обновить токены');
-
           if (clearTokensOnError) {
             await clearTokens();
-            console.log('🧹 Токены очищены');
           }
 
           return response; // Возвращаем оригинальный 401 ответ
@@ -275,7 +262,6 @@ export async function authFetch(
     }
 
   } catch (error) {
-    console.error('❌ Ошибка в authFetch:', error);
     throw error;
   }
 }

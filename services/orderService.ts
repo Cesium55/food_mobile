@@ -85,7 +85,6 @@ export async function getCurrentPendingPurchase(): Promise<CreateOrderResponse |
     const purchaseData = rawData.purchase || rawData;
     
     if (!purchaseData || !purchaseData.id) {
-      console.error('Неверный формат ответа от /purchases/current-pending:', responseData);
       return null;
     }
     
@@ -110,7 +109,6 @@ export async function getCurrentPendingPurchase(): Promise<CreateOrderResponse |
     
     return data;
   } catch (error) {
-    console.error('Ошибка получения текущего pending платежа:', error);
     return null;
   }
 }
@@ -157,7 +155,6 @@ export async function createOrderFromCart(
   const purchaseData = rawData.purchase || rawData;
   
   if (!purchaseData || !purchaseData.id) {
-    console.error('Неверный формат ответа от /purchases/with-partial-success:', responseData);
     throw new Error('Неверный формат ответа от сервера');
   }
   
@@ -285,7 +282,6 @@ export async function getPurchaseById(purchaseId: number): Promise<Purchase> {
 
     return purchase;
   } catch (error) {
-    console.error('Ошибка получения покупки:', error);
     throw error;
   }
 }
@@ -341,7 +337,6 @@ export async function getPurchasesByStatus(status?: string): Promise<CreateOrder
     
     return [];
   } catch (error) {
-    console.error('Ошибка получения покупок:', error);
     throw error;
   }
 }

@@ -1,5 +1,6 @@
+import { config } from '@/constants/config';
 import { useShopPoint } from "@/hooks/useShopPoints";
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
 import { WebView } from 'react-native-webview';
 import ShopModal from './ShopModal';
@@ -27,34 +28,37 @@ export default function YandexMapsWebView() {
   const shopData = shopPoint ? {
     id: shopPoint.id,
     name: `Торговая точка #${shopPoint.id}`,
-    address: shopPoint.address_formated || shopPoint.address_raw
+    address: shopPoint.address_formated || shopPoint.address_raw,
+    latitude: shopPoint.latitude,
+    longitude: shopPoint.longitude,
   } : null;
+
+  // Мемоизируем source, чтобы WebView не перезагружался при каждом рендере
+  const webViewSource = useMemo(() => {
+    const baseUrl = config.apiBaseUrl.replace(/\/$/, '');
+    return { uri: `${baseUrl}/maps/shop-points` };
+  }, []);
 
   return (
     <View style={styles.container}>
       <WebView
         ref={webViewRef}
-        source={{ 
-          uri: `https://gembos.ru/maps/shop-points?v=${Date.now()}` // Добавляем timestamp для обхода кэша
-        }}
+        source={webViewSource}
         originWhitelist={['*']}
         javaScriptEnabled
-        cacheEnabled={false}
-        incognito={true}
-        sharedCookiesEnabled={false}
+        cacheEnabled={true}
+        incognito={false}
+        sharedCookiesEnabled={true}
         style={styles.webview}
         geolocationEnabled={true}
         onMessage={(event) => {
-          console.log("WebView message received:", event.nativeEvent.data);
           try {
             const data = JSON.parse(event.nativeEvent.data);
-            console.log("Parsed data:", data);
             if (data.type === 'markerClick' && data.shopPointId) {
-              console.log("Navigating to shop point:", data.shopPointId);
               handleMarkerClick(data.shopPointId);
             }
           } catch (error) {
-            console.log('Error parsing WebView message:', error);
+            // Error parsing WebView message
           }
         }}
       />

@@ -91,7 +91,6 @@ export const ShopsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           setIsInitialized(true);
           setCurrentSellerId(sellerId);
         } else {
-          console.error('❌ Неверный формат данных точек продаж:', shopPointsData);
           setError('Неверный формат данных точек продаж');
           setShops([]);
           setIsInitialized(true);
@@ -104,14 +103,12 @@ export const ShopsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         setCurrentSellerId(sellerId);
       } else {
         const errorText = await response.text();
-        console.error('❌ Ошибка загрузки точек продаж:', response.status, errorText);
         setError('Ошибка загрузки точек продаж');
         setShops([]);
         setIsInitialized(true);
         setCurrentSellerId(sellerId);
       }
     } catch (err) {
-      console.error('❌ Ошибка подключения к серверу при загрузке точек продаж:', err);
       setError('Ошибка подключения к серверу');
       setShops([]);
       setIsInitialized(true);

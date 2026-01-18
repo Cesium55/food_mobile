@@ -42,11 +42,9 @@ export const uploadProductImage = async (
       return data.data || data;
     } else {
       const errorText = await response.text();
-      console.error('Ошибка загрузки изображения:', response.status, errorText);
       return null;
     }
   } catch (error) {
-    console.error('Ошибка при загрузке изображения:', error);
     return null;
   }
 };
@@ -93,11 +91,9 @@ export const uploadProductImagesBatch = async (
       return data.data || data;
     } else {
       const errorText = await response.text();
-      console.error('Ошибка загрузки изображений:', response.status, errorText);
       return [];
     }
   } catch (error) {
-    console.error('Ошибка при загрузке изображений:', error);
     return [];
   }
 };
@@ -135,11 +131,9 @@ export const uploadSellerImage = async (
       return data.data || data;
     } else {
       const errorText = await response.text();
-      console.error('Ошибка загрузки изображения продавца:', response.status, errorText);
       return null;
     }
   } catch (error) {
-    console.error('Ошибка при загрузке изображения продавца:', error);
     return null;
   }
 };
@@ -162,11 +156,9 @@ export const deleteProductImage = async (imageId: number): Promise<boolean> => {
       return true;
     } else {
       const errorText = await response.text();
-      console.error('Ошибка удаления изображения товара:', response.status, errorText);
       return false;
     }
   } catch (error) {
-    console.error('Ошибка при удалении изображения товара:', error);
     return false;
   }
 };
@@ -189,11 +181,9 @@ export const deleteSellerImage = async (imageId: number): Promise<boolean> => {
       return true;
     } else {
       const errorText = await response.text();
-      console.error('Ошибка удаления изображения продавца:', response.status, errorText);
       return false;
     }
   } catch (error) {
-    console.error('Ошибка при удалении изображения продавца:', error);
     return false;
   }
 };

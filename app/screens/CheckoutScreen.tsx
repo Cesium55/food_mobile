@@ -1,4 +1,6 @@
 import { PaymentWebView } from "@/components/payment/PaymentWebView";
+import { IconSymbol } from "@/components/ui/icon-symbol";
+import { spacing } from "@/constants/tokens";
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useCart } from "@/hooks/useCart";
@@ -633,11 +635,26 @@ export default function CheckoutScreen() {
     return item.message || 'Ошибка';
   };
 
+  const handleBackPress = () => {
+    router.replace('/(tabs)/(profile)');
+  };
+
   if (loadingOrder) {
     return (
       <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]} edges={['top']}>
         <View style={styles.header}>
+          <TouchableOpacity 
+            style={styles.backButton}
+            onPress={handleBackPress}
+          >
+            <IconSymbol 
+              name="arrow.left" 
+              color={colors.text}
+              size={24}
+            />
+          </TouchableOpacity>
           <Text style={[styles.headerTitle, { color: colors.text }]}>Оформление заказа</Text>
+          <View style={styles.headerSpacer} />
         </View>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#4CAF50" />
@@ -651,7 +668,18 @@ export default function CheckoutScreen() {
     return (
       <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]} edges={['top']}>
         <View style={styles.header}>
+          <TouchableOpacity 
+            style={styles.backButton}
+            onPress={handleBackPress}
+          >
+            <IconSymbol 
+              name="arrow.left" 
+              color={colors.text}
+              size={24}
+            />
+          </TouchableOpacity>
           <Text style={[styles.headerTitle, { color: colors.text }]}>Оформление заказа</Text>
+          <View style={styles.headerSpacer} />
         </View>
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>Ошибка загрузки данных заказа</Text>
@@ -664,9 +692,20 @@ export default function CheckoutScreen() {
     <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]} edges={['top']}>
       {/* Header */}
       <View style={styles.header}>
+        <TouchableOpacity 
+          style={styles.backButton}
+          onPress={handleBackPress}
+        >
+          <IconSymbol 
+            name="arrow.left" 
+            color={colors.text}
+            size={24}
+          />
+        </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>
           Оформление заказа
         </Text>
+        <View style={styles.headerSpacer} />
       </View>
 
       <View style={styles.container}>
@@ -978,13 +1017,24 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 16,
+    paddingHorizontal: spacing.lg,
     paddingVertical: 12,
+    position: 'relative',
+  },
+  backButton: {
+    position: 'absolute',
+    left: spacing.lg,
+    padding: 8,
+    zIndex: 1,
   },
   headerTitle: {
     fontSize: 18,
     fontWeight: '700',
     textAlign: 'center',
+    flex: 1,
+  },
+  headerSpacer: {
+    width: 40,
   },
   container: {
     flex: 1,

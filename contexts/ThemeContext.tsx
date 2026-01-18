@@ -69,7 +69,6 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
         setThemeModeState(savedTheme);
       }
     } catch (error) {
-      console.error('Ошибка загрузки темы:', error);
     }
   };
 
@@ -79,7 +78,6 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
       setThemeModeState(mode);
       await AsyncStorage.setItem(THEME_STORAGE_KEY, mode);
     } catch (error) {
-      console.error('Ошибка сохранения темы:', error);
     }
   };
 

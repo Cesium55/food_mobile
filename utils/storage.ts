@@ -22,9 +22,7 @@ export const saveTokens = async (accessToken: string, refreshToken: string): Pro
       [TOKEN_KEYS.ACCESS_TOKEN, accessToken],
       [TOKEN_KEYS.REFRESH_TOKEN, refreshToken],
     ]);
-    console.log('✅ Токены сохранены в AsyncStorage');
   } catch (error) {
-    console.error('❌ Ошибка сохранения токенов:', error);
     throw error;
   }
 };
@@ -44,7 +42,6 @@ export const getTokens = async (): Promise<{ accessToken: string | null; refresh
       refreshToken: tokens[1][1],
     };
   } catch (error) {
-    console.error('❌ Ошибка получения токенов:', error);
     return { accessToken: null, refreshToken: null };
   }
 };
@@ -58,9 +55,7 @@ export const clearTokens = async (): Promise<void> => {
       TOKEN_KEYS.ACCESS_TOKEN,
       TOKEN_KEYS.REFRESH_TOKEN,
     ]);
-    console.log('✅ Токены удалены из AsyncStorage');
   } catch (error) {
-    console.error('❌ Ошибка удаления токенов:', error);
     throw error;
   }
 };
@@ -81,7 +76,6 @@ export const saveLastLocation = async (latitude: number, longitude: number): Pro
     const locationData = JSON.stringify({ latitude, longitude });
     await AsyncStorage.setItem(LOCATION_KEY, locationData);
   } catch (error) {
-    console.error('❌ Ошибка сохранения местоположения:', error);
   }
 };
 
@@ -96,7 +90,6 @@ export const getLastLocation = async (): Promise<{ latitude: number; longitude: 
     }
     return null;
   } catch (error) {
-    console.error('❌ Ошибка получения местоположения:', error);
     return null;
   }
 };

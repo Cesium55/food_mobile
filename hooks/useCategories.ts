@@ -24,7 +24,6 @@ export const useCategories = () => {
       setError(null);
       
       const url = getApiUrl(API_ENDPOINTS.CATEGORIES.BASE);
-      console.log('🚀 API FETCH Categories:', url);
 
       const response = await authFetch(url, {
         method: 'GET',
@@ -35,8 +34,6 @@ export const useCategories = () => {
         const data = await response.json();
         const categoriesData = data.data || data;
         
-        console.log('📦 API RESPONSE Categories (RAW):', JSON.stringify(categoriesData, null, 2));
-        
         if (Array.isArray(categoriesData)) {
           setCategories(categoriesData);
         } else {
@@ -44,11 +41,9 @@ export const useCategories = () => {
         }
       } else {
         const errorText = await response.text();
-        console.error('❌ API ERROR Categories:', response.status, errorText);
         setError('Ошибка загрузки категорий');
       }
     } catch (err) {
-      console.error('❌ API CRASH Categories:', err);
       setError('Ошибка подключения к серверу');
     } finally {
       setLoading(false);
@@ -59,7 +54,6 @@ export const useCategories = () => {
   const fetchCategoryOffers = useCallback(async (categoryId: number) => {
     try {
       const url = getApiUrl(`${API_ENDPOINTS.CATEGORIES.BASE}/${categoryId}/offers`);
-      console.log('🚀 API FETCH Category Offers:', url);
 
       const response = await authFetch(url, {
         method: 'GET',
@@ -70,15 +64,11 @@ export const useCategories = () => {
         const data = await response.json();
         const offersData = data.data || data;
         
-        console.log(`📦 API RESPONSE Offers for category ${categoryId}:`, Array.isArray(offersData) ? offersData.length : 'not array');
-        
         return Array.isArray(offersData) ? offersData : [];
       } else {
-        console.error('❌ API ERROR Category Offers:', response.status);
         return [];
       }
     } catch (err) {
-      console.error('❌ API CRASH Category Offers:', err);
       return [];
     }
   }, []);
