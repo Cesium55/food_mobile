@@ -1,10 +1,13 @@
 import { StyleSheet, Text, View } from 'react-native';
 
 import { GridOfferList } from '@/components/offers/GridOfferList';
+import { createProductModal } from '@/components/product/ProductModalContent';
 import HorizontalSellersList from '@/components/sellers/horizontalSellersList';
 import { TabScreen } from '@/components/TabScreen';
 import { spacing, typography } from '@/constants/tokens';
+import { useModal } from '@/contexts/ModalContext';
 import { useColors } from '@/contexts/ThemeContext';
+import { Offer } from '@/hooks/useOffers';
 import { useOffers } from '@/hooks/useOffers';
 import { getCurrentLocation, getLocationWithCache } from '@/services/locationService';
 import { getBoundingBox } from '@/utils/locationUtils';
@@ -14,6 +17,7 @@ export default function HomeScreen() {
   const [searchText, setSearchText] = useState('');
   const [refreshing, setRefreshing] = useState(false);
   const { offers, fetchOffersWithLocation, fetchOffers, loading } = useOffers();
+  const { openModal } = useModal();
   const colors = useColors();
   const styles = createStyles(colors);
 
@@ -72,6 +76,12 @@ export default function HomeScreen() {
     }
   }, [loadData]);
 
+  // Обработчик открытия товара в модалке
+  const handleOfferPress = useCallback((offer: Offer) => {
+    const { content, footer } = createProductModal(offer);
+    openModal(content, footer);
+  }, [openModal]);
+
   return (
     
     <TabScreen 
@@ -97,6 +107,7 @@ export default function HomeScreen() {
           <GridOfferList
             offers={offers}
             limit={10}
+            onOfferPress={handleOfferPress}
           />
         )}
       </View>

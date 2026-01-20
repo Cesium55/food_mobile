@@ -59,8 +59,14 @@ export function GridOfferList({
 
   return (
     <View style={styles.grid}>
-      {offersWithDistance.map(({ offer, distance }) => (
-        <View key={offer.id} style={styles.gridItem}>
+      {offersWithDistance.map(({ offer, distance }, index) => (
+        <View 
+          key={offer.id} 
+          style={[
+            styles.gridItem,
+            index % 2 === 0 ? styles.gridItemLeft : styles.gridItemRight
+          ]}
+        >
           <MiniOfferCard 
             offer={offer}
             distance={distance}
@@ -76,10 +82,16 @@ const styles = StyleSheet.create({
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: spacing.md,
     justifyContent: 'space-between',
   },
   gridItem: {
     width: '48%',
+    marginBottom: spacing.md,
+  },
+  gridItemLeft: {
+    marginRight: 0,
+  },
+  gridItemRight: {
+    marginLeft: 0,
   },
 });

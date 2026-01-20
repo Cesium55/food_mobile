@@ -101,15 +101,9 @@ export default function ProductImageSection({ offer }: ProductImageSectionProps)
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#fff',
     alignItems: 'center',
-    paddingVertical: 40,
+    paddingVertical: 20,
     position: 'relative',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 3,
   },
   scrollView: {
     width: 240,

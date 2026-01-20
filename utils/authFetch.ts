@@ -99,7 +99,7 @@ async function refreshAccessToken(): Promise<{ success: boolean; accessToken?: s
       return { success: false, accessToken: null };
 
     } catch (error) {
-      await clearTokens();
+      // Не очищаем токены при ошибке сети/таймаута
       return { success: false, accessToken: null };
     } finally {
       isRefreshing = false;

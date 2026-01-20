@@ -1,11 +1,25 @@
 import { ProfileScreenWrapper } from "@/components/profile/ProfileScreenWrapper";
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import { useModal } from "@/contexts/ModalContext";
 import { configureNotifications, getFCMToken, initializeFirebase, sendFCMTokenToServer } from "@/services/firebaseService";
 import { useState } from "react";
 import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 export default function Settings() {
     const [loading, setLoading] = useState(false);
+    const { openModal } = useModal();
+
+    const handleOpenModal = () => {
+        openModal(
+            <>
+                {Array.from({ length: 100 }).map((_, i) => (
+                    <Text key={i} style={styles.modalItem}>
+                        -- nothing here --
+                    </Text>
+                ))}
+            </>
+        );
+    };
 
     const handleGetToken = async () => {
         setLoading(true);
@@ -91,6 +105,14 @@ export default function Settings() {
                         <Text style={[styles.buttonText, styles.buttonTextSecondary]}>Отправить FCM токен</Text>
                         {loading && <ActivityIndicator size="small" color="#007AFF" style={styles.loader} />}
                     </TouchableOpacity>
+
+                    <TouchableOpacity 
+                        style={[styles.button, styles.buttonOutline]} 
+                        onPress={handleOpenModal}
+                    >
+                        <IconSymbol name="plus" color="#333" size={20} />
+                        <Text style={[styles.buttonText, styles.buttonTextOutline]}>Открыть тестовую модалку</Text>
+                    </TouchableOpacity>
                 </View>
             </View>
         </ProfileScreenWrapper>
@@ -126,6 +148,11 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: '#007AFF',
     },
+    buttonOutline: {
+        backgroundColor: '#f5f5f5',
+        borderWidth: 1,
+        borderColor: '#ddd',
+    },
     buttonDisabled: {
         opacity: 0.6,
     },
@@ -138,7 +165,24 @@ const styles = StyleSheet.create({
     buttonTextSecondary: {
         color: '#007AFF',
     },
+    buttonTextOutline: {
+        color: '#333',
+    },
     loader: {
         marginLeft: 8,
+    },
+    modalTitle: {
+        fontSize: 22,
+        fontWeight: 'bold',
+        marginBottom: 20,
+        textAlign: 'center',
+        color: '#333',
+    },
+    modalItem: {
+        fontSize: 16,
+        color: '#666',
+        paddingVertical: 8,
+        borderBottomWidth: 1,
+        borderBottomColor: '#eee',
     },
 });

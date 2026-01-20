@@ -42,7 +42,7 @@ export function OfferActions({
   const strikethroughOpacity = useSharedValue(isInCart ? 0 : 1);
   const distanceOpacity = useSharedValue(isInCart ? 0 : 1);
   const minusOpacity = useSharedValue(isInCart ? 1 : 0);
-  const quantityOpacity = useSharedValue(isInCart ? 1 : 0);
+  const quantityOpacity = useSharedValue(isInCart && quantity > 0 ? 1 : 0);
   
   React.useEffect(() => {
     const config = { 
@@ -56,8 +56,8 @@ export function OfferActions({
     
     // Минус и количество
     minusOpacity.value = withTiming(isInCart ? 1 : 0, config);
-    quantityOpacity.value = withTiming(isInCart ? 1 : 0, config);
-  }, [isInCart]);
+    quantityOpacity.value = withTiming(isInCart && quantity > 0 ? 1 : 0, config);
+  }, [isInCart, quantity]);
   
   // Зачеркнутая цена и расстояние уезжают/приезжают вправо
   const strikethroughStyle = useAnimatedStyle(() => ({
@@ -124,10 +124,10 @@ export function OfferActions({
               {distance}
             </Animated.Text>
           )}
-          {isInCart && (
-            <Animated.Text style={[styles.cartQuantity, quantityStyle]}>
+          {isInCart && quantity > 0 && (
+            <Text style={styles.cartQuantity}>
               {quantity} шт
-            </Animated.Text>
+            </Text>
           )}
         </View>
         
@@ -146,9 +146,9 @@ export function OfferActions({
               styles.buttonTouchableDisabled
             ]}>
               <Text style={[
-                styles.cartButtonText,
-                styles.cartButtonTextDisabled
-              ]}>+</Text>
+              styles.cartButtonText,
+              styles.cartButtonTextDisabled
+            ]}>+</Text>
             </View>
           </View>
         ) : (
@@ -248,10 +248,11 @@ const createStyles = (tokens: any) => {
       color: colors.gray[500],
     },
     cartQuantity: {
-      fontSize: typography.fontSize.xs,
-      fontFamily: typography.fontFamily.regular,
-      color: colors.text.secondary,
+      fontSize: typography.fontSize.sm,
+      fontFamily: typography.fontFamily.semibold,
+      color: colors.text.primary,
       marginTop: spacing.xxs,
+      textAlign: 'center',
     },
   });
 };
