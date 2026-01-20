@@ -1,7 +1,9 @@
 import { TabScreen } from "@/components/TabScreen";
 import VerticalOfferCard from "@/components/offers/VerticalOfferCard";
+import { createProductModal } from "@/components/product/ProductModalContent";
+import { useModal } from "@/contexts/ModalContext";
 import { useCategories } from "@/hooks/useCategories";
-import { useOffers } from "@/hooks/useOffers";
+import { Offer, useOffers } from "@/hooks/useOffers";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React from "react";
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
@@ -11,6 +13,7 @@ const ROW_HEIGHT = 70;
 export default function CategoryDetail() {
   const { categoryId } = useLocalSearchParams<{ categoryId: string }>();
   const router = useRouter();
+  const { openModal } = useModal();
   const { getCategoryById, getSubCategories, getCategoryPath } = useCategories();
   const { getOffersByCategory } = useOffers();
   
@@ -18,6 +21,11 @@ export default function CategoryDetail() {
   const subCategories = getSubCategories(Number(categoryId));
   const breadcrumbs = getCategoryPath(Number(categoryId));
   const offers = getOffersByCategory(Number(categoryId));
+
+  const handleOfferPress = (offer: Offer) => {
+    const { content, footer } = createProductModal(offer);
+    openModal(content, footer);
+  };
 
   if (!category) {
     return (
@@ -72,7 +80,11 @@ export default function CategoryDetail() {
               <Text style={styles.offersTitle}>Товары со скидкой ({offers.length})</Text>
               <View style={styles.offersGrid}>
                 {offers.map((offer) => (
-                  <VerticalOfferCard key={offer.id} offer={offer} />
+                  <VerticalOfferCard 
+                    key={offer.id} 
+                    offer={offer}
+                    onPress={() => handleOfferPress(offer)}
+                  />
                 ))}
               </View>
             </View>

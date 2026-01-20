@@ -1,8 +1,9 @@
 import { TabScreen } from '@/components/TabScreen';
 import { MiniOfferCard } from '@/components/offers/mini/MiniOfferCard';
+import { createProductModal } from '@/components/product/ProductModalContent';
+import { useModal } from '@/contexts/ModalContext';
 import { Category, useCategories } from '@/hooks/useCategories';
 import { Offer, useOffers } from '@/hooks/useOffers';
-import { router, useSegments } from 'expo-router';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
@@ -20,7 +21,7 @@ const CategorySection = ({
   const [selectedCategoryPath, setSelectedCategoryPath] = useState<Category[]>([]);
   const [offers, setOffers] = useState<Offer[]>([]);
   const [loading, setLoading] = useState(true);
-  const segments = useSegments();
+  const { openModal } = useModal();
   const scrollViewRef = useRef<ScrollView>(null);
   const offersScrollViewRef = useRef<ScrollView>(null);
 
@@ -63,9 +64,9 @@ const CategorySection = ({
     loadOffers();
   }, [activeCategoryId, fetchOffersByCategory]);
 
-  const handleProductPress = (offerId: number) => {
-    const currentTab = segments[0] === '(tabs)' ? segments[1] : '(catalog)';
-    router.push(`/(tabs)/${currentTab}/product/${offerId}`);
+  const handleProductPress = (offer: Offer) => {
+    const { content, footer } = createProductModal(offer);
+    openModal(content, footer);
   };
 
   const handleSubcategoryPress = (subcategory: Category) => {
@@ -162,7 +163,7 @@ const CategorySection = ({
             <View key={offer.id} style={styles.cardWrapper}>
               <MiniOfferCard 
                 offer={offer} 
-                onPress={() => handleProductPress(offer.id)}
+                onPress={() => handleProductPress(offer)}
               />
             </View>
           ))}

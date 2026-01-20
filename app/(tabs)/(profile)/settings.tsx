@@ -5,20 +5,52 @@ import { configureNotifications, getFCMToken, initializeFirebase, sendFCMTokenTo
 import { useState } from "react";
 import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
+// Тестовый компонент модалки
+function TestModal({ level }: { level: number }) {
+    const { openModal, closeModal } = useModal();
+
+    const handleOpenAnother = () => {
+        console.log(`Opening modal level ${level + 1} from level ${level}`);
+        openModal(<TestModal level={level + 1} />);
+    };
+
+    return (
+        <View style={styles.testModalContainer}>
+            <Text style={styles.testModalTitle}>Тестовая модалка #{level}</Text>
+            <Text style={styles.testModalText}>
+                Это тестовая модалка уровня {level}
+            </Text>
+            <Text style={styles.testModalText}>
+                Нажмите кнопку ниже, чтобы открыть еще одну такую же модалку поверх этой.
+            </Text>
+            
+            <TouchableOpacity 
+                style={styles.testModalButton}
+                onPress={handleOpenAnother}
+            >
+                <IconSymbol name="plus" color="#fff" size={20} />
+                <Text style={styles.testModalButtonText}>Открыть модалку #{level + 1}</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+                style={[styles.testModalButton, styles.testModalButtonClose]}
+                onPress={closeModal}
+            >
+                <IconSymbol name="xmark" color="#333" size={20} />
+                <Text style={[styles.testModalButtonText, styles.testModalButtonTextClose]}>Закрыть эту модалку</Text>
+            </TouchableOpacity>
+
+            <View style={styles.testModalSpacer} />
+        </View>
+    );
+}
+
 export default function Settings() {
     const [loading, setLoading] = useState(false);
     const { openModal } = useModal();
 
     const handleOpenModal = () => {
-        openModal(
-            <>
-                {Array.from({ length: 100 }).map((_, i) => (
-                    <Text key={i} style={styles.modalItem}>
-                        -- nothing here --
-                    </Text>
-                ))}
-            </>
-        );
+        openModal(<TestModal level={1} />);
     };
 
     const handleGetToken = async () => {
@@ -184,5 +216,48 @@ const styles = StyleSheet.create({
         paddingVertical: 8,
         borderBottomWidth: 1,
         borderBottomColor: '#eee',
+    },
+    testModalContainer: {
+        padding: 20,
+    },
+    testModalTitle: {
+        fontSize: 24,
+        fontWeight: 'bold',
+        marginBottom: 16,
+        color: '#333',
+        textAlign: 'center',
+    },
+    testModalText: {
+        fontSize: 16,
+        color: '#666',
+        marginBottom: 12,
+        lineHeight: 24,
+    },
+    testModalButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#007AFF',
+        borderRadius: 8,
+        padding: 16,
+        marginTop: 20,
+        marginBottom: 12,
+    },
+    testModalButtonClose: {
+        backgroundColor: '#f5f5f5',
+        borderWidth: 1,
+        borderColor: '#ddd',
+    },
+    testModalButtonText: {
+        color: '#fff',
+        fontSize: 16,
+        fontWeight: '600',
+        marginLeft: 8,
+    },
+    testModalButtonTextClose: {
+        color: '#333',
+    },
+    testModalSpacer: {
+        height: 100,
     },
 });

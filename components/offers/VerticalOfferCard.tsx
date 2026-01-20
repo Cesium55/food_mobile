@@ -13,9 +13,10 @@ import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 interface VerticalOfferCardProps {
   offer: Offer;
+  onPress?: () => void;
 }
 
-export default function VerticalOfferCard({ offer }: VerticalOfferCardProps) {
+export default function VerticalOfferCard({ offer, onPress }: VerticalOfferCardProps) {
   const router = useRouter();
   const segments = useSegments();
   const { shops } = useShops();
@@ -62,8 +63,12 @@ export default function VerticalOfferCard({ offer }: VerticalOfferCardProps) {
   }
 
   const handlePress = () => {
-    const currentTab = segments[0] === '(tabs)' ? segments[1] : '(catalog)';
-    router.push(`/(tabs)/${currentTab}/product/${offer.id}`);
+    if (onPress) {
+      onPress();
+    } else {
+      const currentTab = segments[0] === '(tabs)' ? segments[1] : '(catalog)';
+      router.push(`/(tabs)/${currentTab}/product/${offer.id}`);
+    }
   };
 
   return (

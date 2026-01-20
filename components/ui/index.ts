@@ -18,6 +18,5 @@ export type { ThemedViewProps } from '../themed-view';
 
 export { Collapsible } from './collapsible';
 export { IconSymbol } from './icon-symbol';
-export { AppModal } from './AppModal';
 export { StandardModal } from './StandardModal';
 
