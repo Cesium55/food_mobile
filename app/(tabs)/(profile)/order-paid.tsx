@@ -1,18 +1,157 @@
 import { ProfileScreenWrapper } from "@/components/profile/ProfileScreenWrapper";
 import { QRCodeDisplay } from "@/components/qr/QRCodeDisplay";
+import { createShopModal } from "@/components/yandex_maps_webview";
+import { useModal } from "@/contexts/ModalContext";
 import { useOffers } from "@/hooks/useOffers";
-import { useShops } from "@/hooks/useShops";
+import { usePublicSeller } from "@/hooks/usePublicSeller";
+import { useShopPoint } from "@/hooks/useShopPoints";
 import { CreateOrderResponse, getPurchaseById } from "@/services/orderService";
 import { getPaymentByPurchaseId, getPurchaseToken } from "@/services/paymentService";
+import { getFirstImageUrl } from "@/utils/imageUtils";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
-import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
+// Компонент для отображения группы товаров продавца
+function SellerGroup({ 
+  sellerId, 
+  shopId, 
+  items 
+}: { 
+  sellerId: number; 
+  shopId: number; 
+  items: Array<{ offerId: number; productName: string; quantity: number; currentCost: string; originalCost: string; shopId: number; fulfilledQuantity: number; fulfillmentStatus?: string; imageUrl: string | null }> 
+}) {
+  const { seller } = usePublicSeller(sellerId);
+  const { shopPoint } = useShopPoint(shopId);
+  const { openModal } = useModal();
+  const [imageError, setImageError] = useState(false);
+  
+  const sellerName = seller?.short_name || seller?.full_name || `Продавец #${sellerId}`;
+  const sellerImageUrl = getFirstImageUrl(seller?.images || []);
+  const hasSellerImage = sellerImageUrl && !imageError;
+  
+  // Получаем адрес торговой точки
+  let shopAddress = shopPoint?.address_formated || shopPoint?.address_raw;
+  if (!shopAddress) {
+    shopAddress = 'Адрес не указан';
+  }
+
+  const handleAddressPress = () => {
+    if (shopId) {
+      const { content } = createShopModal(shopId);
+      openModal(content);
+    }
+  }
+
+  return (
+    <View style={styles.shopSection}>
+      {/* Заголовок с информацией о продавце */}
+      <View style={styles.sellerHeader}>
+        {hasSellerImage ? (
+          <Image
+            source={{ uri: sellerImageUrl! }}
+            style={styles.sellerAvatar}
+            onError={() => setImageError(true)}
+            resizeMode="cover"
+          />
+        ) : (
+          <View style={styles.sellerAvatarPlaceholder}>
+            <Text style={styles.sellerAvatarText}>
+              {sellerName.charAt(0).toUpperCase()}
+            </Text>
+          </View>
+        )}
+        <View style={styles.sellerInfo}>
+          <Text style={styles.shopName}>{sellerName}</Text>
+          <TouchableOpacity onPress={handleAddressPress} activeOpacity={0.7}>
+            <Text style={styles.shopAddress}>{shopAddress}</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+      
+      {/* Список товаров */}
+      {items.map((item) => {
+        // Определяем статус выдачи на основе fulfillment_status
+        const fulfillmentStatus = item.fulfillmentStatus;
+        const fulfilledQty = item.fulfilledQuantity || 0;
+        
+        let statusText = '';
+        let statusStyle = styles.fulfillmentTextNotFulfilled;
+        
+        if (fulfillmentStatus === 'fulfilled') {
+          statusText = '✓ Выдан';
+          statusStyle = styles.fulfillmentTextSuccess;
+        } else if (fulfillmentStatus === 'partially_fulfilled') {
+          statusText = `Выдано: ${fulfilledQty} из ${item.quantity}`;
+          statusStyle = styles.fulfillmentTextPartial;
+        } else if (fulfillmentStatus === 'unfulfilled') {
+          statusText = 'Не выдан';
+          statusStyle = styles.fulfillmentTextNotFulfilled;
+        } else if (fulfilledQty > 0) {
+          // Если статус не указан, но есть количество - определяем по количеству
+          if (fulfilledQty >= item.quantity) {
+            statusText = '✓ Выдан';
+            statusStyle = styles.fulfillmentTextSuccess;
+          } else {
+            statusText = `Выдано: ${fulfilledQty} из ${item.quantity}`;
+            statusStyle = styles.fulfillmentTextPartial;
+          }
+        } else {
+          statusText = 'Не выдан';
+          statusStyle = styles.fulfillmentTextNotFulfilled;
+        }
+        
+        return (
+          <View key={item.offerId} style={styles.itemCard}>
+            {/* Изображение товара */}
+            {item.imageUrl ? (
+              <Image
+                source={{ uri: item.imageUrl }}
+                style={styles.itemImage}
+                resizeMode="cover"
+              />
+            ) : (
+              <View style={styles.itemImagePlaceholder}>
+                <Text style={styles.itemImageText}>
+                  {item.productName.charAt(0).toUpperCase()}
+                </Text>
+              </View>
+            )}
+            
+            <View style={styles.itemInfo}>
+              <Text style={styles.itemName}>{item.productName}</Text>
+              <Text style={styles.itemQuantity}>
+                {item.quantity} шт. × {item.currentCost} ₽
+              </Text>
+              {/* Статус выдачи */}
+              <View style={styles.fulfillmentStatus}>
+                <Text style={statusStyle}>
+                  {statusText}
+                </Text>
+              </View>
+            </View>
+            <Text style={styles.itemTotal}>
+              {(parseFloat(item.currentCost) * item.quantity).toFixed(2)} ₽
+            </Text>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
+// Загружаем офферы при открытии экрана, чтобы товары отображались правильно
 export default function OrderPaidScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ purchaseId?: string }>();
-  const { getOfferById } = useOffers();
-  const { getShopById } = useShops();
+  const { getOfferById, refetch: refetchOffers } = useOffers();
+  
+  // Загружаем офферы при монтировании
+  useEffect(() => {
+    refetchOffers({ skipExpiredFilter: true });
+  }, [refetchOffers]);
+
   const [orderData, setOrderData] = useState<CreateOrderResponse | null>(null);
   const [paymentDate, setPaymentDate] = useState<Date | null>(null);
   const [loading, setLoading] = useState(true);
@@ -190,40 +329,52 @@ export default function OrderPaidScreen() {
   const purchase = orderData.purchase;
   const offerResults = orderData.offer_results || [];
 
-  // Группируем товары по магазинам из purchase_offers
-  const shopGroups = purchase.purchase_offers.reduce((groups, po) => {
+  // Группируем товары по продавцам из purchase_offers
+  const sellerGroups = purchase.purchase_offers.reduce((groups, po) => {
     const offer = getOfferById(po.offer_id);
-    if (!offer) return groups;
-
-    const shop = getShopById(offer.shopId);
-    if (!shop) return groups;
-
-    const shopId = shop.id;
-    if (!groups[shopId]) {
-      groups[shopId] = {
-        shopId: shop.id,
-        shopName: shop.name,
-        shopAddress: shop.address,
+    
+    // Используем данные из API напрямую, если оффер не загружен
+    const productName = (po.offer as any)?.product?.name 
+      || offer?.productName 
+      || `Товар #${po.offer.product_id}`;
+    
+    // Получаем sellerId из оффера или из данных API
+    const sellerId = offer?.sellerId || (po.offer as any)?.product?.seller_id || null;
+    const shopId = offer?.shopId || po.offer.shop_id;
+    
+    if (!sellerId) {
+      // Если sellerId не найден, пропускаем товар или используем fallback
+      return groups;
+    }
+    
+    if (!groups[sellerId]) {
+      groups[sellerId] = {
+        sellerId: sellerId,
+        shopId: shopId,
         items: [],
       };
     }
 
-    groups[shopId].items.push({
+    // Получаем изображение товара
+    const productImages = (po.offer as any)?.product?.images || offer?.productImages || [];
+    const imageUrl = getFirstImageUrl(productImages);
+
+    groups[sellerId].items.push({
       offerId: po.offer_id,
-      productName: offer.productName || 'Неизвестный товар',
+      productName: productName,
       quantity: po.quantity,
       currentCost: po.offer?.current_cost || po.cost_at_purchase || '0.00',
       originalCost: po.offer?.original_cost || po.cost_at_purchase || '0.00',
-      shopId: shop.id,
-      shopName: shop.name,
-      fulfilledQuantity: po.fulfilled_quantity || 0,
-      fulfillmentStatus: po.fulfillment_status,
+      shopId: shopId,
+      fulfilledQuantity: (po as any).fulfilled_quantity || 0,
+      fulfillmentStatus: (po as any).fulfillment_status,
+      imageUrl: imageUrl,
     });
 
     return groups;
-  }, {} as Record<number, { shopId: number; shopName: string; shopAddress?: string; items: Array<{ offerId: number; productName: string; quantity: number; currentCost: string; originalCost: string; shopId: number; shopName: string; fulfilledQuantity: number; fulfillmentStatus?: string }> }>);
+  }, {} as Record<number, { sellerId: number; shopId: number; items: Array<{ offerId: number; productName: string; quantity: number; currentCost: string; originalCost: string; shopId: number; fulfilledQuantity: number; fulfillmentStatus?: string; imageUrl: string | null }> }>);
 
-  const shopGroupsArray = Object.values(shopGroups);
+  const sellerGroupsArray = Object.values(sellerGroups);
 
   const totalAmount = purchase.purchase_offers.reduce((sum, po) => {
     const cost = po.offer?.current_cost || po.cost_at_purchase || '0.00';
@@ -279,65 +430,9 @@ export default function OrderPaidScreen() {
           </View>
         </View>
 
-        {/* Товары по магазинам */}
-        {shopGroupsArray.map((group) => (
-          <View key={group.shopId} style={styles.shopSection}>
-            <Text style={styles.shopName}>{group.shopName}</Text>
-            {group.shopAddress && (
-              <Text style={styles.shopAddress}>{group.shopAddress}</Text>
-            )}
-            {group.items.map((item) => {
-              // Определяем статус выдачи на основе fulfillment_status
-              const fulfillmentStatus = item.fulfillmentStatus;
-              const fulfilledQty = item.fulfilledQuantity || 0;
-              
-              let statusText = '';
-              let statusStyle = styles.fulfillmentTextNotFulfilled;
-              
-              if (fulfillmentStatus === 'fulfilled') {
-                statusText = '✓ Выдан';
-                statusStyle = styles.fulfillmentTextSuccess;
-              } else if (fulfillmentStatus === 'partially_fulfilled') {
-                statusText = `Выдано: ${fulfilledQty} из ${item.quantity}`;
-                statusStyle = styles.fulfillmentTextPartial;
-              } else if (fulfillmentStatus === 'unfulfilled') {
-                statusText = 'Не выдан';
-                statusStyle = styles.fulfillmentTextNotFulfilled;
-              } else if (fulfilledQty > 0) {
-                // Если статус не указан, но есть количество - определяем по количеству
-                if (fulfilledQty >= item.quantity) {
-                  statusText = '✓ Выдан';
-                  statusStyle = styles.fulfillmentTextSuccess;
-                } else {
-                  statusText = `Выдано: ${fulfilledQty} из ${item.quantity}`;
-                  statusStyle = styles.fulfillmentTextPartial;
-                }
-              } else {
-                statusText = 'Не выдан';
-                statusStyle = styles.fulfillmentTextNotFulfilled;
-              }
-              
-              return (
-                <View key={item.offerId} style={styles.itemCard}>
-                  <View style={styles.itemInfo}>
-                    <Text style={styles.itemName}>{item.productName}</Text>
-                    <Text style={styles.itemQuantity}>
-                      {item.quantity} шт. × {item.currentCost} ₽
-                    </Text>
-                    {/* Статус выдачи */}
-                    <View style={styles.fulfillmentStatus}>
-                      <Text style={statusStyle}>
-                        {statusText}
-                      </Text>
-                    </View>
-                  </View>
-                  <Text style={styles.itemTotal}>
-                    {(parseFloat(item.currentCost) * item.quantity).toFixed(2)} ₽
-                  </Text>
-                </View>
-              );
-            })}
-          </View>
+        {/* Товары по продавцам */}
+        {sellerGroupsArray.map((group) => (
+          <SellerGroup key={group.sellerId} sellerId={group.sellerId} shopId={group.shopId} items={group.items} />
         ))}
 
         {/* Итого */}
@@ -369,8 +464,9 @@ export default function OrderPaidScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 16,
     paddingTop: 20,
+    paddingBottom: 16,
+    gap: 12,
   },
   loadingContainer: {
     flex: 1,
@@ -391,14 +487,8 @@ const styles = StyleSheet.create({
   },
   paymentInfoSection: {
     backgroundColor: '#fff',
-    borderRadius: 12,
+    borderRadius: 28,
     padding: 16,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
   },
   paymentInfoLabel: {
     fontSize: 14,
@@ -412,14 +502,8 @@ const styles = StyleSheet.create({
   },
   orderInfoSection: {
     backgroundColor: '#fff',
-    borderRadius: 12,
+    borderRadius: 28,
     padding: 16,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
   },
   sectionTitle: {
     fontSize: 18,
@@ -443,14 +527,39 @@ const styles = StyleSheet.create({
   },
   shopSection: {
     backgroundColor: '#fff',
-    borderRadius: 12,
+    borderRadius: 28,
     padding: 16,
+  },
+  sellerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
+  },
+  sellerAvatar: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    marginRight: 12,
+  },
+  sellerAvatarPlaceholder: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#E8F5E9',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  sellerAvatarText: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#4CAF50',
+  },
+  sellerInfo: {
+    flex: 1,
   },
   shopName: {
     fontSize: 16,
@@ -459,9 +568,10 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   shopAddress: {
-    fontSize: 14,
+    fontSize: 12,
     color: '#666',
-    marginBottom: 12,
+    marginTop: 2,
+    textDecorationLine: 'underline',
   },
   itemCard: {
     flexDirection: 'row',
@@ -470,6 +580,26 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#E0E0E0',
+  },
+  itemImage: {
+    width: 60,
+    height: 60,
+    borderRadius: 8,
+    marginRight: 12,
+  },
+  itemImagePlaceholder: {
+    width: 60,
+    height: 60,
+    borderRadius: 8,
+    backgroundColor: '#E8F5E9',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  itemImageText: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#4CAF50',
   },
   itemInfo: {
     flex: 1,
@@ -509,14 +639,8 @@ const styles = StyleSheet.create({
   },
   totalSection: {
     backgroundColor: '#fff',
-    borderRadius: 12,
+    borderRadius: 28,
     padding: 16,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
   },
   totalRow: {
     flexDirection: 'row',
@@ -552,15 +676,9 @@ const styles = StyleSheet.create({
   },
   qrSection: {
     backgroundColor: '#fff',
-    borderRadius: 12,
+    borderRadius: 28,
     padding: 20,
-    marginBottom: 16,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
   },
   qrLoadingText: {
     marginTop: 12,
@@ -569,15 +687,9 @@ const styles = StyleSheet.create({
   },
   cancelledSection: {
     backgroundColor: '#fff',
-    borderRadius: 12,
+    borderRadius: 28,
     padding: 32,
-    marginBottom: 16,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
   },
   cancelledIcon: {
     fontSize: 64,

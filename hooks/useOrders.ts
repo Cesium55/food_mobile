@@ -45,9 +45,14 @@ export const useOrders = () => {
       
       shopsSet.add(shopName);
       
+      // Используем название из данных API (если есть), или из загруженного оффера, или fallback
+      const productName = (po.offer as any)?.product?.name 
+        || offer?.productName 
+        || `Товар #${po.offer.product_id}`;
+      
       items.push({
         id: index + 1,
-        productName: offer?.productName || `Товар #${po.offer.product_id}`,
+        productName,
         quantity: po.quantity,
         price: po.cost_at_purchase,
         shopName,
@@ -119,9 +124,14 @@ export const useOrders = () => {
           
           shopsSet.add(shopName);
           
+          // Используем название из данных API (если есть), или из загруженного оффера, или fallback
+          const productName = (po.offer as any)?.product?.name 
+            || offer?.productName 
+            || `Товар #${po.offer.product_id}`;
+          
           items.push({
             id: index + 1,
-            productName: offer?.productName || `Товар #${po.offer.product_id}`,
+            productName,
             quantity: po.quantity,
             price: po.cost_at_purchase,
             shopName,
@@ -195,9 +205,14 @@ export const useOrders = () => {
           
           shopsSet.add(shopName);
           
+          // Используем название из данных API (если есть), или из загруженного оффера, или fallback
+          const productName = (po.offer as any)?.product?.name 
+            || offer?.productName 
+            || `Товар #${po.offer.product_id}`;
+          
           items.push({
             id: index + 1,
-            productName: offer?.productName || `Товар #${po.offer.product_id}`,
+            productName,
             quantity: po.quantity,
             price: po.cost_at_purchase,
             shopName,
@@ -306,9 +321,14 @@ export const useOrders = () => {
           
           shopsSet.add(shopName);
           
+          // Используем название из данных API (если есть), или из загруженного оффера, или fallback
+          const productName = (po.offer as any)?.product?.name 
+            || offer?.productName 
+            || `Товар #${po.offer.product_id}`;
+          
           items.push({
             id: index + 1,
-            productName: offer?.productName || `Товар #${po.offer.product_id}`,
+            productName,
             quantity: po.quantity,
             price: po.cost_at_purchase,
             shopName,

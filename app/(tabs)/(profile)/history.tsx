@@ -1,12 +1,19 @@
 import { ProfileScreenWrapper } from "@/components/profile/ProfileScreenWrapper";
 import { useOrders } from "@/hooks/useOrders";
+import { useOffers } from "@/hooks/useOffers";
 import { useFocusEffect, useRouter } from "expo-router";
-import React, { useCallback } from "react";
+import React, { useCallback, useEffect } from "react";
 import { ActivityIndicator, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 export default function History() {
   const router = useRouter();
   const { orders, getTotalSpent, getTotalSaved, loading, refetchOrders } = useOrders();
+  const { refetch: refetchOffers } = useOffers();
+
+  // Загружаем офферы при монтировании, чтобы товары в заказах отображались правильно
+  useEffect(() => {
+    refetchOffers({ skipExpiredFilter: true });
+  }, [refetchOffers]);
 
   const formatDate = (date: Date) => {
     // Если date - это строка ISO (UTC), создаем Date объект
@@ -126,13 +133,32 @@ export default function History() {
                   }
                 }}
               >
-                {/* Информация о заказе в одну строку */}
-                <View style={styles.orderRow}>
+                {/* Информация о заказе */}
+                <View style={styles.orderHeader}>
                   <Text style={styles.orderDate}>{formatDate(order.date)}</Text>
                   <Text style={styles.totalAmount}>
                     {order.totalAmount.toFixed(2)} ₽
                   </Text>
                 </View>
+                
+                {/* Список товаров */}
+                {order.items && order.items.length > 0 && (
+                  <View style={styles.itemsContainer}>
+                    {order.items.slice(0, 3).map((item, index) => (
+                      <View key={item.id} style={styles.itemRow}>
+                        <Text style={styles.itemName} numberOfLines={1}>
+                          {item.productName}
+                        </Text>
+                        <Text style={styles.itemQuantity}>×{item.quantity}</Text>
+                      </View>
+                    ))}
+                    {order.items.length > 3 && (
+                      <Text style={styles.moreItems}>
+                        и еще {order.items.length - 3} товар{order.items.length - 3 > 1 ? 'ов' : ''}
+                      </Text>
+                    )}
+                  </View>
+                )}
               </TouchableOpacity>
             );
           })
@@ -215,11 +241,12 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
   },
-  orderRow: {
+  orderHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     gap: 12,
+    marginBottom: 8,
   },
   orderDate: {
     fontSize: 14,
@@ -230,5 +257,34 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     color: '#333',
+  },
+  itemsContainer: {
+    marginTop: 8,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#F0F0F0',
+  },
+  itemRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  itemName: {
+    fontSize: 13,
+    color: '#666',
+    flex: 1,
+    marginRight: 8,
+  },
+  itemQuantity: {
+    fontSize: 13,
+    color: '#999',
+    fontWeight: '500',
+  },
+  moreItems: {
+    fontSize: 12,
+    color: '#999',
+    fontStyle: 'italic',
+    marginTop: 4,
   },
 });

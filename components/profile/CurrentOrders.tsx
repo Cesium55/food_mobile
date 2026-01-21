@@ -100,6 +100,25 @@ export function CurrentOrders({ orders }: CurrentOrdersProps) {
                 </View>
               </View>
 
+              {/* Список товаров */}
+              {order.items && order.items.length > 0 && (
+                <View style={styles.itemsContainer}>
+                  {order.items.slice(0, 3).map((item, index) => (
+                    <View key={item.id} style={styles.itemRow}>
+                      <Text style={styles.itemName} numberOfLines={1}>
+                        {item.productName}
+                      </Text>
+                      <Text style={styles.itemQuantity}>×{item.quantity}</Text>
+                    </View>
+                  ))}
+                  {order.items.length > 3 && (
+                    <Text style={styles.moreItems}>
+                      и еще {order.items.length - 3} товар{order.items.length - 3 > 1 ? 'ов' : ''}
+                    </Text>
+                  )}
+                </View>
+              )}
+
               <View style={styles.orderFooter}>
                 <Text style={styles.totalLabel}>Итого:</Text>
                 <Text style={styles.totalAmount}>{order.totalAmount.toFixed(2)} ₽</Text>
@@ -170,6 +189,36 @@ const styles = StyleSheet.create({
   statusText: {
     fontSize: 11,
     fontWeight: '600',
+  },
+  itemsContainer: {
+    marginTop: 8,
+    marginBottom: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#F0F0F0',
+  },
+  itemRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  itemName: {
+    fontSize: 13,
+    color: '#666',
+    flex: 1,
+    marginRight: 8,
+  },
+  itemQuantity: {
+    fontSize: 13,
+    color: '#999',
+    fontWeight: '500',
+  },
+  moreItems: {
+    fontSize: 12,
+    color: '#999',
+    fontStyle: 'italic',
+    marginTop: 4,
   },
   orderFooter: {
     flexDirection: 'row',

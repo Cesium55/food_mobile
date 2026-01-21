@@ -24,6 +24,13 @@ export interface PurchaseOffer {
     current_cost: string; // decimal формат
     count: number;
     reserved_count: number;
+    product?: {
+      id: number;
+      name: string;
+      description?: string;
+      article?: string | null;
+      code?: string | null;
+    };
   };
 }
 
