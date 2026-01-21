@@ -42,22 +42,27 @@ export default function Index() {
       });
       
       if (result.success && result.userData) {
-        // Проверяем phone_verified в токене
+        // Проверяем phone_verified в токене или в данных пользователя
         const tokens = await getTokens();
+        let phoneVerified = false;
+        
         if (tokens.accessToken) {
           const payload = decodeJWT(tokens.accessToken);
-          
-          if (payload && payload.phone_verified === true) {
-            // Телефон верифицирован - переходим на главную страницу
-            router.replace('/(tabs)/(home)');
-          } else {
-            // Телефон не верифицирован - переходим на экран верификации
-            log('info', 'Phone not verified, redirecting to verification screen');
-            router.replace('/verify-phone');
-          }
-        } else {
-          // Нет токена - переходим на главную (на случай если проверка прошла через кеш)
+          phoneVerified = payload?.phone_verified === true;
+        }
+        
+        // Если в токене нет информации, проверяем данные пользователя
+        if (!phoneVerified && result.userData.phone_verified === true) {
+          phoneVerified = true;
+        }
+        
+        if (phoneVerified) {
+          // Телефон верифицирован - переходим на главную страницу
           router.replace('/(tabs)/(home)');
+        } else {
+          // Телефон не верифицирован - переходим на экран верификации
+          log('info', 'Phone not verified, redirecting to verification screen');
+          router.replace('/verify-phone');
         }
       } else if (result.errorType === 'network') {
         // Сетевая ошибка - показываем экран с возможностью повтора

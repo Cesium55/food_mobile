@@ -59,7 +59,7 @@ export function ProfileScreenWrapper({
       </View>
 
       {/* Контент */}
-      <View style={styles.contentWrapper}>
+      
         <ScrollView 
           style={styles.content} 
           contentContainerStyle={styles.scrollContent}
@@ -74,10 +74,10 @@ export function ProfileScreenWrapper({
               />
             ) : undefined
           }
-        >
-          {children}
+        ><View style={styles.contentWrapper}>
+          {children}</View>
         </ScrollView>
-      </View>
+      
     </SafeAreaView>
   );
 }
@@ -85,12 +85,22 @@ export function ProfileScreenWrapper({
 const createStyles = (colors: any, topInset: number) => StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: '#eee',
+    // backgroundColor: '#123',
+    overflow: 'visible',
   },
   topBarWrapper: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
     overflow: 'hidden',
     zIndex: 10,
-    paddingTop: topInset > 0 ? 0 : 20, // Если нет inset, добавляем отступ
+    paddingTop: 20,
+    backgroundColor: colors.background.default,
+    // backgroundColor: '#f00',
+    borderBottomLeftRadius: 28,
+    borderBottomRightRadius: 28,
   },
   topBar: {
     flexDirection: 'row',
@@ -99,17 +109,26 @@ const createStyles = (colors: any, topInset: number) => StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.md,
     paddingTop: spacing.sm,
-    borderBottomLeftRadius: 28,
-    borderBottomRightRadius: 28,
     backgroundColor: colors.background.default,
+    // backgroundColor: '#0f0',
   },
   contentWrapper: {
     flex: 1,
-    backgroundColor: '#eeeeee',
+    // backgroundColor: '#00f',
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
-    marginTop: -28,
-    paddingTop: 28,
+    marginTop: 0,
+    paddingTop: 40,
+    overflow: 'hidden',
+    zIndex: 1,
+    position: 'relative',
+  },
+  content: {
+    // zIndex: 1233,
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
   },
   backButton: {
     width: 40,
@@ -125,11 +144,5 @@ const createStyles = (colors: any, topInset: number) => StyleSheet.create({
   },
   spacer: {
     width: 40,
-  },
-  content: {
-    flex: 1,
-  },
-  scrollContent: {
-    flexGrow: 1,
   },
 });

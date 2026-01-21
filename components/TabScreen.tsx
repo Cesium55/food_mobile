@@ -34,6 +34,7 @@ export function TabScreen({
   const colors = useColors();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const insets = useSafeAreaInsets();
+  const styles = createStyles(colors, insets.top);
 
   const handleRefresh = async () => {
     if (!onRefresh) return;
@@ -47,37 +48,37 @@ export function TabScreen({
   };
 
   return (
-    
-    
-    <SafeAreaView style={[styles.container, { backgroundColor: '#fff' }]} edges={[]}>
-      <Text> </Text>
-    <View  style={[styles.container, { backgroundColor: '#eee' }]}>
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
       {useScrollView ? (
         <>
           {showTopBar && (
-            <TopBar 
-              searchValue={searchValue}
-              onSearchChange={onSearchChange}
-            />
+            <View style={styles.topBarWrapper}>
+              <TopBar 
+                searchValue={searchValue}
+                onSearchChange={onSearchChange}
+              />
+            </View>
           )}
           {!showTopBar && title && (
-            <View style={styles.header}>
-              {showBackButton && (
-                <TouchableOpacity 
-                  style={styles.backButton}
-                  onPress={onBackPress || (() => router.back())}
-                >
-                  <IconSymbol 
-                    name="arrow.left" 
-                    color={colors.text.primary}
-                  />
-                </TouchableOpacity>
-              )}
-              <Text style={[styles.title, { color: colors.text.primary }]}>{title}</Text>
+            <View style={[styles.headerWrapper, { backgroundColor: colors.background.default }]}>
+              <View style={styles.header}>
+                {showBackButton && (
+                  <TouchableOpacity 
+                    style={styles.backButton}
+                    onPress={onBackPress || (() => router.back())}
+                  >
+                    <IconSymbol 
+                      name="arrow.left" 
+                      color={colors.text.primary}
+                    />
+                  </TouchableOpacity>
+                )}
+                <Text style={[styles.title, { color: colors.text.primary }]}>{title}</Text>
+              </View>
             </View>
           )}
           <ScrollView 
-            style={[styles.content, showTopBar && styles.contentWithTopBar]} 
+            style={styles.content}
             contentContainerStyle={[styles.scrollContent, showTopBar && styles.scrollContentWithTopBar]}
             showsVerticalScrollIndicator={false}
             refreshControl={
@@ -87,11 +88,14 @@ export function TabScreen({
                   onRefresh={handleRefresh}
                   tintColor={colors.primary[500]}
                   colors={[colors.primary[500]]}
+                  progressViewOffset={showTopBar ? 50 : 0}
                 />
               ) : undefined
             }
           >
-            {children}
+            <View style={styles.contentWrapper}>
+              {children}
+            </View>
           </ScrollView>
         </>
       ) : (
@@ -125,17 +129,47 @@ export function TabScreen({
           )}
         </>
       )}
-      </View>
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
+const createStyles = (colors: any, topInset: number) => StyleSheet.create({
+  safeArea: {
     flex: 1,
+    backgroundColor: '#eee',
+    overflow: 'visible',
+  },
+  topBarWrapper: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    overflow: 'hidden',
+    zIndex: 10,
+    paddingTop: 20,
+    backgroundColor: colors.background.default,
+    borderBottomLeftRadius: 28,
+    borderBottomRightRadius: 28,
+  },
+  headerWrapper: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    overflow: 'hidden',
+    zIndex: 10,
+    paddingTop: 20,
+    borderBottomLeftRadius: 28,
+    borderBottomRightRadius: 28,
   },
   contentWrapper: {
     flex: 1,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingTop: 40,
+    overflow: 'hidden',
+    position: 'relative',
+    zIndex: 1,
   },
   topBarAbsolute: {
     position: 'absolute',
@@ -146,8 +180,8 @@ const styles = StyleSheet.create({
   },
   header: {
     paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.xxxl,
-    paddingTop: spacing.lg,
+    paddingBottom: spacing.md,
+    paddingTop: spacing.sm,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -170,19 +204,16 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
   },
-  contentWithTopBar: {
-    marginTop: -spacing.md,
-  },
   scrollContent: {
     flexGrow: 1,
   },
   scrollContentWithTopBar: {
-    paddingTop: spacing.xxxl,
+    paddingTop: 40,
   },
   title: {
     fontSize: typography.fontSize.xxl,
     fontFamily: typography.fontFamily.bold,
     textAlign: 'center',
-    position: 'absolute',
+    flex: 1,
   },
 });
