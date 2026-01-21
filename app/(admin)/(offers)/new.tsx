@@ -191,6 +191,7 @@ export default function NewOfferScreen() {
                 showsVerticalScrollIndicator={false}
                 keyboardShouldPersistTaps="handled"
                 keyboardDismissMode="on-drag"
+                nestedScrollEnabled={true}
             >
                     {/* Торговая точка */}
                     <View style={styles.infoSection}>
@@ -266,7 +267,11 @@ export default function NewOfferScreen() {
                                         </Text>
                                     </View>
                                 ) : (
-                                    <ScrollView style={styles.productsList}>
+                                    <ScrollView 
+                                        style={styles.productsList}
+                                        nestedScrollEnabled={true}
+                                        showsVerticalScrollIndicator={true}
+                                    >
                                         {filteredProducts.map(product => (
                                             <TouchableOpacity
                                                 key={product.id}
@@ -456,7 +461,11 @@ export default function NewOfferScreen() {
                                                     <Text style={styles.emptyText}>Нет доступных стратегий</Text>
                                                 </View>
                                             ) : (
-                                                <ScrollView style={styles.strategiesList}>
+                                                <ScrollView 
+                                                    style={styles.strategiesList}
+                                                    nestedScrollEnabled={true}
+                                                    showsVerticalScrollIndicator={true}
+                                                >
                                                     {strategies.map(strategy => (
                                                         <TouchableOpacity
                                                             key={strategy.id}

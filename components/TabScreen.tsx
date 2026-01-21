@@ -2,7 +2,7 @@ import { TopBar } from "@/components/TopBar";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { spacing, typography } from "@/constants/tokens";
 import { useColors } from "@/contexts/ThemeContext";
-import { router } from "expo-router";
+import { router, usePathname, useSegments } from "expo-router";
 import { useState } from "react";
 import { RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
@@ -26,15 +26,42 @@ export function TabScreen({
   onBackPress,
   onRefresh,
   refreshing = false,
-  showTopBar = true,
+  showTopBar,
   searchValue,
   onSearchChange,
   useScrollView = true,
 }: TabScreenProps) {
   const colors = useColors();
+  const pathname = usePathname();
+  const segments = useSegments();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const insets = useSafeAreaInsets();
   const styles = createStyles(colors, insets.top);
+
+  // Определяем, находимся ли мы в админ-режиме
+  // Проверяем через сегменты пути (более надежно) и pathname
+  const isAdminMode = segments.length > 0 && (
+    segments[0] === '(admin)' || 
+    segments.some(segment => 
+      segment === '(admin)' || 
+      segment === 'admin' ||
+      (typeof segment === 'string' && (segment.includes('admin') || segment.includes('(admin)')))
+    )
+  ) || (pathname && (
+    pathname.includes('/(admin)') || 
+    pathname.startsWith('/admin') ||
+    pathname.includes('/admin/') ||
+    pathname.includes('(admin)')
+  ));
+  
+  // В админ-режиме TopBar не показываем, если явно не указано showTopBar
+  // По умолчанию показываем TopBar только в режиме покупателя (не админ)
+  const shouldShowTopBar = showTopBar !== undefined 
+    ? showTopBar 
+    : !isAdminMode;
+  
+  // Отладочный вывод (можно убрать после проверки)
+  // console.log('TabScreen Debug:', { pathname, segments, isAdminMode, shouldShowTopBar, showTopBar });
 
   const handleRefresh = async () => {
     if (!onRefresh) return;
@@ -51,7 +78,7 @@ export function TabScreen({
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       {useScrollView ? (
         <>
-          {showTopBar && (
+          {shouldShowTopBar && (
             <View style={styles.topBarWrapper}>
               <TopBar 
                 searchValue={searchValue}
@@ -59,7 +86,7 @@ export function TabScreen({
               />
             </View>
           )}
-          {!showTopBar && title && (
+          {!shouldShowTopBar && title && (
             <View style={[styles.headerWrapper, { backgroundColor: colors.background.default }]}>
               <View style={styles.header}>
                 {showBackButton && (
@@ -79,7 +106,7 @@ export function TabScreen({
           )}
           <ScrollView 
             style={styles.content}
-            contentContainerStyle={[styles.scrollContent, showTopBar && styles.scrollContentWithTopBar]}
+            contentContainerStyle={[styles.scrollContent, shouldShowTopBar && styles.scrollContentWithTopBar]}
             showsVerticalScrollIndicator={false}
             refreshControl={
               onRefresh ? (
@@ -88,7 +115,7 @@ export function TabScreen({
                   onRefresh={handleRefresh}
                   tintColor={colors.primary[500]}
                   colors={[colors.primary[500]]}
-                  progressViewOffset={showTopBar ? 50 : 0}
+                  progressViewOffset={shouldShowTopBar ? 50 : 0}
                 />
               ) : undefined
             }
@@ -100,10 +127,10 @@ export function TabScreen({
         </>
       ) : (
         <>
-          <View style={[styles.contentWrapper, { paddingTop: showTopBar ? insets.top : 0 }]}>
+          <View style={[styles.contentWrapper, { paddingTop: shouldShowTopBar ? insets.top : 0 }]}>
             {children}
           </View>
-          {showTopBar && (
+          {shouldShowTopBar && (
             <View style={styles.topBarAbsolute}>
               <TopBar 
                 searchValue={searchValue}
@@ -111,7 +138,7 @@ export function TabScreen({
               />
             </View>
           )}
-          {!showTopBar && title && (
+          {!shouldShowTopBar && title && (
             <View style={[styles.header, styles.headerAbsolute]}>
               {showBackButton && (
                 <TouchableOpacity 

@@ -2,7 +2,7 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { spacing } from "@/constants/tokens";
 import { useColors } from "@/contexts/ThemeContext";
 import { useUser } from "@/hooks/useUser";
-import { router } from "expo-router";
+import { router, usePathname } from "expo-router";
 import { useState } from "react";
 import { StyleSheet, TouchableOpacity, View } from "react-native";
 import Search from "./search/search";
@@ -20,7 +20,11 @@ export function TopBar({
 }: TopBarProps) {
   const colors = useColors();
   const user = useUser();
+  const pathname = usePathname();
   const [localSearchValue, setLocalSearchValue] = useState(searchValue || '');
+
+  // Определяем, находимся ли мы в админ-режиме
+  const isAdminMode = pathname?.includes('/(admin)');
 
   const handleSearchChange = (text: string) => {
     setLocalSearchValue(text);

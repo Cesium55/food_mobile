@@ -20,6 +20,7 @@ interface CartItemStorage {
 }
 
 const CART_STORAGE_KEY = '@cart_items';
+const SELECTED_ITEMS_STORAGE_KEY = '@cart_selected_items'; // Сохранение выбранных товаров
 const ORDER_CACHE_KEY = '@cached_order'; // Кэш заказа: { purchaseId, reservedItems: CartItem[] }
 
 // Временный маппинг адресов магазинов (можно расширить через API)
@@ -163,13 +164,28 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     const loadCart = async () => {
       setIsLoading(true);
+      console.log('[CartContext] Начало загрузки корзины');
+      
       const loadedItems = await loadCartFromStorage();
+      console.log('[CartContext] Загружено товаров:', loadedItems.length);
       setCartItems(loadedItems);
       
-      // НЕ выбираем товары автоматически - только пользователь может управлять галочками
-      setSelectedItems(new Set());
+      // Загружаем сохраненные выбранные товары
+      const loadedSelectedItems = await loadSelectedItems();
+      
+      // Фильтруем выбранные товары - оставляем только те, которые есть в корзине
+      const validSelectedItems = new Set<number>();
+      loadedItems.forEach(item => {
+        if (loadedSelectedItems.has(item.id)) {
+          validSelectedItems.add(item.id);
+        }
+      });
+      
+      console.log('[CartContext] Восстановлено выбранных товаров:', validSelectedItems.size, 'из', loadedSelectedItems.size);
+      setSelectedItems(validSelectedItems);
       
       setIsLoading(false);
+      console.log('[CartContext] Загрузка корзины завершена');
     };
     
     loadCart();
@@ -181,6 +197,45 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       saveCartToStorage(cartItems);
     }
   }, [cartItems, isLoading]);
+
+  // Сохраняем выбранные товары при каждом изменении
+  useEffect(() => {
+    if (!isLoading) {
+      const saveSelectedItems = async () => {
+        try {
+          const selectedIds = Array.from(selectedItems);
+          await AsyncStorage.setItem(SELECTED_ITEMS_STORAGE_KEY, JSON.stringify(selectedIds));
+          console.log('[CartContext] Сохранены выбранные товары:', selectedIds);
+        } catch (error) {
+          console.error('[CartContext] Ошибка сохранения выбранных товаров:', error);
+        }
+      };
+      saveSelectedItems();
+    }
+  }, [selectedItems, isLoading]);
+
+  // Загружаем выбранные товары при инициализации
+  const loadSelectedItems = async (): Promise<Set<number>> => {
+    try {
+      const storedData = await AsyncStorage.getItem(SELECTED_ITEMS_STORAGE_KEY);
+      if (!storedData) {
+        console.log('[CartContext] Нет сохраненных выбранных товаров');
+        return new Set();
+      }
+      
+      const selectedIds: number[] = JSON.parse(storedData);
+      if (!Array.isArray(selectedIds)) {
+        console.log('[CartContext] Некорректные данные выбранных товаров');
+        return new Set();
+      }
+      
+      console.log('[CartContext] Загружены выбранные товары:', selectedIds);
+      return new Set(selectedIds);
+    } catch (error) {
+      console.error('[CartContext] Ошибка загрузки выбранных товаров:', error);
+      return new Set();
+    }
+  };
 
   // НЕ выбираем товары автоматически - только пользователь может управлять галочками
 
@@ -214,11 +269,20 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (existingItem) {
         // Если товар уже есть, увеличиваем количество (но не больше доступного количества)
         const newQuantity = Math.min(existingItem.quantity + 1, offer.count);
-        return prevItems.map(item =>
+        const updatedItems = prevItems.map(item =>
           item.id === existingItem.id
             ? { ...item, quantity: newQuantity }
             : item
         );
+        
+        // Автоматически выбираем товар при добавлении
+        setSelectedItems(prev => {
+          const newSet = new Set(prev);
+          newSet.add(existingItem.id);
+          return newSet;
+        });
+        
+        return updatedItems;
       } else {
         // Если товара нет, добавляем новый
         // Безопасно конвертируем expiresDate в Date объект
@@ -246,8 +310,9 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
           ? Math.round(((originalCostNum - finalPriceNum) / originalCostNum) * 100)
           : 0;
 
+        const newItemId = Date.now(); // Генерируем уникальный ID
         const newItem: CartItem = {
-          id: Date.now(), // Генерируем уникальный ID
+          id: newItemId,
           offerId: offer.id,
           productName: offer.productName,
           shopId: offer.shopId,
@@ -259,6 +324,14 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
           quantity: 1,
           expiresDate: expiresDate,
         };
+        
+        // Автоматически выбираем новый товар при добавлении
+        setSelectedItems(prev => {
+          const newSet = new Set(prev);
+          newSet.add(newItemId);
+          return newSet;
+        });
+        
         return [...prevItems, newItem];
       }
     });
@@ -325,9 +398,11 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Очистить корзину
   const clearCart = async () => {
+    console.log('[CartContext] Очистка корзины');
     setCartItems([]);
     setSelectedItems(new Set());
     await AsyncStorage.removeItem(CART_STORAGE_KEY);
+    await AsyncStorage.removeItem(SELECTED_ITEMS_STORAGE_KEY);
   };
 
   // Переключить выбор товара

@@ -49,7 +49,7 @@ export default function CheckoutScreen() {
   const params = useLocalSearchParams<{ purchaseId?: string; orderData?: string }>();
   const { shops, getShopById } = useShops();
   const { getOfferById, fetchOffers } = useOffers();
-  const { clearCart, getCachedOrder, clearCachedOrder, restoreItemsFromOrder } = useCart();
+  const { getCachedOrder, clearCachedOrder, restoreItemsFromOrder } = useCart();
   
   // Загружаем offers при монтировании без фильтров (для работы getOfferById)
   useEffect(() => {
@@ -532,8 +532,9 @@ export default function CheckoutScreen() {
             // Удаляем paymentId из storage
             await AsyncStorage.removeItem(PAYMENT_ID_STORAGE_KEY).catch(() => {});
             
-            // Очищаем корзину после успешного платежа
-            await clearCart();
+            // НЕ очищаем корзину - товары уже были удалены при создании заказа через cacheOrder
+            // Невыбранные товары должны остаться в корзине
+            await clearCachedOrder();
             
             // Перенаправляем на экран оплаченного заказа
             setLoadedOrderData((prevData) => {
@@ -596,8 +597,9 @@ export default function CheckoutScreen() {
         // Удаляем paymentId из storage, так как платеж завершен
         await AsyncStorage.removeItem(PAYMENT_ID_STORAGE_KEY).catch(() => {});
         
-        // Очищаем корзину после успешного платежа
-        await clearCart();
+        // НЕ очищаем корзину - товары уже были удалены при создании заказа через cacheOrder
+        // Невыбранные товары должны остаться в корзине
+        await clearCachedOrder();
         
         // Перенаправляем на экран оплаченного заказа
         if (purchase && purchase.id) {
@@ -660,8 +662,9 @@ export default function CheckoutScreen() {
         // Удаляем paymentId из storage, так как платеж завершен
         await AsyncStorage.removeItem(PAYMENT_ID_STORAGE_KEY).catch(() => {});
         
-        // Очищаем корзину после успешного платежа
-        await clearCart();
+        // НЕ очищаем корзину - товары уже были удалены при создании заказа через cacheOrder
+        // Невыбранные товары должны остаться в корзине
+        await clearCachedOrder();
         
         // Перенаправляем на экран оплаченного заказа
         // handleBackPress в order-paid.tsx обработает правильную навигацию назад
