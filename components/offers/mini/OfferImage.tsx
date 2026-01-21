@@ -11,9 +11,10 @@ interface OfferImageProps {
   shopImageUri: string | null;
   shopInitial: string;
   timeLeftText: string;
+  hasDynamicPricing?: boolean;
 }
 
-export function OfferImage({ imageUri, shopImageUri, shopInitial, timeLeftText }: OfferImageProps) {
+export function OfferImage({ imageUri, shopImageUri, shopInitial, timeLeftText, hasDynamicPricing = false }: OfferImageProps) {
   const styles = useThemedStyles(createStyles);
   const [imageError, setImageError] = useState(false);
   const [shopImageError, setShopImageError] = useState(false);
@@ -35,6 +36,13 @@ export function OfferImage({ imageUri, shopImageUri, shopInitial, timeLeftText }
           <Text style={styles.placeholderText}>
             {shopInitial}
           </Text>
+        </View>
+      )}
+      
+      {/* Плашка "Станет дешевле" для товаров с динамической ценой */}
+      {hasDynamicPricing && (
+        <View style={styles.dynamicPricingBadge}>
+          <Text style={styles.dynamicPricingText}>Станет дешевле</Text>
         </View>
       )}
       
@@ -117,6 +125,22 @@ const createStyles = (tokens: any) => {
       color: colors.common.white,
     },
     
+    // Плашка "Станет дешевле"
+    dynamicPricingBadge: {
+      position: 'absolute',
+      top: spacing.sm,
+      right: spacing.sm,
+      backgroundColor: '#2196F3', // Синий цвет
+      paddingHorizontal: spacing.sm,
+      paddingVertical: spacing.xs,
+      borderRadius: borderRadius.sm,
+      zIndex: 10,
+    },
+    dynamicPricingText: {
+      fontSize: typography.fontSize.xs,
+      fontFamily: typography.fontFamily.semibold,
+      color: colors.common.white,
+    },
     // Срок годности
     expiryBadge: {
       position: 'absolute',

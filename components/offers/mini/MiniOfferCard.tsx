@@ -7,10 +7,11 @@ import { useCart } from '@/hooks/useCart';
 import { Offer } from '@/hooks/useOffers';
 import { usePublicSeller } from '@/hooks/usePublicSeller';
 import { useThemedStyles } from '@/hooks/useThemeTokens';
+import { getDaysUntilExpiry, getExpiryText } from '@/utils/expiryUtils';
 import { getFirstImageUrl } from '@/utils/imageUtils';
 import { getCurrentPrice } from '@/utils/pricingUtils';
 import { router } from 'expo-router';
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { OfferActions } from './OfferActions';
 import { OfferImage } from './OfferImage';
@@ -37,15 +38,27 @@ export function MiniOfferCard({ offer, distance, onPress }: MiniOfferCardProps) 
   const originalPrice = parseFloat(offer.originalCost);
   const finalPrice = currentPrice ? parseFloat(currentPrice) : originalPrice;
   
-  // Время до истечения
-  const now = new Date();
-  const expiryDate = new Date(offer.expiresDate);
-  const hoursLeft = Math.floor((expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60));
-  const daysLeft = Math.floor(hoursLeft / 24);
+  // Время до истечения с обновлением каждую секунду, если осталось меньше суток
+  const daysUntilExpiry = getDaysUntilExpiry(offer.expiresDate);
+  const [timeLeftText, setTimeLeftText] = useState(getExpiryText(offer.expiresDate));
   
-  const timeLeftText = daysLeft > 0 
-    ? `${daysLeft} ${daysLeft === 1 ? 'день' : daysLeft < 5 ? 'дня' : 'дней'}`
-    : `${hoursLeft} ${hoursLeft === 1 ? 'час' : hoursLeft < 5 ? 'часа' : 'часов'}`;
+  // Обновляем время каждую секунду, если осталось меньше суток
+  useEffect(() => {
+    if (daysUntilExpiry <= 1 && daysUntilExpiry > 0) {
+      // Обновляем сразу
+      setTimeLeftText(getExpiryText(offer.expiresDate));
+      
+      // Устанавливаем интервал для обновления каждую секунду
+      const interval = setInterval(() => {
+        setTimeLeftText(getExpiryText(offer.expiresDate));
+      }, 1000);
+      
+      return () => clearInterval(interval);
+    } else {
+      // Если больше суток, просто устанавливаем значение один раз
+      setTimeLeftText(getExpiryText(offer.expiresDate));
+    }
+  }, [offer.expiresDate, daysUntilExpiry]);
   
   // Расстояние - если передано, форматируем (distance уже в километрах)
   const distanceText = distance !== undefined
@@ -86,6 +99,9 @@ export function MiniOfferCard({ offer, distance, onPress }: MiniOfferCardProps) 
     }
   };
   
+  // Проверяем, есть ли динамическая цена
+  const hasDynamicPricing = offer.isDynamicPricing && offer.pricingStrategy;
+  
   return (
     <Pressable style={styles.card} onPress={handleCardPress}>
       <OfferImage 
@@ -93,6 +109,7 @@ export function MiniOfferCard({ offer, distance, onPress }: MiniOfferCardProps) 
         shopImageUri={shopImageUri}
         shopInitial={shopInitial}
         timeLeftText={timeLeftText}
+        hasDynamicPricing={hasDynamicPricing}
       />
       
       <View style={styles.content}>

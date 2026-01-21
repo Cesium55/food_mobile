@@ -86,16 +86,26 @@ async function refreshAccessToken(): Promise<{ success: boolean; accessToken?: s
       clearTimeout(timeoutId);
 
       if (response.status === HTTP_STATUS.OK) {
-        const responseData = await response.json();
+        try {
+          const responseData = await response.json();
 
-        // Стандартная структура ответа: {data: {access_token, refresh_token}}
-        if (responseData.data && responseData.data.access_token && responseData.data.refresh_token) {
-          await saveTokens(responseData.data.access_token, responseData.data.refresh_token);
-          return { success: true, accessToken: responseData.data.access_token };
+          // Стандартная структура ответа: {data: {access_token, refresh_token}}
+          if (responseData.data && responseData.data.access_token && responseData.data.refresh_token) {
+            await saveTokens(responseData.data.access_token, responseData.data.refresh_token);
+            return { success: true, accessToken: responseData.data.access_token };
+          }
+        } catch (parseError) {
+          // Ошибка парсинга JSON - не очищаем токены, это может быть временная проблема
+          return { success: false, accessToken: null };
         }
       }
 
-      await clearTokens();
+      // Очищаем токены только при ошибках авторизации (401, 403)
+      // Не очищаем при временных ошибках сервера (500, 503) или других ошибках
+      if (response.status === HTTP_STATUS.UNAUTHORIZED || response.status === HTTP_STATUS.FORBIDDEN) {
+        await clearTokens();
+      }
+      
       return { success: false, accessToken: null };
 
     } catch (error) {

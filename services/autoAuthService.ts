@@ -308,32 +308,53 @@ class AuthService {
       clearTimeout(timeoutId);
 
       if (response.status === HTTP_STATUS.OK) {
-        const responseData = await response.json();
-        
-        // Проверяем структуру ответа - токены лежат в data.data
-        if (responseData && responseData.data && responseData.data.access_token && responseData.data.refresh_token) {
-          await saveTokens(responseData.data.access_token, responseData.data.refresh_token);
+        try {
+          const responseData = await response.json();
           
-          // Получаем данные пользователя с новым токеном
-          const userData = await this.getUserData(responseData.data.access_token);
-          
-          // Обновляем кеш если получили данные пользователя
-          if (userData) {
-            this.userCache = userData;
-            this.lastAuthCheck = Date.now();
+          // Проверяем структуру ответа - токены лежат в data.data
+          if (responseData && responseData.data && responseData.data.access_token && responseData.data.refresh_token) {
+            await saveTokens(responseData.data.access_token, responseData.data.refresh_token);
+            
+            // Получаем данные пользователя с новым токеном
+            const userData = await this.getUserData(responseData.data.access_token);
+            
+            // Обновляем кеш если получили данные пользователя
+            if (userData) {
+              this.userCache = userData;
+              this.lastAuthCheck = Date.now();
+            }
+            
+            return {
+              success: true,
+              userData,
+            };
           }
-          
-          return {
-            success: true,
-            userData,
+        } catch (parseError) {
+          // Ошибка парсинга JSON - считаем это временной проблемой
+          return { 
+            success: false, 
+            error: 'Ошибка парсинга ответа сервера',
+            errorType: 'network'
           };
         }
+      }
+
+      // Определяем тип ошибки на основе HTTP статуса
+      let errorType: 'network' | 'auth' | 'unknown' = 'unknown';
+      if (response.status === HTTP_STATUS.UNAUTHORIZED || response.status === HTTP_STATUS.FORBIDDEN) {
+        errorType = 'auth';
+      } else if (response.status >= 500) {
+        // Временные ошибки сервера
+        errorType = 'network';
+      } else {
+        // Другие ошибки (400, 404 и т.д.) - считаем проблемой авторизации
+        errorType = 'auth';
       }
 
       return { 
         success: false, 
         error: 'Не удалось обновить токены',
-        errorType: 'auth'
+        errorType
       };
       
     } catch (error) {

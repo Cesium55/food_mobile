@@ -1,5 +1,5 @@
-import { config } from '@/constants/config';
 import { createProductModal } from '@/components/product/ProductModalContent';
+import { config } from '@/constants/config';
 import { useModal } from '@/contexts/ModalContext';
 import { Offer, useOffers } from '@/hooks/useOffers';
 import { useShopPoint } from "@/hooks/useShopPoints";
@@ -256,7 +256,7 @@ const ShopModalContent = React.memo(function ShopModalContent({
 });
 
 // Глобальное хранилище для загруженных магазинов (вне компонента, чтобы сохранялось между монтированиями)
-const loadedShopPointsSet = new Set<number>();
+export const loadedShopPointsSet = new Set<number>();
 
 // Глобальное хранилище для состояния модалок магазинов
 interface ShopModalState {
@@ -265,6 +265,18 @@ interface ShopModalState {
 }
 
 const shopModalStates = new Map<number, ShopModalState>();
+
+// Функция для создания модалки магазина (экспортируем для использования в других компонентах)
+export function createShopModal(shopPointId: number) {
+  const hasBeenLoaded = loadedShopPointsSet.has(shopPointId);
+  return {
+    content: <ShopModalContent 
+      shopPointId={shopPointId} 
+      hasBeenLoaded={hasBeenLoaded}
+      showSkeleton={true}
+    />,
+  };
+}
 
 
 export default function YandexMapsWebView() {

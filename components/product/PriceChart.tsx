@@ -36,13 +36,35 @@ export default function PriceChart({ offer }: PriceChartProps) {
 
     const points: PricePoint[] = [];
     
+    // Функция для форматирования подписи (короткий формат с одной буквой "д")
+    const formatLabel = (timeRemaining: number, isCurrent: boolean, isExpiry: boolean): string => {
+      if (isCurrent) {
+        return 'Сейчас';
+      }
+      if (isExpiry) {
+        return 'Истечение';
+      }
+      
+      const hours = Math.floor(timeRemaining / 3600);
+      const days = Math.floor(hours / 24);
+      const minutes = Math.floor((timeRemaining % 3600) / 60);
+      
+      if (days > 0) {
+        return `${days}д`;
+      } else if (hours > 0) {
+        return `${hours}ч`;
+      } else {
+        return `${minutes}м`;
+      }
+    };
+
     // Добавляем начальную точку (текущее время, текущая цена)
     const currentPrice = calculateDynamicPrice(offer);
     if (currentPrice !== null) {
       points.push({
         timeRemaining: totalSeconds,
         price: parseFloat(currentPrice),
-        label: 'Сейчас',
+        label: formatLabel(totalSeconds, true, false),
       });
     }
 
@@ -51,23 +73,10 @@ export default function PriceChart({ offer }: PriceChartProps) {
     sortedSteps.forEach((step) => {
       if (step.time_remaining_seconds <= totalSeconds) {
         const price = originalCostNum * (1 - step.discount_percent / 100);
-        const hours = Math.floor(step.time_remaining_seconds / 3600);
-        const days = Math.floor(hours / 24);
-        
-        let label: string;
-        if (days > 0) {
-          label = `${days} ${days === 1 ? 'день' : days < 5 ? 'дня' : 'дней'}`;
-        } else if (hours > 0) {
-          label = `${hours} ${hours === 1 ? 'час' : hours < 5 ? 'часа' : 'часов'}`;
-        } else {
-          const minutes = Math.floor(step.time_remaining_seconds / 60);
-          label = `${minutes} мин`;
-        }
-
         points.push({
           timeRemaining: step.time_remaining_seconds,
           price,
-          label,
+          label: formatLabel(step.time_remaining_seconds, false, false),
         });
       }
     });
@@ -79,7 +88,7 @@ export default function PriceChart({ offer }: PriceChartProps) {
       points.push({
         timeRemaining: 0,
         price: finalPrice,
-        label: 'Истечение',
+        label: formatLabel(0, false, true),
       });
     }
 
@@ -90,21 +99,18 @@ export default function PriceChart({ offer }: PriceChartProps) {
     const labels = sortedPoints.map(p => p.label);
     const prices = sortedPoints.map(p => p.price);
 
-    const screenWidth = Dimensions.get('window').width;
-    const chartWidth = screenWidth - 80; // Отступы по 40px с каждой стороны
-
     const data = {
       labels,
       datasets: [
         {
           data: prices,
-          color: (opacity = 1) => `rgba(76, 175, 80, ${opacity})`, // Зеленый цвет
+          color: (opacity = 1) => `rgba(255, 152, 0, ${opacity})`, // Оранжевый цвет
           strokeWidth: 2,
         },
       ],
     };
 
-    return { pricePoints: sortedPoints, chartData: { data, chartWidth } };
+    return { pricePoints: sortedPoints, chartData: { data } };
   }, [offer]);
 
   if (!offer.isDynamicPricing || !offer.pricingStrategy || pricePoints.length === 0 || !chartData) {
@@ -112,6 +118,35 @@ export default function PriceChart({ offer }: PriceChartProps) {
   }
 
   const screenWidth = Dimensions.get('window').width;
+  // График должен быть на всю ширину без боковых отступов
+  // chartSectionContainer: marginHorizontal: -16, paddingHorizontal: 0
+  // infoSection: paddingHorizontal: 36
+  // Доступная ширина = screenWidth - (36-16)*2 = screenWidth - 40
+  const chartWidth = screenWidth - 40;
+
+  // Конфигурация графика с оранжевыми цветами
+  const chartConfig = {
+    backgroundColor: '#ffffff',
+    backgroundGradientFrom: '#ffffff',
+    backgroundGradientTo: '#ffffff',
+    decimalPlaces: 0,
+    color: (opacity = 1) => `rgba(255, 152, 0, ${opacity})`, // Оранжевый цвет
+    labelColor: (opacity = 1) => `rgba(102, 102, 102, ${opacity})`,
+    style: {
+      borderRadius: 16,
+    },
+    propsForDots: {
+      r: '6',
+      strokeWidth: '2',
+      stroke: '#FF9800',
+      fill: '#ffffff',
+    },
+    propsForBackgroundLines: {
+      strokeDasharray: '',
+      stroke: '#E0E0E0',
+      strokeWidth: 1,
+    },
+  };
 
   return (
     <View style={styles.container}>
@@ -122,32 +157,11 @@ export default function PriceChart({ offer }: PriceChartProps) {
 
       <LineChart
         data={chartData.data}
-        width={chartData.chartWidth}
+        width={chartWidth}
         height={220}
         yAxisLabel="₽"
         yAxisSuffix=""
-        chartConfig={{
-          backgroundColor: '#ffffff',
-          backgroundGradientFrom: '#ffffff',
-          backgroundGradientTo: '#ffffff',
-          decimalPlaces: 0,
-          color: (opacity = 1) => `rgba(76, 175, 80, ${opacity})`,
-          labelColor: (opacity = 1) => `rgba(102, 102, 102, ${opacity})`,
-          style: {
-            borderRadius: 16,
-          },
-          propsForDots: {
-            r: '6',
-            strokeWidth: '2',
-            stroke: '#4CAF50',
-            fill: '#ffffff',
-          },
-          propsForBackgroundLines: {
-            strokeDasharray: '',
-            stroke: '#E0E0E0',
-            strokeWidth: 1,
-          },
-        }}
+        chartConfig={chartConfig}
         bezier
         style={styles.chart}
         withInnerLines={true}
@@ -155,22 +169,6 @@ export default function PriceChart({ offer }: PriceChartProps) {
         withVerticalLines={false}
         withHorizontalLines={true}
       />
-
-      {/* Легенда */}
-      <View style={styles.legend}>
-        <View style={styles.legendItem}>
-          <View style={[styles.legendColor, { backgroundColor: '#4CAF50' }]} />
-          <Text style={styles.legendText}>Текущая цена: {pricePoints[0]?.price.toFixed(2)} ₽</Text>
-        </View>
-        {pricePoints.length > 1 && (
-          <View style={styles.legendItem}>
-            <View style={[styles.legendColor, { backgroundColor: '#FF9800' }]} />
-            <Text style={styles.legendText}>
-              Финальная цена: {pricePoints[pricePoints.length - 1]?.price.toFixed(2)} ₽
-            </Text>
-          </View>
-        )}
-      </View>
     </View>
   );
 }
@@ -179,9 +177,11 @@ const styles = StyleSheet.create({
   container: {
     backgroundColor: '#fff',
     borderRadius: 12,
-    padding: 16,
+    paddingTop: 16,
+    paddingBottom: 16,
+    paddingHorizontal: 0, // Убираем боковые отступы
     marginTop: 16,
-    marginHorizontal: 20,
+    marginHorizontal: 0,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -190,6 +190,7 @@ const styles = StyleSheet.create({
   },
   header: {
     marginBottom: 16,
+    paddingHorizontal: 16, // Добавляем отступы только для заголовка
   },
   title: {
     fontSize: 18,
@@ -204,26 +205,5 @@ const styles = StyleSheet.create({
   chart: {
     marginVertical: 8,
     borderRadius: 16,
-  },
-  legend: {
-    marginTop: 16,
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#E0E0E0',
-    gap: 8,
-  },
-  legendItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  legendColor: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-  },
-  legendText: {
-    fontSize: 13,
-    color: '#666',
   },
 });

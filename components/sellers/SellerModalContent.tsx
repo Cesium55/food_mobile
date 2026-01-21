@@ -1,0 +1,271 @@
+import { IconSymbol } from '@/components/ui/icon-symbol';
+import { createShopModal } from '@/components/yandex_maps_webview';
+import { useModal } from '@/contexts/ModalContext';
+import { useOffers } from '@/hooks/useOffers';
+import { ShopPoint, useSellerWithShops } from '@/hooks/usePublicSeller';
+import { getFirstImageUrl } from '@/utils/imageUtils';
+import React, { useState } from 'react';
+import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+
+interface SellerModalContentProps {
+  sellerId: number;
+}
+
+export function SellerModalContent({ sellerId }: SellerModalContentProps) {
+  const { seller, loading: sellerLoading, error: sellerError } = useSellerWithShops(sellerId);
+  const { getOffersBySeller } = useOffers();
+  const { openModal } = useModal();
+  const [imageError, setImageError] = useState(false);
+
+  const sellerOffers = getOffersBySeller(sellerId);
+  const shops = seller?.shop_points || [];
+  
+  // Получаем URL первого изображения продавца
+  const imageUrl = seller ? getFirstImageUrl(seller.images) : null;
+  const hasImage = imageUrl && !imageError;
+
+  const handleShopPress = (shop: ShopPoint) => {
+    if (!shop || !shop.id) {
+      console.warn('Invalid shop passed to handleShopPress:', shop);
+      return;
+    }
+    
+    console.log('[SellerModalContent] Opening shop modal for shop:', shop.id);
+    
+    // Создаем контент модалки магазина
+    const { content } = createShopModal(shop.id);
+    
+    // Открываем новую модалку поверх текущей (добавляем в стек)
+    openModal(content);
+  };
+
+  if (sellerLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <Text style={styles.loadingText}>Загрузка...</Text>
+      </View>
+    );
+  }
+
+  if (sellerError || !seller) {
+    return (
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorIcon}>🔍</Text>
+        <Text style={styles.errorText}>{sellerError || 'Продавец не найден'}</Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.container}>
+      {/* Информация о продавце */}
+      <View style={styles.sellerInfo}>
+        {hasImage ? (
+          <Image
+            source={{ uri: imageUrl! }}
+            style={styles.sellerAvatarImage}
+            onError={() => setImageError(true)}
+            resizeMode="cover"
+          />
+        ) : (
+          <View style={styles.sellerAvatar}>
+            <Text style={styles.sellerAvatarText}>
+              {seller.short_name.charAt(0).toUpperCase()}
+            </Text>
+          </View>
+        )}
+        <View style={styles.sellerDetails}>
+          <Text style={styles.sellerName}>{seller.full_name}</Text>
+          <View style={styles.statsRow}>
+            <View style={styles.stat}>
+              <Text style={styles.statValue}>{shops.length}</Text>
+              <Text style={styles.statLabel}>магазинов</Text>
+            </View>
+            <View style={styles.stat}>
+              <Text style={styles.statValue}>{sellerOffers.length}</Text>
+              <Text style={styles.statLabel}>товаров</Text>
+            </View>
+          </View>
+        </View>
+      </View>
+
+      {/* Список магазинов */}
+      <View style={styles.shopsSection}>
+        <Text style={styles.sectionTitle}>Магазины</Text>
+        
+        {shops.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyText}>У этого продавца пока нет магазинов</Text>
+          </View>
+        ) : (
+          shops.map((shop) => (
+            <TouchableOpacity
+              key={shop.id}
+              style={styles.shopCard}
+              activeOpacity={0.7}
+              onPress={() => handleShopPress(shop)}
+            >
+              <View style={styles.shopIcon}>
+                <Text style={styles.shopIconText}>🏪</Text>
+              </View>
+              <View style={styles.shopInfo}>
+                <Text style={styles.shopName}>Магазин №{shop.id}</Text>
+                <Text style={styles.shopAddress}>{shop.address_formated || shop.address_raw}</Text>
+              </View>
+              <IconSymbol name="chevron.right" color="#999" size={20} />
+            </TouchableOpacity>
+          ))
+        )}
+      </View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  loadingContainer: {
+    padding: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#666',
+  },
+  errorContainer: {
+    padding: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  errorIcon: {
+    fontSize: 64,
+    marginBottom: 16,
+  },
+  errorText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#333',
+    textAlign: 'center',
+  },
+  sellerInfo: {
+    backgroundColor: '#fff',
+    padding: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: -16,
+    paddingHorizontal: 36,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
+  },
+  sellerAvatar: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#4CAF50',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  sellerAvatarImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    marginRight: 16,
+  },
+  sellerAvatarText: {
+    fontSize: 36,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+  sellerDetails: {
+    flex: 1,
+  },
+  sellerName: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 8,
+  },
+  statsRow: {
+    flexDirection: 'row',
+    gap: 24,
+  },
+  stat: {
+    alignItems: 'flex-start',
+  },
+  statValue: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#4CAF50',
+  },
+  statLabel: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 2,
+  },
+  shopsSection: {
+    paddingTop: 20,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 16,
+  },
+  emptyContainer: {
+    padding: 40,
+    alignItems: 'center',
+  },
+  emptyText: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+  },
+  shopCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  shopIcon: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#E8F5E9',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  shopIconText: {
+    fontSize: 24,
+  },
+  shopInfo: {
+    flex: 1,
+  },
+  shopName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 4,
+  },
+  shopAddress: {
+    fontSize: 14,
+    color: '#666',
+  },
+});
+
+// Функция для создания модалки продавца
+export function createSellerModal(sellerId: number) {
+  return {
+    content: <SellerModalContent sellerId={sellerId} />,
+  };
+}

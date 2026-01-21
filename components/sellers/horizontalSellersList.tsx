@@ -1,7 +1,8 @@
+import { createSellerModal } from '@/components/sellers/SellerModalContent';
+import { useModal } from '@/contexts/ModalContext';
 import { PublicSeller } from '@/hooks/usePublicSeller';
 import { useSellers } from '@/hooks/useSellers';
 import { getFirstImageUrl } from '@/utils/imageUtils';
-import { useRouter, useSegments } from 'expo-router';
 import React, { useState } from 'react';
 import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
@@ -9,13 +10,12 @@ const AVATAR_SIZE = 90;
 
 export default function HorizontalSellersList() {
   const { sellers } = useSellers();
-  const router = useRouter();
-  const segments = useSegments();
+  const { openModal } = useModal();
 
   const handleSellerPress = (sellerId: number) => {
-    // Определяем текущую вкладку и переходим в seller внутри неё
-    const currentTab = segments[0] === '(tabs)' ? segments[1] : '(home)';
-    router.push(`/(tabs)/${currentTab}/seller/${sellerId}`);
+    // Открываем модалку продавца
+    const { content } = createSellerModal(sellerId);
+    openModal(content);
   };
 
   return (
