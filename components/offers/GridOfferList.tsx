@@ -71,6 +71,7 @@ export function GridOfferList({
             offer={offer}
             distance={distance}
             onPress={onOfferPress ? () => onOfferPress(offer) : undefined}
+            showCheaperBadge={true}
           />
         </View>
       ))}

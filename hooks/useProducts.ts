@@ -77,12 +77,16 @@ export const useProducts = (sellerId?: number, options?: { requireAuth?: boolean
       setLoading(true);
       setError(null);
       
+      // Если sellerId не указан, не загружаем товары
+      if (sellerId === undefined || sellerId === null) {
+        setProducts([]);
+        setLoading(false);
+        return;
+      }
+      
       // Формируем URL с параметрами фильтрации
       const params = new URLSearchParams();
-      
-      if (sellerId !== undefined) {
-        params.append('seller_id', sellerId.toString());
-      }
+      params.append('seller_id', sellerId.toString());
 
       if (filters?.categoryIds && filters.categoryIds.length > 0) {
         filters.categoryIds.forEach(id => {

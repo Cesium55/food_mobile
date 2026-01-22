@@ -167,6 +167,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 4,
     elevation: 4,
+    zIndex: 15,
   },
   discountBadgeText: {
     color: '#fff',

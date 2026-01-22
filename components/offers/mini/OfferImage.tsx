@@ -12,9 +12,10 @@ interface OfferImageProps {
   shopInitial: string;
   timeLeftText: string;
   hasDynamicPricing?: boolean;
+  willBecomeCheaper?: boolean;
 }
 
-export function OfferImage({ imageUri, shopImageUri, shopInitial, timeLeftText, hasDynamicPricing = false }: OfferImageProps) {
+export function OfferImage({ imageUri, shopImageUri, shopInitial, timeLeftText, hasDynamicPricing = false, willBecomeCheaper = false }: OfferImageProps) {
   const styles = useThemedStyles(createStyles);
   const [imageError, setImageError] = useState(false);
   const [shopImageError, setShopImageError] = useState(false);
@@ -39,8 +40,8 @@ export function OfferImage({ imageUri, shopImageUri, shopInitial, timeLeftText, 
         </View>
       )}
       
-      {/* Плашка "Станет дешевле" для товаров с динамической ценой */}
-      {hasDynamicPricing && (
+      {/* Плашка "Станет дешевле" для товаров с динамической ценой, которые могут подешеветь */}
+      {willBecomeCheaper && (
         <View style={styles.dynamicPricingBadge}>
           <Text style={styles.dynamicPricingText}>Станет дешевле</Text>
         </View>
@@ -78,12 +79,13 @@ const createStyles = (tokens: any) => {
       aspectRatio: 1,
       backgroundColor: colors.gray[100],
       borderRadius: borderRadius.lg,
-      overflow: 'hidden',
+      overflow: 'visible',
     },
     image: {
       width: '100%',
       height: '100%',
       borderRadius: borderRadius.lg,
+      overflow: 'hidden',
     },
     placeholderImage: {
       width: '100%',
@@ -134,7 +136,12 @@ const createStyles = (tokens: any) => {
       paddingHorizontal: spacing.sm,
       paddingVertical: spacing.xs,
       borderRadius: borderRadius.sm,
-      zIndex: 10,
+      zIndex: 100,
+      elevation: 10,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.25,
+      shadowRadius: 3.84,
     },
     dynamicPricingText: {
       fontSize: typography.fontSize.xs,

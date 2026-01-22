@@ -131,3 +131,75 @@ export function getCurrentPrice(offer: Offer): string | null {
 export function isDynamicPricing(offer: Offer): boolean {
   return offer.isDynamicPricing || false;
 }
+
+/**
+ * Проверяет, может ли цена товара снизиться в будущем
+ * @param offer - Оффер
+ * @returns true если цена может снизиться в будущем
+ */
+export function canPriceDecrease(offer: Offer): boolean {
+  // Если нет динамического ценообразования или нет стратегии, цена не снизится
+  if (!offer.isDynamicPricing || !offer.pricingStrategy) {
+    return false;
+  }
+
+  // Проверяем, что есть шаги стратегии
+  if (!offer.pricingStrategy.steps || offer.pricingStrategy.steps.length === 0) {
+    return false;
+  }
+
+  // Вычисляем сколько секунд осталось до истечения срока годности
+  const now = new Date();
+  let expiryDate: Date;
+  
+  try {
+    const dateString = offer.expiresDate;
+    
+    if (typeof dateString === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+      expiryDate = new Date(dateString + 'T23:59:59');
+    } else {
+      expiryDate = new Date(dateString);
+    }
+    
+    if (isNaN(expiryDate.getTime())) {
+      return false;
+    }
+  } catch (error) {
+    return false;
+  }
+
+  const timeRemainingSeconds = Math.floor((expiryDate.getTime() - now.getTime()) / 1000);
+  
+  // Если срок истек, цена не снизится
+  if (timeRemainingSeconds < -60) {
+    return false;
+  }
+
+  // Сортируем шаги по убыванию времени
+  const sortedSteps = [...offer.pricingStrategy.steps].sort(
+    (a, b) => b.time_remaining_seconds - a.time_remaining_seconds
+  );
+
+  // Находим текущий шаг
+  const applicableStep = sortedSteps.find(
+    step => timeRemainingSeconds >= step.time_remaining_seconds
+  );
+
+  // Если есть шаги с большей скидкой (меньше time_remaining_seconds), цена может снизиться
+  if (applicableStep) {
+    const currentDiscount = applicableStep.discount_percent;
+    // Проверяем, есть ли шаги с большей скидкой
+    const hasBetterSteps = sortedSteps.some(
+      step => step.time_remaining_seconds < applicableStep.time_remaining_seconds && 
+              step.discount_percent > currentDiscount
+    );
+    return hasBetterSteps;
+  }
+
+  // Если мы еще не достигли первого шага, цена может снизиться
+  if (sortedSteps.length > 0 && timeRemainingSeconds > sortedSteps[0].time_remaining_seconds) {
+    return true;
+  }
+
+  return false;
+}

@@ -11,6 +11,7 @@ import { useState } from "react";
 import {
     ActivityIndicator,
     Image,
+    RefreshControl,
     ScrollView,
     StyleSheet,
     Text,
@@ -22,11 +23,19 @@ import {
 export default function ProductsScreen() {
     const { seller } = useSellerMe();
     const { categories, getCategoryById } = useCategories();
-    const { products, loading: productsLoading, error: productsError } = useProducts(seller?.id);
+    const { products, loading: productsLoading, error: productsError, refetch } = useProducts(seller?.id);
     const { openModal, closeModal } = useModal();
     const [searchQuery, setSearchQuery] = useState("");
+    const [refreshing, setRefreshing] = useState(false);
 
+    // Фильтруем товары: только текущего продавца + поиск
     const filteredProducts = products.filter(product => {
+        // Фильтр по продавцу
+        if (seller?.id && product.seller_id !== seller.id) {
+            return false;
+        }
+        
+        // Фильтр по поиску
         const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                             product.description.toLowerCase().includes(searchQuery.toLowerCase());
         return matchesSearch;
@@ -49,6 +58,15 @@ export default function ProductsScreen() {
 
     const handleAddProduct = () => {
         openModal(<NewProductContent onClose={closeModal} />);
+    };
+
+    const handleRefresh = async () => {
+        setRefreshing(true);
+        try {
+            await refetch();
+        } finally {
+            setRefreshing(false);
+        }
     };
 
     // Получаем все категории, которые имеют товары
@@ -113,6 +131,14 @@ export default function ProductsScreen() {
                 <ScrollView 
                     contentContainerStyle={styles.scrollContent}
                     showsVerticalScrollIndicator={false}
+                    refreshControl={
+                        <RefreshControl
+                            refreshing={refreshing}
+                            onRefresh={handleRefresh}
+                            tintColor="#34C759"
+                            colors={["#34C759"]}
+                        />
+                    }
                 >
                     <Text style={styles.countText}>
                         Всего товаров: {filteredProducts.length}

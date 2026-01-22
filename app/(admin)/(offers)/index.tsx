@@ -11,7 +11,7 @@ import { useShops } from "@/hooks/useShops";
 import { getImageUrl } from "@/utils/imageUtils";
 import { getCurrentPrice } from "@/utils/pricingUtils";
 import { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Image, RefreshControl, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 
 interface GroupedOffer {
     shopId: number;
@@ -28,6 +28,7 @@ export default function OffersScreen() {
     const { products, refetch: refetchProducts } = useProducts(seller?.id);
     
     const [searchQuery, setSearchQuery] = useState("");
+    const [refreshing, setRefreshing] = useState(false);
 
     useEffect(() => {
         if (seller?.id) {
@@ -49,10 +50,15 @@ export default function OffersScreen() {
         });
     }, [offers, products]);
 
-    // Фильтрация (автоматически исключаем просроченные + поиск)
+    // Фильтрация (автоматически исключаем просроченные + поиск + фильтр по продавцу)
     const filteredOffers = useMemo(() => {
         const now = new Date();
         return enrichedOffers.filter(offer => {
+            // Фильтр по продавцу - только текущего продавца
+            if (seller?.id && offer.sellerId !== seller.id) {
+                return false;
+            }
+            
             // Автоматический фильтр просроченных
             const expiryDate = new Date(offer.expiresDate);
             if (expiryDate < now) return false;
@@ -67,7 +73,7 @@ export default function OffersScreen() {
 
             return true;
         });
-    }, [enrichedOffers, searchQuery]);
+    }, [enrichedOffers, searchQuery, seller?.id]);
 
     // Сортировка по дате (по умолчанию)
     const sortedOffers = useMemo(() => {
@@ -106,15 +112,27 @@ export default function OffersScreen() {
     };
 
     const handleAddOffer = () => {
-        console.log('[OffersScreen] handleAddOffer called, shops:', shops);
         const targetShop = shops[0];
         if (targetShop) {
-            console.log('[OffersScreen] Opening modal with shopId:', targetShop.id);
             openModal(<NewOfferContent shopId={targetShop.id} onClose={closeModal} />);
         } else {
-            console.log('[OffersScreen] No shops, opening modal without shopId');
             // Если магазинов нет, открываем модалку без предустановленного магазина
             openModal(<NewOfferContent onClose={closeModal} />);
+        }
+    };
+
+    const handleRefresh = async () => {
+        setRefreshing(true);
+        try {
+            if (seller?.id) {
+                await Promise.all([
+                    fetchOffersForAdmin(seller.id),
+                    refetchProducts(),
+                    refetchShops(),
+                ]);
+            }
+        } finally {
+            setRefreshing(false);
         }
     };
 
@@ -180,6 +198,14 @@ export default function OffersScreen() {
                 <ScrollView 
                     contentContainerStyle={styles.scrollContent}
                     showsVerticalScrollIndicator={false}
+                    refreshControl={
+                        <RefreshControl
+                            refreshing={refreshing}
+                            onRefresh={handleRefresh}
+                            tintColor="#34C759"
+                            colors={["#34C759"]}
+                        />
+                    }
                 >
                     <Text style={styles.countText}>
                         Всего предложений: {sortedOffers.length}

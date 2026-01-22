@@ -69,6 +69,7 @@ export function HorizontalOfferList({
             offer={offer}
             distance={distance}
             onPress={onOfferPress ? () => onOfferPress(offer) : undefined}
+            showCheaperBadge={true}
           />
         </View>
       ))}

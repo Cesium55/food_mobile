@@ -9,7 +9,7 @@ import { usePublicSeller } from '@/hooks/usePublicSeller';
 import { useThemedStyles } from '@/hooks/useThemeTokens';
 import { getDaysUntilExpiry, getExpiryText } from '@/utils/expiryUtils';
 import { getFirstImageUrl } from '@/utils/imageUtils';
-import { getCurrentPrice } from '@/utils/pricingUtils';
+import { canPriceDecrease, getCurrentPrice } from '@/utils/pricingUtils';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
@@ -21,9 +21,10 @@ interface MiniOfferCardProps {
   offer: Offer;
   distance?: number;
   onPress?: () => void;
+  showCheaperBadge?: boolean;
 }
 
-export function MiniOfferCard({ offer, distance, onPress }: MiniOfferCardProps) {
+export function MiniOfferCard({ offer, distance, onPress, showCheaperBadge = false }: MiniOfferCardProps) {
   const styles = useThemedStyles(createStyles);
   const { cartItems, addToCart, increaseQuantity, decreaseQuantity } = useCart();
   const { seller } = usePublicSeller(offer.sellerId || null);
@@ -99,8 +100,9 @@ export function MiniOfferCard({ offer, distance, onPress }: MiniOfferCardProps) 
     }
   };
   
-  // Проверяем, есть ли динамическая цена
+  // Проверяем, есть ли динамическая цена и может ли она снизиться
   const hasDynamicPricing = offer.isDynamicPricing && offer.pricingStrategy;
+  const willBecomeCheaper = showCheaperBadge ? canPriceDecrease(offer) : false;
   
   return (
     <Pressable style={styles.card} onPress={handleCardPress}>
@@ -110,6 +112,7 @@ export function MiniOfferCard({ offer, distance, onPress }: MiniOfferCardProps) 
         shopInitial={shopInitial}
         timeLeftText={timeLeftText}
         hasDynamicPricing={hasDynamicPricing}
+        willBecomeCheaper={willBecomeCheaper}
       />
       
       <View style={styles.content}>

@@ -164,6 +164,7 @@ const CategorySection = ({
               <MiniOfferCard 
                 offer={offer} 
                 onPress={() => handleProductPress(offer)}
+                showCheaperBadge={true}
               />
             </View>
           ))}
