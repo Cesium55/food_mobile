@@ -179,10 +179,12 @@ export const useOffers = () => {
     skipDefaultFilters?: boolean; // Новый параметр для пропуска дефолтных фильтров
     sellerId?: number; // Новый параметр для фильтрации по продавцу (для админки)
     categoryIds?: number[]; // Фильтр по ID категорий (OR логика)
+    preserveExisting?: boolean; // Сохранять существующие данные при ошибке
   }) => {
     try {
       setLoading(true);
       setError(null);
+      const preserveExisting = filters?.preserveExisting ?? false;
       
       // Формируем URL с параметрами фильтрации
       const params = new URLSearchParams();
@@ -246,6 +248,12 @@ export const useOffers = () => {
           // Сначала трансформируем офферы
           let transformedOffers = offersData.map(transformOffer);
           
+          // Если preserveExisting=true и мы получили пустой массив, не заменяем существующие данные
+          if (preserveExisting && transformedOffers.length === 0 && offers.length > 0) {
+            // Не обновляем список, сохраняем существующие данные
+            return;
+          }
+          
           // Загружаем стратегии для офферов, у которых они отсутствуют
           const offersNeedingStrategy = transformedOffers.filter(
             offer => offer.isDynamicPricing && offer.pricingStrategyId && !offer.pricingStrategy
@@ -254,8 +262,22 @@ export const useOffers = () => {
           // Загружаем стратегии для офферов, у которых они отсутствуют
           // Делаем это в отдельном шаге, чтобы не блокировать основной рендер
           if (offersNeedingStrategy.length > 0) {
-            // Сначала устанавливаем офферы без стратегий (чтобы не блокировать UI)
-            setOffers(transformedOffers);
+            // Если preserveExisting=true, обновляем только существующие офферы и добавляем новые
+            if (preserveExisting) {
+              setOffers(prevOffers => {
+                // Обновляем существующие офферы и добавляем новые, избегая дубликатов
+                const existingIds = new Set(prevOffers.map(o => o.id));
+                const updatedOffers = prevOffers.map(existingOffer => {
+                  const updated = transformedOffers.find(o => o.id === existingOffer.id);
+                  return updated || existingOffer;
+                });
+                const newOffers = transformedOffers.filter(o => !existingIds.has(o.id));
+                return [...updatedOffers, ...newOffers];
+              });
+            } else {
+              // Сначала устанавливаем офферы без стратегий (чтобы не блокировать UI)
+              setOffers(transformedOffers);
+            }
             
             // Затем загружаем стратегии асинхронно и обновляем офферы
             Promise.all(
@@ -312,24 +334,50 @@ export const useOffers = () => {
               });
             });
           } else {
-            // Если стратегии не нужны, просто устанавливаем офферы
-            setOffers(transformedOffers);
+            // Если стратегии не нужны
+            if (preserveExisting) {
+              // Обновляем существующие офферы и добавляем новые
+              setOffers(prevOffers => {
+                const existingIds = new Set(prevOffers.map(o => o.id));
+                const updatedOffers = prevOffers.map(existingOffer => {
+                  const updated = transformedOffers.find(o => o.id === existingOffer.id);
+                  return updated || existingOffer;
+                });
+                const newOffers = transformedOffers.filter(o => !existingIds.has(o.id));
+                return [...updatedOffers, ...newOffers];
+              });
+            } else {
+              // Просто устанавливаем офферы
+              setOffers(transformedOffers);
+            }
           }
         } else {
           setError('Неверный формат данных офферов');
-          setOffers([]);
+          // Не очищаем список при ошибке формата, если нужно сохранить существующие данные
+          if (!preserveExisting) {
+            setOffers([]);
+          }
         }
       } else if (response.status === 404) {
         setError('Офферы не найдены');
-        setOffers([]);
+        // Не очищаем список при 404, если нужно сохранить существующие данные
+        if (!preserveExisting) {
+          setOffers([]);
+        }
       } else {
         const errorText = await response.text();
         setError('Ошибка загрузки офферов');
-        setOffers([]);
+        // Не очищаем список при ошибке, если нужно сохранить существующие данные
+        if (!preserveExisting) {
+          setOffers([]);
+        }
       }
     } catch (err) {
       setError('Ошибка подключения к серверу');
-      setOffers([]);
+      // Не очищаем список при ошибке подключения, если нужно сохранить существующие данные
+      if (!preserveExisting) {
+        setOffers([]);
+      }
     } finally {
       setLoading(false);
     }

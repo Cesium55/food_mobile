@@ -1,3 +1,4 @@
+import { StandardModal } from "@/components/ui";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { API_ENDPOINTS } from "@/constants/api";
 import { getApiUrl } from "@/constants/env";
@@ -8,12 +9,14 @@ import { ImageFile, deleteProductImage, uploadProductImagesBatch } from "@/utils
 import { getImageUrl } from "@/utils/imageUtils";
 import * as ImagePicker from 'expo-image-picker';
 import { router, useLocalSearchParams } from "expo-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
     ActivityIndicator,
     Alert,
     Image,
     Modal,
+    NativeScrollEvent,
+    NativeSyntheticEvent,
     ScrollView,
     StyleSheet,
     Text,
@@ -21,7 +24,6 @@ import {
     TouchableOpacity,
     View
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 
 interface Product {
     id: number;
@@ -37,9 +39,14 @@ interface ProductImage {
     id?: number; // ID изображения, если доступен
 }
 
-export default function ProductDetailScreen() {
+interface ProductDetailScreenProps {
+    productId?: number;
+    onClose?: () => void;
+}
+
+export function ProductDetailContent({ productId: productIdProp, onClose }: ProductDetailScreenProps) {
     const { id } = useLocalSearchParams<{ id: string }>();
-    const productId = Number(id);
+    const productId = productIdProp ?? Number(id);
     const { categories, getCategoryById, getCategoryPath } = useCategories();
     const { fetchProductById } = useProducts(); // fetchProductById не требует seller_id, так как загружает конкретный товар по ID
 
@@ -57,6 +64,9 @@ export default function ProductDetailScreen() {
     const [newImages, setNewImages] = useState<ImageFile[]>([]); // Новые изображения для загрузки
     const [imagesToDelete, setImagesToDelete] = useState<number[]>([]); // ID изображений для удаления
     const [isUploading, setIsUploading] = useState(false);
+    const [currentImageIndex, setCurrentImageIndex] = useState(0);
+    const galleryScrollRef = useRef<ScrollView>(null);
+    const handleClose = onClose ?? (() => router.back());
 
     // Функция загрузки товара с сервера
     const loadProduct = async () => {
@@ -85,12 +95,25 @@ export default function ProductDetailScreen() {
                 setProduct(productData);
                 
                 // Инициализируем существующие изображения
-                // Преобразуем строки путей в объекты (ID будет добавлен позже, если доступен)
-                // Фильтруем только валидные строки
+                // Преобразуем изображения в объекты с path
+                // images может быть массивом строк или объектов {id, order, path}
                 setExistingImages(
                     (apiProduct.images || [])
-                        .filter((path): path is string => typeof path === 'string' && path.length > 0)
-                        .map(path => ({ path }))
+                        .map((img): ProductImage | null => {
+                            if (typeof img === 'string' && img.length > 0) {
+                                return { path: img };
+                            } else if (img && typeof img === 'object' && img !== null && 'path' in img) {
+                                const imgObj = img as { path: string; id?: number; order?: number };
+                                if (imgObj.path && typeof imgObj.path === 'string' && imgObj.path.length > 0) {
+                                    return {
+                                        path: imgObj.path,
+                                        id: imgObj.id,
+                                    };
+                                }
+                            }
+                            return null;
+                        })
+                        .filter((img): img is ProductImage => img !== null)
                 );
                 setNewImages([]);
                 setImagesToDelete([]);
@@ -243,7 +266,7 @@ export default function ProductDetailScreen() {
                     onPress: () => {
                         setTimeout(() => {
                             Alert.alert("Успех", "Товар удален");
-                            router.back();
+                            handleClose();
                         }, 100);
                     }
                 }
@@ -495,15 +518,9 @@ export default function ProductDetailScreen() {
     };
 
     return (
-        <SafeAreaView style={styles.safeArea} edges={[]}>
+            <View style={styles.modalContainer}>
             {/* Заголовок */}
             <View style={styles.header}>
-                <TouchableOpacity 
-                    style={styles.headerBackButton}
-                    onPress={() => router.back()}
-                >
-                    <IconSymbol name="arrow.left" color="#333" size={24} />
-                </TouchableOpacity>
                 <Text style={styles.headerTitle} numberOfLines={1}>
                     {product?.name || 'Загрузка...'}
                 </Text>
@@ -537,7 +554,7 @@ export default function ProductDetailScreen() {
                     <Text style={styles.errorText}>{error || 'Товар не найден'}</Text>
                     <TouchableOpacity 
                         style={styles.backButton}
-                        onPress={() => router.back()}
+                        onPress={handleClose}
                     >
                         <Text style={styles.backButtonText}>Вернуться назад</Text>
                     </TouchableOpacity>
@@ -553,9 +570,20 @@ export default function ProductDetailScreen() {
                 {/* Галерея изображений */}
                 <View style={styles.gallerySection}>
                     <Text style={styles.sectionTitle}>Фотографии товара</Text>
+                    <View style={styles.galleryContainer}>
                     <ScrollView 
+                        ref={galleryScrollRef}
                         horizontal 
+                        pagingEnabled
                         showsHorizontalScrollIndicator={false}
+                        onScroll={(event: NativeSyntheticEvent<NativeScrollEvent>) => {
+                            const scrollPosition = event.nativeEvent.contentOffset.x;
+                            const imageWidth = 250; // ширина изображения
+                            const index = Math.round(scrollPosition / imageWidth);
+                            setCurrentImageIndex(index);
+                        }}
+                        scrollEventThrottle={16}
+                        style={styles.galleryScrollView}
                         contentContainerStyle={styles.galleryScroll}
                     >
                         {/* Существующие изображения */}
@@ -574,7 +602,7 @@ export default function ProductDetailScreen() {
                                         <View 
                                             style={[styles.galleryImage, styles.galleryImagePlaceholder]}
                                         >
-                                            <Text style={styles.imagePlaceholderText}>📸</Text>
+                                            <IconSymbol name="photo" size={32} color="#999" />
                                             <Text style={styles.imageNumberText}>Фото {index + 1}</Text>
                                         </View>
                                     )}
@@ -620,6 +648,22 @@ export default function ProductDetailScreen() {
                             </TouchableOpacity>
                         )}
                     </ScrollView>
+                    
+                    {/* Индикаторы изображений */}
+                    {(existingImages.length + newImages.length + (isEditing ? 1 : 0)) > 1 && (
+                        <View style={styles.indicators}>
+                            {Array.from({ length: existingImages.length + newImages.length + (isEditing ? 1 : 0) }).map((_, index) => (
+                                <View
+                                    key={index}
+                                    style={[
+                                        styles.indicatorDot,
+                                        index === currentImageIndex && styles.indicatorDotActive
+                                    ]}
+                                />
+                            ))}
+                        </View>
+                    )}
+                    </View>
                 </View>
 
                 {/* Основная информация */}
@@ -869,12 +913,22 @@ export default function ProductDetailScreen() {
                     </View>
                 </View>
             </Modal>
-        </SafeAreaView>
+        </View>
+    );
+}
+
+export default function ProductDetailScreen(props: ProductDetailScreenProps) {
+    const handleClose = props.onClose ?? (() => router.back());
+
+    return (
+        <StandardModal visible onClose={handleClose}>
+            <ProductDetailContent {...props} onClose={handleClose} />
+        </StandardModal>
     );
 }
 
 const styles = StyleSheet.create({
-    safeArea: {
+    modalContainer: {
         flex: 1,
         backgroundColor: '#f5f5f5',
     },
@@ -885,9 +939,6 @@ const styles = StyleSheet.create({
         backgroundColor: '#fff',
         borderBottomWidth: 1,
         borderBottomColor: '#e0e0e0',
-    },
-    headerBackButton: {
-        marginRight: 12,
     },
     headerTitle: {
         flex: 1,
@@ -915,13 +966,19 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     scrollContent: {
+        paddingTop: 16,
         paddingBottom: 40,
+        paddingHorizontal: 0,
     },
     gallerySection: {
         backgroundColor: '#fff',
         paddingTop: 0,
         paddingBottom: 16,
         marginBottom: 8,
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: '#e0e0e0',
+        overflow: 'hidden',
     },
     sectionTitle: {
         fontSize: 18,
@@ -930,9 +987,15 @@ const styles = StyleSheet.create({
         paddingHorizontal: 16,
         marginBottom: 12,
     },
+    galleryContainer: {
+        alignItems: 'center',
+    },
+    galleryScrollView: {
+        width: 250,
+        height: 250,
+    },
     galleryScroll: {
-        paddingHorizontal: 16,
-        gap: 12,
+        alignItems: 'center',
     },
     imageWrapper: {
         position: 'relative',
@@ -976,17 +1039,39 @@ const styles = StyleSheet.create({
         borderStyle: 'dashed',
         justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: '#fafafa',
+        backgroundColor: '#fff',
     },
     addImageText: {
         marginTop: 8,
         fontSize: 14,
         color: '#999',
     },
+    indicators: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginTop: 16,
+        gap: 6,
+    },
+    indicatorDot: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+        backgroundColor: '#ccc',
+    },
+    indicatorDotActive: {
+        backgroundColor: '#34C759',
+        width: 10,
+        height: 10,
+        borderRadius: 5,
+    },
     infoSection: {
         backgroundColor: '#fff',
         padding: 16,
         marginBottom: 8,
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: '#e0e0e0',
     },
     fieldContainer: {
         marginBottom: 20,
@@ -1003,7 +1088,7 @@ const styles = StyleSheet.create({
         borderRadius: 8,
         padding: 12,
         fontSize: 16,
-        backgroundColor: '#f9f9f9',
+        backgroundColor: '#fff',
     },
     textArea: {
         minHeight: 100,
@@ -1029,7 +1114,7 @@ const styles = StyleSheet.create({
         borderColor: '#ddd',
         borderRadius: 8,
         padding: 12,
-        backgroundColor: '#f9f9f9',
+        backgroundColor: '#fff',
     },
     categoryButtonText: {
         fontSize: 16,
@@ -1041,7 +1126,7 @@ const styles = StyleSheet.create({
     categoryGroup: {
         marginBottom: 24,
         backgroundColor: '#fff',
-        borderRadius: 12,
+        borderRadius: 16,
         padding: 16,
         borderWidth: 1,
         borderColor: '#e0e0e0',
@@ -1100,12 +1185,12 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         padding: 12,
         borderRadius: 8,
-        backgroundColor: '#f9f9f9',
+        backgroundColor: '#fff',
         borderWidth: 1,
         borderColor: '#e0e0e0',
     },
     subCategoryButtonSelected: {
-        backgroundColor: '#E3F2FD',
+        backgroundColor: '#fff',
         borderColor: '#007AFF',
     },
     subCategoryText: {
@@ -1142,7 +1227,7 @@ const styles = StyleSheet.create({
     addCharButton: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#E3F2FD',
+        backgroundColor: '#f5f7fa',
         paddingHorizontal: 12,
         paddingVertical: 6,
         borderRadius: 6,
@@ -1195,7 +1280,7 @@ const styles = StyleSheet.create({
         borderRadius: 6,
         padding: 8,
         fontSize: 14,
-        backgroundColor: '#f9f9f9',
+        backgroundColor: '#fff',
         textAlign: 'right',
     },
     deleteCharButton: {
@@ -1217,6 +1302,9 @@ const styles = StyleSheet.create({
     actionsSection: {
         backgroundColor: '#fff',
         padding: 16,
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: '#e0e0e0',
     },
     saveButton: {
         backgroundColor: '#007AFF',
@@ -1234,9 +1322,11 @@ const styles = StyleSheet.create({
         fontWeight: '600',
     },
     changesIndicator: {
-        backgroundColor: '#FFF3CD',
-        borderColor: '#FFC107',
+        backgroundColor: '#fff',
+        borderColor: '#e0e0e0',
         borderWidth: 1,
+        borderLeftWidth: 4,
+        borderLeftColor: '#FFC107',
         borderRadius: 8,
         padding: 12,
         marginBottom: 12,
@@ -1302,7 +1392,7 @@ const styles = StyleSheet.create({
         borderRadius: 8,
         padding: 12,
         fontSize: 16,
-        backgroundColor: '#f9f9f9',
+        backgroundColor: '#fff',
     },
     modalFooter: {
         flexDirection: 'row',

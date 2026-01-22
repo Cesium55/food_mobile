@@ -1,12 +1,20 @@
+import { StandardModal } from "@/components/ui";
 import { IconSymbol } from "@/components/ui/icon-symbol";
-import { useOffers } from "@/hooks/useOffers";
+import { Offer, useOffers } from "@/hooks/useOffers";
 import { usePricingStrategies } from "@/hooks/usePricingStrategies";
+import { useSellerMe } from "@/hooks/useSeller";
 import { useShops } from "@/hooks/useShops";
+import { getImageUrl } from "@/utils/imageUtils";
+import { getCurrentPrice } from "@/utils/pricingUtils";
 import { router, useLocalSearchParams } from "expo-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
     ActivityIndicator,
     Alert,
+    Dimensions,
+    Image,
+    NativeScrollEvent,
+    NativeSyntheticEvent,
     ScrollView,
     StyleSheet,
     Text,
@@ -14,25 +22,31 @@ import {
     TouchableOpacity,
     View
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 
-export default function OfferDetailScreen() {
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
+interface OfferDetailScreenProps {
+    offerId?: number;
+    onClose?: () => void;
+}
+
+
+export function OfferDetailContent({ offerId: offerIdProp, onClose }: OfferDetailScreenProps) {
     const { id } = useLocalSearchParams();
-    const offerId = typeof id === 'string' ? parseInt(id) : 0;
-    const { shops, loading: shopsLoading } = useShops(); // Shops уже фильтруются, так как useOffers возвращает только офферы текущего продавца
-    const { getOfferById, loading: offersLoading, updateOffer } = useOffers();
+    const offerId = offerIdProp ?? (typeof id === 'string' ? parseInt(id) : 0);
+    const { shops, loading: shopsLoading } = useShops();
+    const { getOfferById, loading: offersLoading, updateOffer, fetchOffers, offers } = useOffers();
     const { strategies, loading: strategiesLoading } = usePricingStrategies();
+    const { seller } = useSellerMe();
     
-    const offer = getOfferById(offerId);
-    const shop = offer ? shops.find(s => s.id === offer.shopId) : null;
-
+    const [offer, setOffer] = useState<Offer | null>(null);
+    const [loadingOffer, setLoadingOffer] = useState(true);
     const [isEditing, setIsEditing] = useState(false);
     const [hasChanges, setHasChanges] = useState(false);
     const [pricingMode, setPricingMode] = useState<'fixed' | 'strategy'>('fixed');
     const [selectedStrategyId, setSelectedStrategyId] = useState<number | null>(null);
     const [showStrategyPicker, setShowStrategyPicker] = useState(false);
     
-    // Локальное состояние для редактирования
     const [editedOffer, setEditedOffer] = useState<{
         originalCost: string;
         currentCost: string | null;
@@ -40,6 +54,39 @@ export default function OfferDetailScreen() {
         expiresDate: string;
         description?: string;
     } | null>(null);
+    
+    const [currentImageIndex, setCurrentImageIndex] = useState(0);
+    const imagesScrollRef = useRef<ScrollView>(null);
+
+    useEffect(() => {
+        if (!offerId) {
+            setLoadingOffer(false);
+            return;
+        }
+        
+        const foundOffer = getOfferById(offerId);
+        if (foundOffer) {
+            setOffer(foundOffer);
+            setLoadingOffer(false);
+            return;
+        }
+        
+        if (seller?.id && !offersLoading) {
+            setLoadingOffer(true);
+            fetchOffers({ skipDefaultFilters: true, sellerId: seller.id, preserveExisting: true }).then(() => {
+                const loadedOffer = getOfferById(offerId);
+                if (loadedOffer) {
+                    setOffer(loadedOffer);
+                }
+                setLoadingOffer(false);
+            }).catch(() => {
+                setLoadingOffer(false);
+            });
+        } else if (!offersLoading) {
+            setLoadingOffer(false);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [offerId, offers.length, seller?.id, offersLoading]);
 
     useEffect(() => {
         if (offer) {
@@ -50,53 +97,49 @@ export default function OfferDetailScreen() {
                 originalCost: offer.originalCost,
                 currentCost: offer.currentCost,
                 count: offer.count,
-                expiresDate: offer.expiresDate.split('T')[0], // Форматируем дату для input
+                expiresDate: offer.expiresDate.split('T')[0],
                 description: offer.description,
             });
         }
     }, [offer]);
 
-    if (offersLoading || shopsLoading) {
+    const handleClose = onClose ?? (() => router.back());
+
+    if (offersLoading || shopsLoading || loadingOffer) {
         return (
-            <SafeAreaView style={styles.safeArea} edges={['top']}>
-                <View style={styles.header}>
-                    <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-                        <IconSymbol name="arrow.left" size={24} color="#007AFF" />
-                    </TouchableOpacity>
-                    <Text style={styles.headerTitle}>Загрузка...</Text>
-                    <View style={styles.headerSpacer} />
-                </View>
+            <View style={styles.modalContainer}>
                 <View style={styles.loadingContainer}>
                     <ActivityIndicator size="large" color="#007AFF" />
                     <Text style={styles.loadingText}>Загрузка данных...</Text>
                 </View>
-            </SafeAreaView>
+            </View>
         );
     }
 
-    if (!offer) {
+    if (!offer && !loadingOffer && !offersLoading) {
         return (
-            <SafeAreaView style={styles.safeArea} edges={['top']}>
-                <View style={styles.header}>
-                    <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-                        <IconSymbol name="arrow.left" size={24} color="#007AFF" />
-                    </TouchableOpacity>
-                    <Text style={styles.headerTitle}>Ошибка</Text>
-                    <View style={styles.headerSpacer} />
-                </View>
+            <View style={styles.modalContainer}>
                 <View style={styles.errorContainer}>
                     <Text style={styles.errorIcon}>⚠️</Text>
                     <Text style={styles.errorText}>Предложение не найдено</Text>
-                    <TouchableOpacity 
-                        style={styles.backButton}
-                        onPress={() => router.back()}
-                    >
+                    <TouchableOpacity style={styles.backButton} onPress={handleClose}>
                         <Text style={styles.backButtonText}>Вернуться назад</Text>
                     </TouchableOpacity>
                 </View>
-            </SafeAreaView>
+            </View>
         );
     }
+
+    if (!offer) return null;
+
+    const shop = shops.find(s => s.id === offer.shopId);
+    const now = new Date();
+    const expiryDate = new Date(offer.expiresDate);
+    const isExpired = expiryDate < now;
+    const currentPriceStr = getCurrentPrice(offer);
+    const currentPrice = currentPriceStr ? parseFloat(currentPriceStr) : null;
+    const originalCost = offer.originalCost ? (typeof offer.originalCost === 'string' ? parseFloat(offer.originalCost) : offer.originalCost) : 0;
+    const discount = currentPrice && originalCost > 0 ? Math.round(((originalCost - currentPrice) / originalCost) * 100) : 0;
 
     const handleEdit = () => {
         setIsEditing(true);
@@ -115,7 +158,6 @@ export default function OfferDetailScreen() {
                         onPress: () => {
                             setIsEditing(false);
                             setHasChanges(false);
-                            // Сбрасываем изменения
                             if (offer) {
                                 const isDynamic = offer.isDynamicPricing || !!offer.pricingStrategyId;
                                 setPricingMode(isDynamic ? 'strategy' : 'fixed');
@@ -134,13 +176,13 @@ export default function OfferDetailScreen() {
             );
         } else {
             setIsEditing(false);
+            setActiveTab('info');
         }
     };
 
     const handleSave = () => {
         if (!editedOffer) return;
 
-        // Валидация в зависимости от режима ценообразования
         if (pricingMode === 'fixed') {
             const originalCostNum = parseFloat(editedOffer.originalCost);
             if (originalCostNum <= 0) {
@@ -149,12 +191,8 @@ export default function OfferDetailScreen() {
             }
             if (editedOffer.currentCost !== null) {
                 const currentCostNum = parseFloat(editedOffer.currentCost);
-                if (currentCostNum < 0) {
-                    Alert.alert("Ошибка", "Цена со скидкой не может быть отрицательной");
-                    return;
-                }
-                if (currentCostNum > originalCostNum) {
-                    Alert.alert("Ошибка", "Цена со скидкой не может быть больше оригинальной цены");
+                if (currentCostNum < 0 || currentCostNum > originalCostNum) {
+                    Alert.alert("Ошибка", "Цена со скидкой должна быть от 0 до оригинальной цены");
                     return;
                 }
             }
@@ -179,15 +217,12 @@ export default function OfferDetailScreen() {
                     text: "Сохранить",
                     onPress: async () => {
                         try {
-                            // Преобразуем дату в полный datetime с временем конца дня (23:59:59)
                             let expiresDateTime: string;
                             if (editedOffer.expiresDate) {
-                                // Если дата в формате YYYY-MM-DD, добавляем время конца дня
                                 if (/^\d{4}-\d{2}-\d{2}$/.test(editedOffer.expiresDate)) {
                                     const date = new Date(editedOffer.expiresDate + 'T23:59:59');
                                     expiresDateTime = date.toISOString();
                                 } else {
-                                    // Если уже полный datetime, используем как есть
                                     const date = new Date(editedOffer.expiresDate);
                                     date.setHours(23, 59, 59, 999);
                                     expiresDateTime = date.toISOString();
@@ -211,8 +246,8 @@ export default function OfferDetailScreen() {
 
                             if (pricingMode === 'strategy') {
                                 updateData.pricing_strategy_id = selectedStrategyId;
-                                updateData.current_cost = null; // Для динамического ценообразования current_cost должен быть null
-                                updateData.original_cost = editedOffer.originalCost; // Сохраняем базовую цену для расчета скидок
+                                updateData.current_cost = null;
+                                updateData.original_cost = editedOffer.originalCost;
                             } else {
                                 updateData.pricing_strategy_id = null;
                                 updateData.current_cost = editedOffer.currentCost;
@@ -224,6 +259,10 @@ export default function OfferDetailScreen() {
                             Alert.alert("Успех", "Изменения сохранены");
                             setIsEditing(false);
                             setHasChanges(false);
+                            const updatedOffer = getOfferById(offerId);
+                            if (updatedOffer) {
+                                setOffer(updatedOffer);
+                            }
                         } catch (error: any) {
                             console.error('Ошибка обновления оффера:', error);
                             Alert.alert(
@@ -231,25 +270,6 @@ export default function OfferDetailScreen() {
                                 error.message || "Не удалось сохранить изменения. Попробуйте еще раз."
                             );
                         }
-                    }
-                }
-            ]
-        );
-    };
-
-    const handleDelete = () => {
-        Alert.alert(
-            "Удалить предложение?",
-            "Это действие нельзя будет отменить",
-            [
-                { text: "Отмена", style: "cancel" },
-                {
-                    text: "Удалить",
-                    style: "destructive",
-                    onPress: async () => {
-                        // TODO: Реализовать API запрос для удаления
-                        Alert.alert("Успех", "Предложение удалено");
-                        router.back();
                     }
                 }
             ]
@@ -266,22 +286,6 @@ export default function OfferDetailScreen() {
         }
     };
 
-    const getFinalPrice = () => {
-        const price = editedOffer?.currentCost ?? offer.currentCost ?? '0.00';
-        return parseFloat(price);
-    };
-
-    const getDiscount = () => {
-        const original = editedOffer?.originalCost ?? offer.originalCost;
-        const current = editedOffer?.currentCost ?? offer.currentCost;
-        const originalNum = parseFloat(original);
-        const currentNum = current !== null ? parseFloat(current) : null;
-        if (originalNum > 0 && currentNum !== null) {
-            return Math.round(((originalNum - currentNum) / originalNum) * 100);
-        }
-        return 0;
-    };
-
     const displayOffer = editedOffer || {
         originalCost: offer.originalCost,
         currentCost: offer.currentCost,
@@ -291,370 +295,408 @@ export default function OfferDetailScreen() {
     };
 
     return (
-        <SafeAreaView style={styles.safeArea} edges={['top']}>
+        <View style={styles.modalContainer}>
             {/* Заголовок */}
             <View style={styles.header}>
-                <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-                    <IconSymbol name="arrow.left" size={24} color="#007AFF" />
-                </TouchableOpacity>
-                <Text style={styles.headerTitle}>Предложение #{offer.id}</Text>
-                {!isEditing ? (
-                    <TouchableOpacity onPress={handleEdit} style={styles.editButton}>
-                        <IconSymbol name="pencil" size={20} color="#007AFF" />
-                        <Text style={styles.editButtonText}>Редактировать</Text>
-                    </TouchableOpacity>
-                ) : (
-                    <TouchableOpacity onPress={handleCancel} style={styles.cancelButton}>
-                        <Text style={styles.cancelButtonText}>Отмена</Text>
-                    </TouchableOpacity>
-                )}
-            </View>
-
-            <ScrollView
-                style={styles.scrollView}
-                contentContainerStyle={styles.scrollContent}
-                showsVerticalScrollIndicator={false}
-                keyboardShouldPersistTaps="handled"
-                keyboardDismissMode="on-drag"
-            >
-                {/* Информация о товаре */}
-                <View style={styles.infoSection}>
-                    <Text style={styles.sectionTitle}>Товар</Text>
-                    <View style={styles.productCard}>
-                        <Text style={styles.productName}>{offer.productName}</Text>
-                        <Text style={styles.productId}>ID товара: {offer.productId}</Text>
-                        {offer.productDescription && (
-                            <Text style={styles.productDescription}>{offer.productDescription}</Text>
+                <View style={styles.headerTop}>
+                    <View style={styles.headerLeft}>
+                        <Text style={styles.headerTitle}>Предложение #{offer.id}</Text>
+                        {isExpired && (
+                            <View style={styles.expiredBadge}>
+                                <Text style={styles.expiredBadgeText}>Просрочено</Text>
+                            </View>
+                        )}
+                        {offer.isDynamicPricing && !isExpired && (
+                            <View style={styles.dynamicBadge}>
+                                <Text style={styles.dynamicBadgeText}>⚡ Динамическая</Text>
+                            </View>
                         )}
                     </View>
+                    {!isEditing ? (
+                        <TouchableOpacity onPress={handleEdit} style={styles.editButton}>
+                            <IconSymbol name="pencil" size={18} color="#007AFF" />
+                            <Text style={styles.editButtonText}>Редактировать</Text>
+                        </TouchableOpacity>
+                    ) : (
+                        <TouchableOpacity onPress={handleCancel} style={styles.cancelButton}>
+                            <Text style={styles.cancelButtonText}>Отмена</Text>
+                        </TouchableOpacity>
+                    )}
                 </View>
+            </View>
 
-                {/* Торговая точка */}
-                <View style={styles.infoSection}>
-                    <Text style={styles.sectionTitle}>Торговая точка</Text>
-                    <View style={styles.shopCard}>
-                        <Text style={styles.shopName}>
-                            {shop?.fullName || shop?.name || `Точка #${offer.shopId}`}
-                        </Text>
-                        <Text style={styles.shopId}>ID точки: {offer.shopId}</Text>
-                    </View>
-                </View>
-
-                {/* Основная информация */}
-                <View style={styles.infoSection}>
-                    <Text style={styles.sectionTitle}>Основная информация</Text>
-
-                    {/* Индикатор динамического ценообразования (только для просмотра) */}
-                    {!isEditing && offer.isDynamicPricing && (
-                        <View style={styles.dynamicPricingBadge}>
-                            <IconSymbol name="chart.line.uptrend.xyaxis" size={16} color="#007AFF" />
-                            <Text style={styles.dynamicPricingBadgeText}>Динамическое ценообразование</Text>
-                            {offer.pricingStrategy && (
-                                <Text style={styles.dynamicPricingStrategyName}>
-                                    {offer.pricingStrategy.name}
-                                </Text>
+            {/* Контент */}
+            {!isEditing ? (
+                <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+                    {/* Изображения */}
+                    {offer.productImages && offer.productImages.length > 0 && (
+                        <View style={styles.imagesSection}>
+                            <ScrollView 
+                                ref={imagesScrollRef}
+                                horizontal 
+                                pagingEnabled
+                                showsHorizontalScrollIndicator={false}
+                                onScroll={(event: NativeSyntheticEvent<NativeScrollEvent>) => {
+                                    const scrollPosition = event.nativeEvent.contentOffset.x;
+                                    const imageWidth = SCREEN_WIDTH - 32; // ширина изображения
+                                    const index = Math.round(scrollPosition / imageWidth);
+                                    setCurrentImageIndex(index);
+                                }}
+                                scrollEventThrottle={16}
+                                contentContainerStyle={styles.imagesScrollContent}
+                            >
+                                {offer.productImages.map((image, index) => {
+                                    const imageUrl = getImageUrl(image.path);
+                                    return (
+                                        <View key={image.id || index} style={styles.imageWrapper}>
+                                            {imageUrl ? (
+                                                <Image
+                                                    source={{ uri: imageUrl }}
+                                                    style={styles.productImage}
+                                                    resizeMode="cover"
+                                                />
+                                            ) : (
+                                                <View style={[styles.productImage, styles.imagePlaceholder]}>
+                                                    <Text style={styles.imagePlaceholderText}>📸</Text>
+                                                </View>
+                                            )}
+                                        </View>
+                                    );
+                                })}
+                            </ScrollView>
+                            {offer.productImages.length > 1 && (
+                                <View style={styles.imageIndicators}>
+                                    {offer.productImages.map((_, index) => (
+                                        <View
+                                            key={index}
+                                            style={[
+                                                styles.indicatorDot,
+                                                index === currentImageIndex && styles.indicatorDotActive
+                                            ]}
+                                        />
+                                    ))}
+                                </View>
                             )}
                         </View>
                     )}
 
-                    {/* Режим ценообразования (только при редактировании) */}
-                    {isEditing && (
-                        <View style={styles.fieldContainer}>
-                            <Text style={styles.label}>Режим ценообразования *</Text>
-                            <View style={styles.segmentedControl}>
-                                <TouchableOpacity
-                                    style={[
-                                        styles.segment,
-                                        pricingMode === 'fixed' && styles.segmentActive
-                                    ]}
-                                    onPress={() => {
-                                        setPricingMode('fixed');
-                                        setSelectedStrategyId(null);
-                                        if (editedOffer) {
-                                            setEditedOffer({
-                                                ...editedOffer,
-                                                currentCost: editedOffer.currentCost ?? editedOffer.originalCost,
-                                            });
-                                        }
-                                        setHasChanges(true);
-                                    }}
-                                >
-                                    <Text style={[
-                                        styles.segmentText,
-                                        pricingMode === 'fixed' && styles.segmentTextActive
-                                    ]}>
-                                        Фиксированная цена
+                    {/* Цена и скидка */}
+                    <View style={styles.priceSection}>
+                        <View style={styles.priceCard}>
+                            <Text style={styles.priceLabel}>Текущая цена</Text>
+                            {currentPrice && !isExpired ? (
+                                <>
+                                    <Text style={styles.priceValue}>{currentPrice.toFixed(2)} ₽</Text>
+                                    {originalCost > currentPrice && (
+                                        <View style={styles.discountInfo}>
+                                            <Text style={styles.originalPrice}>{originalCost.toFixed(2)} ₽</Text>
+                                            <View style={styles.discountBadge}>
+                                                <Text style={styles.discountBadgeText}>-{discount}%</Text>
+                                            </View>
+                                        </View>
+                                    )}
+                                </>
+                            ) : (
+                                <Text style={styles.expiredPriceText}>Просрочен</Text>
+                            )}
+                        </View>
+                        {offer.isDynamicPricing && offer.pricingStrategy && (
+                            <View style={styles.strategyCard}>
+                                <IconSymbol name="chart.line.uptrend.xyaxis" size={20} color="#007AFF" />
+                                <View style={styles.strategyInfo}>
+                                    <Text style={styles.strategyLabel}>Стратегия</Text>
+                                    <Text style={styles.strategyName}>{offer.pricingStrategy.name}</Text>
+                                </View>
+                            </View>
+                        )}
+                    </View>
+
+                    {/* Основная информация */}
+                    <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>Основная информация</Text>
+                        <View style={styles.infoGrid}>
+                            <View style={styles.infoItem}>
+                                <IconSymbol name="number.circle.fill" size={20} color="#007AFF" />
+                                <View style={styles.infoItemContent}>
+                                    <Text style={styles.infoLabel}>Количество</Text>
+                                    <Text style={styles.infoValue}>{offer.count} шт</Text>
+                                </View>
+                            </View>
+                            <View style={styles.infoItem}>
+                                <IconSymbol name="calendar" size={20} color="#FF9500" />
+                                <View style={styles.infoItemContent}>
+                                    <Text style={styles.infoLabel}>Срок годности</Text>
+                                    <Text style={styles.infoValue}>
+                                        {new Date(offer.expiresDate).toLocaleDateString('ru-RU', { 
+                                            day: '2-digit', 
+                                            month: '2-digit', 
+                                            year: 'numeric' 
+                                        })}
                                     </Text>
-                                </TouchableOpacity>
-                                <TouchableOpacity
-                                    style={[
-                                        styles.segment,
-                                        pricingMode === 'strategy' && styles.segmentActive
-                                    ]}
-                                    onPress={() => {
-                                        setPricingMode('strategy');
-                                        if (editedOffer) {
-                                            setEditedOffer({
-                                                ...editedOffer,
-                                                currentCost: null,
-                                            });
-                                        }
-                                        setHasChanges(true);
-                                    }}
-                                >
-                                    <Text style={[
-                                        styles.segmentText,
-                                        pricingMode === 'strategy' && styles.segmentTextActive
-                                    ]}>
-                                        Стратегия
-                                    </Text>
-                                </TouchableOpacity>
+                                </View>
+                            </View>
+                        </View>
+                    </View>
+
+                    {/* Товар */}
+                    <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>Товар</Text>
+                        <View style={styles.detailCard}>
+                            <Text style={styles.detailLabel}>Название</Text>
+                            <Text style={styles.detailValue}>{offer.productName}</Text>
+                        </View>
+                        {offer.productDescription && (
+                            <View style={styles.detailCard}>
+                                <Text style={styles.detailLabel}>Описание</Text>
+                                <Text style={styles.detailValue}>{offer.productDescription}</Text>
+                            </View>
+                        )}
+                    </View>
+
+                    {/* Торговая точка */}
+                    <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>Торговая точка</Text>
+                        <View style={styles.detailCard}>
+                            <Text style={styles.detailLabel}>Название</Text>
+                            <Text style={styles.detailValue}>
+                                {shop?.fullName || shop?.name || `Точка #${offer.shopId}`}
+                            </Text>
+                        </View>
+                        {shop?.address && (
+                            <View style={styles.detailCard}>
+                                <Text style={styles.detailLabel}>Адрес</Text>
+                                <Text style={styles.detailValue}>{shop.address}</Text>
+                            </View>
+                        )}
+                    </View>
+
+                    {/* Примечание */}
+                    {offer.description && (
+                        <View style={styles.section}>
+                            <Text style={styles.sectionTitle}>Примечание</Text>
+                            <View style={styles.detailCard}>
+                                <Text style={styles.detailValue}>{offer.description}</Text>
                             </View>
                         </View>
                     )}
 
+                    {/* Кнопка удаления */}
+                    <View style={styles.dangerSection}>
+                        <TouchableOpacity style={styles.deleteButton} onPress={() => {
+                            Alert.alert(
+                                "Удалить предложение?",
+                                "Это действие нельзя будет отменить",
+                                [
+                                    { text: "Отмена", style: "cancel" },
+                                    {
+                                        text: "Удалить",
+                                        style: "destructive",
+                                        onPress: () => {
+                                            Alert.alert("Успех", "Предложение удалено");
+                                            handleClose();
+                                        }
+                                    }
+                                ]
+                            );
+                        }}>
+                            <IconSymbol name="trash" size={20} color="#fff" />
+                            <Text style={styles.deleteButtonText}>Удалить предложение</Text>
+                        </TouchableOpacity>
+                    </View>
+
+                    <View style={{ height: 40 }} />
+                </ScrollView>
+            ) : (
+                <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+                    {/* Режим ценообразования */}
+                    <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>Режим ценообразования</Text>
+                        <View style={styles.segmentedControl}>
+                            <TouchableOpacity
+                                style={[styles.segment, pricingMode === 'fixed' && styles.segmentActive]}
+                                onPress={() => {
+                                    setPricingMode('fixed');
+                                    setSelectedStrategyId(null);
+                                    if (editedOffer) {
+                                        setEditedOffer({
+                                            ...editedOffer,
+                                            currentCost: editedOffer.currentCost ?? editedOffer.originalCost,
+                                        });
+                                    }
+                                    setHasChanges(true);
+                                }}
+                            >
+                                <Text style={[styles.segmentText, pricingMode === 'fixed' && styles.segmentTextActive]}>
+                                    Фиксированная цена
+                                </Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.segment, pricingMode === 'strategy' && styles.segmentActive]}
+                                onPress={() => {
+                                    setPricingMode('strategy');
+                                    if (editedOffer) {
+                                        setEditedOffer({ ...editedOffer, currentCost: null });
+                                    }
+                                    setHasChanges(true);
+                                }}
+                            >
+                                <Text style={[styles.segmentText, pricingMode === 'strategy' && styles.segmentTextActive]}>
+                                    Стратегия
+                                </Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+
                     {/* Поля для фиксированной цены */}
-                    {(pricingMode === 'fixed' || (!isEditing && !offer.isDynamicPricing)) && (
+                    {pricingMode === 'fixed' && (
                         <>
-                            {/* Оригинальная цена */}
-                            <View style={styles.fieldContainer}>
-                                <Text style={styles.label}>Оригинальная цена, ₽ *</Text>
-                                {isEditing ? (
-                                    <TextInput
-                                        style={styles.input}
-                                        value={displayOffer.originalCost.toString()}
-                                        onChangeText={(text) => {
-                                            const num = parseFloat(text) || 0;
-                                            handleFieldChange('originalCost', num);
-                                        }}
-                                        keyboardType="decimal-pad"
-                                        placeholder="0.00"
-                                    />
-                                ) : (
-                                    <View style={styles.valueContainer}>
-                                        <Text style={styles.valueText}>
-                                            {offer.originalCost.toFixed(2)} ₽
-                                        </Text>
-                                    </View>
-                                )}
+                            <View style={styles.section}>
+                                <Text style={styles.inputLabel}>Оригинальная цена, ₽ *</Text>
+                                <TextInput
+                                    style={styles.input}
+                                    value={displayOffer.originalCost ? displayOffer.originalCost.toString() : '0.00'}
+                                    onChangeText={(text) => {
+                                        const num = parseFloat(text) || 0;
+                                        handleFieldChange('originalCost', num.toString());
+                                    }}
+                                    keyboardType="decimal-pad"
+                                    placeholder="0.00"
+                                />
                             </View>
-
-                            {/* Цена со скидкой */}
-                            <View style={styles.fieldContainer}>
-                                <Text style={styles.label}>Цена со скидкой, ₽ *</Text>
-                                {isEditing ? (
-                                    <TextInput
-                                        style={styles.input}
-                                        value={displayOffer.currentCost ?? '0.00'}
-                                        onChangeText={(text) => {
-                                            const num = parseFloat(text) || 0;
-                                            handleFieldChange('currentCost', num.toFixed(2));
-                                        }}
-                                        keyboardType="decimal-pad"
-                                        placeholder="0.00"
-                                    />
-                                ) : (
-                                    <View style={styles.valueContainer}>
-                                        <Text style={styles.valueText}>
-                                            {offer.currentCost ? offer.currentCost : '—'} ₽
-                                        </Text>
-                                    </View>
-                                )}
-                            </View>
-
-                            {/* Скидка */}
-                            <View style={styles.fieldContainer}>
-                                <Text style={styles.label}>Скидка</Text>
-                                <View style={styles.valueContainer}>
-                                    <Text style={styles.valueText}>
-                                        {getDiscount() > 0 ? `${getDiscount()}%` : 'Без скидки'}
-                                    </Text>
-                                    {getDiscount() > 0 && displayOffer.currentCost !== null && (
-                                        <Text style={styles.savings}>
-                                            Экономия: {(parseFloat(displayOffer.originalCost) - parseFloat(displayOffer.currentCost ?? '0')).toFixed(2)} ₽
-                                        </Text>
-                                    )}
-                                </View>
+                            <View style={styles.section}>
+                                <Text style={styles.inputLabel}>Цена со скидкой, ₽ *</Text>
+                                <TextInput
+                                    style={styles.input}
+                                    value={displayOffer.currentCost ?? '0.00'}
+                                    onChangeText={(text) => {
+                                        const num = parseFloat(text) || 0;
+                                        handleFieldChange('currentCost', num.toFixed(2));
+                                    }}
+                                    keyboardType="decimal-pad"
+                                    placeholder="0.00"
+                                />
                             </View>
                         </>
                     )}
 
                     {/* Поля для стратегии */}
-                    {isEditing && pricingMode === 'strategy' && (
-                        <>
-                            {/* Выбор стратегии */}
-                            <View style={styles.fieldContainer}>
-                                <Text style={styles.label}>Стратегия ценообразования *</Text>
-                                {!showStrategyPicker ? (
-                                    <TouchableOpacity
-                                        style={styles.strategyInputContainer}
-                                        onPress={() => setShowStrategyPicker(true)}
-                                        activeOpacity={0.7}
-                                    >
-                                        <Text style={[
-                                            styles.strategyInputText,
-                                            !selectedStrategyId && styles.strategyInputPlaceholder
-                                        ]}>
-                                            {selectedStrategyId
-                                                ? strategies.find(s => s.id === selectedStrategyId)?.name || 'Не выбрана'
-                                                : 'Выберите стратегию'
-                                            }
-                                        </Text>
-                                        <IconSymbol name="chevron.down" size={20} color="#666" />
-                                    </TouchableOpacity>
-                                ) : (
-                                    <View style={styles.strategySelector}>
-                                        <View style={styles.selectorHeader}>
-                                            <Text style={styles.selectorTitle}>Выберите стратегию</Text>
-                                            <TouchableOpacity
-                                                onPress={() => setShowStrategyPicker(false)}
-                                                style={styles.closeSelectorButton}
-                                            >
-                                                <IconSymbol name="xmark" size={20} color="#666" />
-                                            </TouchableOpacity>
-                                        </View>
-                                        {strategiesLoading ? (
-                                            <View style={styles.loadingContainer}>
-                                                <ActivityIndicator size="small" color="#007AFF" />
-                                                <Text style={styles.loadingText}>Загрузка стратегий...</Text>
-                                            </View>
-                                        ) : strategies.length === 0 ? (
-                                            <View style={styles.emptyContainer}>
-                                                <Text style={styles.emptyText}>Нет доступных стратегий</Text>
-                                            </View>
-                                        ) : (
-                                            <ScrollView style={styles.strategiesList}>
-                                                {strategies.map(strategy => (
-                                                    <TouchableOpacity
-                                                        key={strategy.id}
-                                                        style={[
-                                                            styles.strategyItem,
-                                                            selectedStrategyId === strategy.id && styles.strategyItemSelected
-                                                        ]}
-                                                        onPress={() => {
-                                                            setSelectedStrategyId(strategy.id);
-                                                            setShowStrategyPicker(false);
-                                                            setHasChanges(true);
-                                                        }}
-                                                    >
-                                                        <View style={styles.strategyItemContent}>
-                                                            <Text style={[
-                                                                styles.strategyItemText,
-                                                                selectedStrategyId === strategy.id && styles.strategyItemTextSelected
-                                                            ]}>
-                                                                {strategy.name}
-                                                            </Text>
-                                                            <Text style={styles.strategyItemSteps}>
-                                                                {strategy.steps.length} шаг{strategy.steps.length !== 1 ? 'ов' : ''}
-                                                            </Text>
-                                                        </View>
-                                                        {selectedStrategyId === strategy.id && (
-                                                            <IconSymbol name="checkmark.circle.fill" size={24} color="#007AFF" />
-                                                        )}
-                                                    </TouchableOpacity>
-                                                ))}
-                                            </ScrollView>
-                                        )}
-                                    </View>
-                                )}
-                            </View>
-
-                            {/* Информация о динамическом ценообразовании */}
-                            {selectedStrategyId && (
-                                <View style={styles.dynamicPricingInfo}>
-                                    <IconSymbol name="info.circle" size={20} color="#007AFF" />
-                                    <Text style={styles.dynamicPricingText}>
-                                        Цена будет рассчитываться автоматически на основе выбранной стратегии и времени до истечения срока годности
+                    {pricingMode === 'strategy' && (
+                        <View style={styles.section}>
+                            <Text style={styles.inputLabel}>Стратегия ценообразования *</Text>
+                            {!showStrategyPicker ? (
+                                <TouchableOpacity
+                                    style={styles.strategyInputContainer}
+                                    onPress={() => setShowStrategyPicker(true)}
+                                >
+                                    <Text style={[
+                                        styles.strategyInputText,
+                                        !selectedStrategyId && styles.strategyInputPlaceholder
+                                    ]}>
+                                        {selectedStrategyId
+                                            ? strategies.find(s => s.id === selectedStrategyId)?.name || 'Не выбрана'
+                                            : 'Выберите стратегию'
+                                        }
                                     </Text>
+                                    <IconSymbol name="chevron.down" size={20} color="#666" />
+                                </TouchableOpacity>
+                            ) : (
+                                <View style={styles.strategySelector}>
+                                    <View style={styles.selectorHeader}>
+                                        <Text style={styles.selectorTitle}>Выберите стратегию</Text>
+                                        <TouchableOpacity
+                                            onPress={() => setShowStrategyPicker(false)}
+                                            style={styles.closeSelectorButton}
+                                        >
+                                            <IconSymbol name="xmark" size={20} color="#666" />
+                                        </TouchableOpacity>
+                                    </View>
+                                    {strategiesLoading ? (
+                                        <View style={styles.loadingContainer}>
+                                            <ActivityIndicator size="small" color="#007AFF" />
+                                        </View>
+                                    ) : strategies.length === 0 ? (
+                                        <View style={styles.emptyContainer}>
+                                            <Text style={styles.emptyText}>Нет доступных стратегий</Text>
+                                        </View>
+                                    ) : (
+                                        <ScrollView style={styles.strategiesList}>
+                                            {strategies.map(strategy => (
+                                                <TouchableOpacity
+                                                    key={strategy.id}
+                                                    style={[
+                                                        styles.strategyItem,
+                                                        selectedStrategyId === strategy.id && styles.strategyItemSelected
+                                                    ]}
+                                                    onPress={() => {
+                                                        setSelectedStrategyId(strategy.id);
+                                                        setShowStrategyPicker(false);
+                                                        setHasChanges(true);
+                                                    }}
+                                                >
+                                                    <View style={styles.strategyItemContent}>
+                                                        <Text style={[
+                                                            styles.strategyItemText,
+                                                            selectedStrategyId === strategy.id && styles.strategyItemTextSelected
+                                                        ]}>
+                                                            {strategy.name}
+                                                        </Text>
+                                                        <Text style={styles.strategyItemSteps}>
+                                                            {strategy.steps.length} шаг{strategy.steps.length !== 1 ? 'ов' : ''}
+                                                        </Text>
+                                                    </View>
+                                                    {selectedStrategyId === strategy.id && (
+                                                        <IconSymbol name="checkmark.circle.fill" size={24} color="#007AFF" />
+                                                    )}
+                                                </TouchableOpacity>
+                                            ))}
+                                        </ScrollView>
+                                    )}
                                 </View>
                             )}
-                        </>
-                    )}
-
-                    {/* Отображение текущей цены для динамического ценообразования (только для просмотра) */}
-                    {!isEditing && offer.isDynamicPricing && offer.currentCost !== null && (
-                        <View style={styles.fieldContainer}>
-                            <Text style={styles.label}>Текущая цена</Text>
-                            <View style={styles.valueContainer}>
-                                <Text style={styles.valueText}>
-                                    {offer.currentCost} ₽
-                                </Text>
-                                <Text style={styles.dynamicPriceNote}>
-                                    Рассчитана автоматически
-                                </Text>
-                            </View>
                         </View>
                     )}
 
                     {/* Количество */}
-                    <View style={styles.fieldContainer}>
-                        <Text style={styles.label}>Количество, шт *</Text>
-                        {isEditing ? (
-                            <TextInput
-                                style={styles.input}
-                                value={displayOffer.count.toString()}
-                                onChangeText={(text) => {
-                                    const num = parseInt(text) || 0;
-                                    handleFieldChange('count', num);
-                                }}
-                                keyboardType="number-pad"
-                                placeholder="0"
-                            />
-                        ) : (
-                            <View style={styles.valueContainer}>
-                                <Text style={styles.valueText}>{offer.count} шт</Text>
-                            </View>
-                        )}
+                    <View style={styles.section}>
+                        <Text style={styles.inputLabel}>Количество, шт *</Text>
+                        <TextInput
+                            style={styles.input}
+                            value={displayOffer.count.toString()}
+                            onChangeText={(text) => {
+                                const num = parseInt(text) || 0;
+                                handleFieldChange('count', num);
+                            }}
+                            keyboardType="number-pad"
+                            placeholder="0"
+                        />
                     </View>
 
                     {/* Срок годности */}
-                    <View style={styles.fieldContainer}>
-                        <Text style={styles.label}>Срок годности *</Text>
-                        {isEditing ? (
-                            <TextInput
-                                style={styles.input}
-                                value={displayOffer.expiresDate}
-                                onChangeText={(text) => handleFieldChange('expiresDate', text)}
-                                placeholder="ГГГГ-ММ-ДД"
-                            />
-                        ) : (
-                            <View style={styles.valueContainer}>
-                                <Text style={styles.valueText}>
-                                    {new Date(offer.expiresDate).toLocaleDateString('ru-RU', { 
-                                        day: '2-digit', 
-                                        month: '2-digit', 
-                                        year: 'numeric' 
-                                    })}
-                                </Text>
-                            </View>
-                        )}
+                    <View style={styles.section}>
+                        <Text style={styles.inputLabel}>Срок годности *</Text>
+                        <TextInput
+                            style={styles.input}
+                            value={displayOffer.expiresDate}
+                            onChangeText={(text) => handleFieldChange('expiresDate', text)}
+                            placeholder="ГГГГ-ММ-ДД"
+                        />
                     </View>
 
                     {/* Описание */}
-                    {displayOffer.description && (
-                        <View style={styles.fieldContainer}>
-                            <Text style={styles.label}>Примечание</Text>
-                            {isEditing ? (
-                                <TextInput
-                                    style={[styles.input, styles.textArea]}
-                                    value={displayOffer.description}
-                                    onChangeText={(text) => handleFieldChange('description', text)}
-                                    placeholder="Дополнительная информация"
-                                    multiline
-                                    numberOfLines={3}
-                                />
-                            ) : (
-                                <View style={styles.valueContainer}>
-                                    <Text style={styles.valueText}>{offer.description}</Text>
-                                </View>
-                            )}
-                        </View>
-                    )}
-                </View>
+                    <View style={styles.section}>
+                        <Text style={styles.inputLabel}>Примечание</Text>
+                        <TextInput
+                            style={[styles.input, styles.textArea]}
+                            value={displayOffer.description}
+                            onChangeText={(text) => handleFieldChange('description', text)}
+                            placeholder="Дополнительная информация"
+                            multiline
+                            numberOfLines={3}
+                        />
+                    </View>
 
-                {/* Кнопки действий */}
-                {isEditing && (
-                    <View style={styles.actionsSection}>
+                    {/* Кнопка сохранения */}
+                    <View style={styles.saveSection}>
                         <TouchableOpacity
                             style={[styles.saveButton, !hasChanges && styles.saveButtonDisabled]}
                             onPress={handleSave}
@@ -663,49 +705,75 @@ export default function OfferDetailScreen() {
                             <Text style={styles.saveButtonText}>Сохранить изменения</Text>
                         </TouchableOpacity>
                     </View>
-                )}
 
-                {/* Кнопка удаления */}
-                <View style={styles.dangerSection}>
-                    <TouchableOpacity style={styles.deleteButton} onPress={handleDelete}>
-                        <IconSymbol name="trash" size={20} color="#fff" />
-                        <Text style={styles.deleteButtonText}>Удалить предложение</Text>
-                    </TouchableOpacity>
-                </View>
+                    <View style={{ height: 40 }} />
+                </ScrollView>
+            )}
+        </View>
+    );
+}
 
-                <View style={{ height: 40 }} />
-            </ScrollView>
-        </SafeAreaView>
+export default function OfferDetailScreen(props: OfferDetailScreenProps) {
+    const handleClose = props.onClose ?? (() => router.back());
+
+    return (
+        <StandardModal visible onClose={handleClose}>
+            <OfferDetailContent {...props} onClose={handleClose} />
+        </StandardModal>
     );
 }
 
 const styles = StyleSheet.create({
-    safeArea: {
+    modalContainer: {
         flex: 1,
-        backgroundColor: '#f5f5f5',
-    },
-    scrollView: {
-        flex: 1,
+        backgroundColor: '#fff',
     },
     header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingHorizontal: 16,
-        paddingVertical: 12,
         backgroundColor: '#fff',
         borderBottomWidth: 1,
-        borderBottomColor: '#e0e0e0',
+        borderBottomColor: '#e9ecef',
     },
-    backButton: {
-        padding: 4,
+    headerTop: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingHorizontal: 16,
+        paddingTop: 16,
+        paddingBottom: 12,
+    },
+    headerLeft: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        flexWrap: 'wrap',
     },
     headerTitle: {
-        fontSize: 18,
+        fontSize: 20,
         fontWeight: '700',
         color: '#333',
-        flex: 1,
-        marginLeft: 12,
+    },
+    expiredBadge: {
+        backgroundColor: '#FF3B30',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 6,
+    },
+    expiredBadgeText: {
+        fontSize: 11,
+        fontWeight: '700',
+        color: '#fff',
+    },
+    dynamicBadge: {
+        backgroundColor: '#007AFF',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 6,
+    },
+    dynamicBadgeText: {
+        fontSize: 11,
+        fontWeight: '700',
+        color: '#fff',
     },
     editButton: {
         flexDirection: 'row',
@@ -713,7 +781,7 @@ const styles = StyleSheet.create({
         gap: 4,
         paddingHorizontal: 12,
         paddingVertical: 6,
-        backgroundColor: '#E3F2FD',
+        backgroundColor: '#f8f9fa',
         borderRadius: 8,
     },
     editButtonText: {
@@ -730,42 +798,328 @@ const styles = StyleSheet.create({
         color: '#FF3B30',
         fontWeight: '500',
     },
-    scrollContent: {
-        padding: 16,
+    content: {
+        flex: 1,
     },
-    infoSection: {
+    imagesSection: {
+        marginBottom: 24,
+        alignItems: 'center',
+    },
+    imagesScrollContent: {
+        alignItems: 'center',
+    },
+    imageWrapper: {
+        width: SCREEN_WIDTH - 32,
+    },
+    productImage: {
+        width: '100%',
+        height: 300,
+        borderRadius: 16,
+        backgroundColor: '#f8f9fa',
+    },
+    imagePlaceholder: {
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    imagePlaceholderText: {
+        fontSize: 64,
+    },
+    imageIndicators: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        alignItems: 'center',
+        gap: 6,
+        marginTop: 16,
+    },
+    indicatorDot: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+        backgroundColor: '#ccc',
+    },
+    indicatorDotActive: {
+        backgroundColor: '#34C759',
+        width: 10,
+        height: 10,
+        borderRadius: 5,
+    },
+    priceSection: {
+        paddingHorizontal: 16,
+        marginBottom: 24,
+        gap: 12,
+    },
+    priceCard: {
+        backgroundColor: '#f8f9fa',
+        padding: 20,
+        borderRadius: 16,
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#e9ecef',
+    },
+    priceLabel: {
+        fontSize: 14,
+        color: '#666',
+        marginBottom: 8,
+    },
+    priceValue: {
+        fontSize: 36,
+        fontWeight: '700',
+        color: '#34C759',
+        marginBottom: 8,
+    },
+    discountInfo: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    originalPrice: {
+        fontSize: 18,
+        color: '#999',
+        textDecorationLine: 'line-through',
+    },
+    discountBadge: {
+        backgroundColor: '#34C759',
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 6,
+    },
+    discountBadgeText: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: '#fff',
+    },
+    expiredPriceText: {
+        fontSize: 24,
+        fontWeight: '700',
+        color: '#FF3B30',
+    },
+    strategyCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#E3F2FD',
+        padding: 16,
+        borderRadius: 16,
+        gap: 12,
+    },
+    strategyInfo: {
+        flex: 1,
+    },
+    strategyLabel: {
+        fontSize: 12,
+        color: '#007AFF',
+        marginBottom: 4,
+    },
+    strategyName: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#007AFF',
+    },
+    section: {
+        paddingHorizontal: 16,
         marginBottom: 24,
     },
     sectionTitle: {
         fontSize: 18,
         fontWeight: '700',
         color: '#333',
-        marginBottom: 12,
+        marginBottom: 16,
     },
-    productCard: {
-        backgroundColor: '#F0F8FF',
+    infoGrid: {
+        gap: 12,
+    },
+    infoItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#f8f9fa',
         padding: 16,
         borderRadius: 12,
+        gap: 12,
         borderWidth: 1,
-        borderColor: '#B3D9FF',
+        borderColor: '#e9ecef',
     },
-    productName: {
+    infoItemContent: {
+        flex: 1,
+    },
+    infoLabel: {
+        fontSize: 12,
+        color: '#666',
+        marginBottom: 4,
+    },
+    infoValue: {
         fontSize: 16,
         fontWeight: '600',
         color: '#333',
-        marginBottom: 4,
     },
-    productDescription: {
-        fontSize: 14,
+    detailCard: {
+        backgroundColor: '#f8f9fa',
+        padding: 16,
+        borderRadius: 12,
+        marginBottom: 12,
+        borderWidth: 1,
+        borderColor: '#e9ecef',
+    },
+    detailLabel: {
+        fontSize: 12,
         color: '#666',
-        marginTop: 8,
+        marginBottom: 6,
+    },
+    detailValue: {
+        fontSize: 16,
+        color: '#333',
+        lineHeight: 22,
+    },
+    dangerSection: {
+        paddingHorizontal: 16,
+        marginBottom: 24,
+    },
+    deleteButton: {
+        backgroundColor: '#FF3B30',
+        padding: 16,
+        borderRadius: 12,
+        alignItems: 'center',
+        flexDirection: 'row',
+        justifyContent: 'center',
+        gap: 8,
+    },
+    deleteButtonText: {
+        color: '#fff',
+        fontSize: 16,
+        fontWeight: '700',
+    },
+    segmentedControl: {
+        flexDirection: 'row',
+        backgroundColor: '#f8f9fa',
+        borderRadius: 12,
+        padding: 4,
+        gap: 4,
+    },
+    segment: {
+        flex: 1,
+        paddingVertical: 12,
+        alignItems: 'center',
+        borderRadius: 8,
+    },
+    segmentActive: {
+        backgroundColor: '#007AFF',
+    },
+    segmentText: {
+        fontSize: 14,
+        fontWeight: '500',
+        color: '#666',
+    },
+    segmentTextActive: {
+        color: '#fff',
+        fontWeight: '600',
+    },
+    inputLabel: {
+        fontSize: 15,
+        fontWeight: '600',
+        color: '#333',
+        marginBottom: 8,
+    },
+    input: {
+        borderWidth: 1,
+        borderColor: '#e9ecef',
+        borderRadius: 12,
+        padding: 16,
+        fontSize: 16,
+        backgroundColor: '#fff',
+        color: '#333',
     },
     textArea: {
-        minHeight: 80,
+        minHeight: 100,
         textAlignVertical: 'top',
     },
-    headerSpacer: {
-        width: 100,
+    strategyInputContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        borderWidth: 1,
+        borderColor: '#e9ecef',
+        borderRadius: 12,
+        padding: 16,
+        backgroundColor: '#fff',
+    },
+    strategyInputText: {
+        fontSize: 16,
+        color: '#333',
+        flex: 1,
+    },
+    strategyInputPlaceholder: {
+        color: '#999',
+    },
+    strategySelector: {
+        borderWidth: 1,
+        borderColor: '#e9ecef',
+        borderRadius: 12,
+        backgroundColor: '#fff',
+        maxHeight: 300,
+        marginTop: 8,
+    },
+    selectorHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: '#e9ecef',
+    },
+    selectorTitle: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#333',
+    },
+    closeSelectorButton: {
+        padding: 4,
+    },
+    strategiesList: {
+        maxHeight: 240,
+    },
+    strategyItem: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: '#f8f9fa',
+    },
+    strategyItemSelected: {
+        backgroundColor: '#F5F7FA',
+    },
+    strategyItemContent: {
+        flex: 1,
+        marginRight: 12,
+    },
+    strategyItemText: {
+        fontSize: 15,
+        color: '#333',
+    },
+    strategyItemTextSelected: {
+        fontWeight: '600',
+        color: '#007AFF',
+    },
+    strategyItemSteps: {
+        fontSize: 12,
+        color: '#999',
+        marginTop: 4,
+    },
+    saveSection: {
+        paddingHorizontal: 16,
+        marginBottom: 24,
+    },
+    saveButton: {
+        backgroundColor: '#007AFF',
+        padding: 18,
+        borderRadius: 12,
+        alignItems: 'center',
+    },
+    saveButtonDisabled: {
+        backgroundColor: '#ccc',
+    },
+    saveButtonText: {
+        color: '#fff',
+        fontSize: 16,
+        fontWeight: '700',
     },
     loadingContainer: {
         flex: 1,
@@ -796,230 +1150,16 @@ const styles = StyleSheet.create({
         marginBottom: 8,
         textAlign: 'center',
     },
-    backButtonText: {
-        fontSize: 16,
-        color: '#007AFF',
-        fontWeight: '600',
+    backButton: {
         marginTop: 16,
-    },
-    shopCard: {
-        backgroundColor: '#FFF9E6',
-        padding: 16,
-        borderRadius: 12,
-        borderWidth: 1,
-        borderColor: '#FFE699',
-    },
-    shopName: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: '#333',
-        marginBottom: 4,
-    },
-    shopId: {
-        fontSize: 13,
-        color: '#666',
-    },
-    fieldContainer: {
-        marginBottom: 20,
-    },
-    label: {
-        fontSize: 15,
-        fontWeight: '600',
-        color: '#333',
-        marginBottom: 8,
-    },
-    input: {
-        borderWidth: 1,
-        borderColor: '#ddd',
-        borderRadius: 8,
         padding: 12,
-        fontSize: 16,
-        backgroundColor: '#fff',
-    },
-    valueContainer: {
-        paddingVertical: 4,
-    },
-    valueText: {
-        fontSize: 16,
-        color: '#333',
-    },
-    finalPrice: {
-        fontSize: 18,
-        fontWeight: '700',
-        color: '#4CAF50',
-    },
-    savings: {
-        fontSize: 13,
-        color: '#4CAF50',
-        marginTop: 4,
-    },
-    actionsSection: {
-        marginTop: 8,
-        marginBottom: 24,
-    },
-    saveButton: {
         backgroundColor: '#007AFF',
-        padding: 16,
-        borderRadius: 12,
-        alignItems: 'center',
+        borderRadius: 8,
     },
-    saveButtonDisabled: {
-        backgroundColor: '#ccc',
-    },
-    saveButtonText: {
+    backButtonText: {
         color: '#fff',
         fontSize: 16,
-        fontWeight: '700',
-    },
-    dangerSection: {
-        marginTop: 8,
-    },
-    deleteButton: {
-        backgroundColor: '#FF3B30',
-        padding: 16,
-        borderRadius: 12,
-        alignItems: 'center',
-        flexDirection: 'row',
-        justifyContent: 'center',
-        gap: 8,
-    },
-    deleteButtonText: {
-        color: '#fff',
-        fontSize: 16,
-        fontWeight: '700',
-    },
-    dynamicPricingBadge: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#E3F2FD',
-        padding: 12,
-        borderRadius: 8,
-        marginBottom: 16,
-        gap: 8,
-    },
-    dynamicPricingBadgeText: {
-        fontSize: 14,
         fontWeight: '600',
-        color: '#007AFF',
-        flex: 1,
-    },
-    dynamicPricingStrategyName: {
-        fontSize: 12,
-        color: '#007AFF',
-        opacity: 0.8,
-    },
-    segmentedControl: {
-        flexDirection: 'row',
-        backgroundColor: '#f0f0f0',
-        borderRadius: 8,
-        padding: 4,
-        gap: 4,
-    },
-    segment: {
-        flex: 1,
-        paddingVertical: 10,
-        paddingHorizontal: 16,
-        borderRadius: 6,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    segmentActive: {
-        backgroundColor: '#007AFF',
-    },
-    segmentText: {
-        fontSize: 14,
-        fontWeight: '500',
-        color: '#666',
-    },
-    segmentTextActive: {
-        color: '#fff',
-        fontWeight: '600',
-    },
-    strategySelector: {
-        borderWidth: 1,
-        borderColor: '#e0e0e0',
-        borderRadius: 12,
-        backgroundColor: '#fff',
-        maxHeight: 300,
-    },
-    strategiesList: {
-        maxHeight: 240,
-    },
-    strategyItem: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        padding: 16,
-        borderBottomWidth: 1,
-        borderBottomColor: '#f0f0f0',
-    },
-    strategyItemSelected: {
-        backgroundColor: '#F0F8FF',
-    },
-    strategyItemContent: {
-        flex: 1,
-        marginRight: 12,
-    },
-    strategyItemText: {
-        fontSize: 15,
-        color: '#333',
-    },
-    strategyItemTextSelected: {
-        fontWeight: '600',
-        color: '#007AFF',
-    },
-    strategyItemSteps: {
-        fontSize: 12,
-        color: '#999',
-        marginTop: 4,
-    },
-    strategyInputContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        borderWidth: 1,
-        borderColor: '#ddd',
-        borderRadius: 8,
-        padding: 12,
-        backgroundColor: '#fff',
-    },
-    strategyInputText: {
-        fontSize: 16,
-        color: '#333',
-        flex: 1,
-    },
-    strategyInputPlaceholder: {
-        color: '#999',
-    },
-    dynamicPricingInfo: {
-        flexDirection: 'row',
-        alignItems: 'flex-start',
-        backgroundColor: '#E3F2FD',
-        padding: 12,
-        borderRadius: 8,
-        gap: 8,
-        marginTop: 8,
-    },
-    dynamicPricingText: {
-        flex: 1,
-        fontSize: 13,
-        color: '#007AFF',
-        lineHeight: 18,
-    },
-    dynamicPriceNote: {
-        fontSize: 12,
-        color: '#999',
-        marginTop: 4,
-        fontStyle: 'italic',
-    },
-    loadingContainer: {
-        padding: 40,
-        alignItems: 'center',
-        gap: 12,
-    },
-    loadingText: {
-        fontSize: 14,
-        color: '#666',
     },
     emptyContainer: {
         padding: 40,
@@ -1030,21 +1170,4 @@ const styles = StyleSheet.create({
         color: '#999',
         textAlign: 'center',
     },
-    selectorHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        padding: 16,
-        borderBottomWidth: 1,
-        borderBottomColor: '#e0e0e0',
-    },
-    selectorTitle: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: '#333',
-    },
-    closeSelectorButton: {
-        padding: 4,
-    },
 });
-

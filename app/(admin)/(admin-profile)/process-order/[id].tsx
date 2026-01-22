@@ -417,8 +417,9 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     scrollContent: {
-        padding: 16,
+        paddingTop: 16,
         paddingBottom: 40,
+        paddingHorizontal: 0,
     },
     section: {
         marginBottom: 24,
@@ -431,9 +432,11 @@ const styles = StyleSheet.create({
     },
     infoCard: {
         backgroundColor: '#fff',
-        borderRadius: 12,
+        borderRadius: 16,
         padding: 16,
         gap: 12,
+        borderWidth: 1,
+        borderColor: '#e0e0e0',
     },
     infoRow: {
         flexDirection: 'row',
@@ -461,9 +464,11 @@ const styles = StyleSheet.create({
     },
     itemCard: {
         backgroundColor: '#fff',
-        borderRadius: 12,
+        borderRadius: 16,
         padding: 16,
         marginBottom: 12,
+        borderWidth: 1,
+        borderColor: '#e0e0e0',
     },
     itemHeader: {
         marginBottom: 12,
@@ -533,10 +538,10 @@ const styles = StyleSheet.create({
         borderRadius: 8,
         borderWidth: 1,
         borderColor: '#ddd',
-        backgroundColor: '#f9f9f9',
+        backgroundColor: '#fff',
     },
     reasonButtonFilled: {
-        backgroundColor: '#E3F2FD',
+        backgroundColor: '#fff',
         borderColor: '#007AFF',
     },
     reasonButtonText: {
@@ -596,7 +601,7 @@ const styles = StyleSheet.create({
     reasonOption: {
         padding: 16,
         borderRadius: 12,
-        backgroundColor: '#f9f9f9',
+        backgroundColor: '#fff',
         marginBottom: 12,
         borderWidth: 1,
         borderColor: '#e0e0e0',

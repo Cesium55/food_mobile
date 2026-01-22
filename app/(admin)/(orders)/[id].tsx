@@ -364,7 +364,8 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     scrollContent: {
-        padding: 16,
+        paddingVertical: 16,
+        paddingHorizontal: 0,
     },
     header: {
         flexDirection: 'row',
@@ -389,8 +390,10 @@ const styles = StyleSheet.create({
     infoSection: {
         backgroundColor: '#fff',
         padding: 16,
-        borderRadius: 12,
+        borderRadius: 16,
         marginBottom: 12,
+        borderWidth: 1,
+        borderColor: '#e0e0e0',
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.05,
@@ -499,8 +502,10 @@ const styles = StyleSheet.create({
     totalSection: {
         backgroundColor: '#fff',
         padding: 16,
-        borderRadius: 12,
+        borderRadius: 16,
         marginBottom: 12,
+        borderWidth: 1,
+        borderColor: '#e0e0e0',
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.05,

@@ -38,6 +38,7 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         paddingTop: 20,
+        backgroundColor: '#f5f5f5',
     },
     modeLabel: {
         fontSize: 18,
@@ -50,7 +51,6 @@ const styles = StyleSheet.create({
         backgroundColor: '#4CAF50',
         borderRadius: 8,
         padding: 16,
-        marginHorizontal: 16,
         marginTop: 20,
         flexDirection: 'row',
         alignItems: 'center',
@@ -66,7 +66,6 @@ const styles = StyleSheet.create({
         backgroundColor: '#34C759',
         borderRadius: 8,
         padding: 16,
-        marginHorizontal: 16,
         marginTop: 12,
         alignItems: 'center',
     },

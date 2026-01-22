@@ -12,6 +12,13 @@ export interface ProductAttribute {
   value: string;
 }
 
+// Интерфейс изображения товара
+export interface ProductImage {
+  id: number;
+  order: number;
+  path: string;
+}
+
 // Интерфейс товара с сервера
 export interface ProductApi {
   id: number;
@@ -20,7 +27,7 @@ export interface ProductApi {
   article: string;
   code: string;
   seller_id: number;
-  images: string[];
+  images: ProductImage[] | string[]; // Может быть массивом объектов или строк
   attributes: ProductAttribute[];
   category_ids?: number[]; // Может быть не в ответе, если категории приходят отдельно
 }
@@ -34,7 +41,7 @@ export interface Product {
   code: string;
   seller_id: number;
   category_ids: number[]; // Массив ID категорий
-  images: string[];
+  images: ProductImage[] | string[]; // Может быть массивом объектов или строк
   characteristics: { [key: string]: string }; // Преобразованные из attributes
 }
 

@@ -1,3 +1,4 @@
+import { StandardModal } from "@/components/ui";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useShopPoint } from "@/hooks/useShopPoints";
 import { getImageUrl } from "@/utils/imageUtils";
@@ -12,11 +13,15 @@ import {
     TouchableOpacity,
     View
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 
-export default function PointDetailScreen() {
+interface PointDetailScreenProps {
+    pointId?: number;
+    onClose?: () => void;
+}
+
+export function PointDetailContent({ pointId: pointIdProp, onClose }: PointDetailScreenProps) {
     const { id } = useLocalSearchParams<{ id: string }>();
-    const pointId = Number(id);
+    const pointId = pointIdProp ?? Number(id);
     const { shopPoint, loading, error } = useShopPoint(pointId);
 
     // Режим редактирования
@@ -24,43 +29,33 @@ export default function PointDetailScreen() {
 
     const [hasChanges, setHasChanges] = useState(false);
 
+    const handleClose = onClose ?? (() => router.back());
+
     if (loading) {
         return (
-            <SafeAreaView style={styles.safeArea} edges={['top']}>
+            <View style={styles.modalContainer}>
                 <View style={styles.header}>
-                    <TouchableOpacity 
-                        style={styles.headerBackButton}
-                        onPress={() => router.back()}
-                    >
-                        <IconSymbol name="arrow.left" color="#333" size={24} />
-                    </TouchableOpacity>
                     <Text style={styles.headerTitle}>Загрузка...</Text>
                     <View style={styles.headerSpacer} />
                 </View>
                 <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
                     <Text style={{ fontSize: 16, color: '#666' }}>Загрузка данных...</Text>
                 </View>
-            </SafeAreaView>
+            </View>
         );
     }
 
     if (error || !shopPoint) {
         return (
-            <SafeAreaView style={styles.safeArea} edges={['top']}>
+            <View style={styles.modalContainer}>
                 <View style={styles.header}>
-                    <TouchableOpacity 
-                        style={styles.headerBackButton}
-                        onPress={() => router.back()}
-                    >
-                        <IconSymbol name="arrow.left" color="#333" size={24} />
-                    </TouchableOpacity>
                     <Text style={styles.headerTitle}>Ошибка</Text>
                     <View style={styles.headerSpacer} />
                 </View>
                 <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
                     <Text style={{ fontSize: 16, color: '#ff3b30' }}>{error || 'Торговая точка не найдена'}</Text>
                 </View>
-            </SafeAreaView>
+            </View>
         );
     }
 
@@ -113,7 +108,7 @@ export default function PointDetailScreen() {
                         // TODO: реализовать удаление через API
                         setTimeout(() => {
                             Alert.alert("Успех", "Торговая точка удалена");
-                            router.back();
+                            handleClose();
                         }, 100);
                     }
                 }
@@ -161,15 +156,9 @@ export default function PointDetailScreen() {
     };
 
     return (
-        <SafeAreaView style={styles.safeArea} edges={['top']}>
+            <View style={styles.modalContainer}>
             {/* Заголовок */}
             <View style={styles.header}>
-                <TouchableOpacity 
-                    style={styles.headerBackButton}
-                    onPress={() => router.back()}
-                >
-                    <IconSymbol name="arrow.left" color="#333" size={24} />
-                </TouchableOpacity>
                 <Text style={styles.headerTitle} numberOfLines={1}>
                     Торговая точка #{shopPoint.id}
                 </Text>
@@ -314,12 +303,22 @@ export default function PointDetailScreen() {
                     </View>
                 )}
             </ScrollView>
-        </SafeAreaView>
+        </View>
+    );
+}
+
+export default function PointDetailScreen(props: PointDetailScreenProps) {
+    const handleClose = props.onClose ?? (() => router.back());
+
+    return (
+        <StandardModal visible onClose={handleClose}>
+            <PointDetailContent {...props} onClose={handleClose} />
+        </StandardModal>
     );
 }
 
 const styles = StyleSheet.create({
-    safeArea: {
+    modalContainer: {
         flex: 1,
         backgroundColor: '#f5f5f5',
     },
@@ -331,9 +330,6 @@ const styles = StyleSheet.create({
         borderBottomWidth: 1,
         borderBottomColor: '#e0e0e0',
     },
-    headerBackButton: {
-        marginRight: 12,
-    },
     headerTitle: {
         flex: 1,
         fontSize: 18,
@@ -342,7 +338,7 @@ const styles = StyleSheet.create({
     },
     headerEditButton: {
         padding: 8,
-        backgroundColor: '#E3F2FD',
+        backgroundColor: '#f5f7fa',
         borderRadius: 8,
     },
     headerCancelButton: {
@@ -357,12 +353,18 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     scrollContent: {
+        paddingTop: 16,
         paddingBottom: 40,
+        paddingHorizontal: 0,
     },
     gallerySection: {
         backgroundColor: '#fff',
         paddingVertical: 16,
         marginBottom: 8,
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: '#e0e0e0',
+        overflow: 'hidden',
     },
     sectionTitle: {
         fontSize: 18,
@@ -417,7 +419,7 @@ const styles = StyleSheet.create({
         borderStyle: 'dashed',
         justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: '#fafafa',
+        backgroundColor: '#fff',
     },
     addImageText: {
         marginTop: 8,
@@ -428,6 +430,9 @@ const styles = StyleSheet.create({
         backgroundColor: '#fff',
         padding: 16,
         marginBottom: 8,
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: '#e0e0e0',
     },
     fieldContainer: {
         marginBottom: 20,
@@ -444,7 +449,7 @@ const styles = StyleSheet.create({
         borderRadius: 8,
         padding: 12,
         fontSize: 16,
-        backgroundColor: '#f9f9f9',
+        backgroundColor: '#fff',
     },
     valueContainer: {
         backgroundColor: '#fff',
@@ -476,6 +481,9 @@ const styles = StyleSheet.create({
     actionsSection: {
         backgroundColor: '#fff',
         padding: 16,
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: '#e0e0e0',
     },
     saveButton: {
         backgroundColor: '#007AFF',
@@ -493,9 +501,11 @@ const styles = StyleSheet.create({
         fontWeight: '600',
     },
     changesIndicator: {
-        backgroundColor: '#FFF3CD',
-        borderColor: '#FFC107',
+        backgroundColor: '#fff',
+        borderColor: '#e0e0e0',
         borderWidth: 1,
+        borderLeftWidth: 4,
+        borderLeftColor: '#FFC107',
         borderRadius: 8,
         padding: 12,
         marginBottom: 12,

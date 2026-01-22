@@ -1,3 +1,4 @@
+import { StandardModal } from "@/components/ui";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { API_ENDPOINTS } from "@/constants/api";
 import { getApiUrl } from "@/constants/env";
@@ -20,9 +21,12 @@ import {
     TouchableOpacity,
     View
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 
-export default function NewProductScreen() {
+interface NewProductScreenProps {
+    onClose?: () => void;
+}
+
+export function NewProductContent({ onClose }: NewProductScreenProps) {
     const { seller } = useSellerMe();
     const { categories, getCategoryById, getCategoryPath } = useCategories();
     const { refetch } = useProducts(seller?.id);
@@ -110,6 +114,8 @@ export default function NewProductScreen() {
         return name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
     };
 
+    const handleClose = onClose ?? (() => router.back());
+
     const handleSave = async () => {
         if (!name || !description) {
             Alert.alert("Ошибка", "Заполните обязательные поля: Название и Описание");
@@ -190,7 +196,7 @@ export default function NewProductScreen() {
                             `Товар "${name}" успешно создан${uploadedImages.length > 0 ? ` и загружено ${uploadedImages.length} изображений` : ''}!`,
                             [{ 
                                 text: "OK",
-                                onPress: () => router.back()
+                                onPress: handleClose
                             }]
                         );
                     } catch (uploadError) {
@@ -204,7 +210,7 @@ export default function NewProductScreen() {
                             `Товар "${name}" успешно создан, но произошла ошибка при загрузке изображений. Вы можете добавить их позже.`,
                             [{ 
                                 text: "OK",
-                                onPress: () => router.back()
+                                onPress: handleClose
                             }]
                         );
                     } finally {
@@ -219,7 +225,7 @@ export default function NewProductScreen() {
                         `Товар "${name}" успешно создан!`,
                         [{ 
                             text: "OK",
-                            onPress: () => router.back()
+                            onPress: handleClose
                         }]
                     );
                 }
@@ -261,7 +267,7 @@ export default function NewProductScreen() {
                 {
                     text: "Да",
                     style: "destructive",
-                    onPress: () => router.back()
+                    onPress: handleClose
                 }
             ]
         );
@@ -416,15 +422,9 @@ export default function NewProductScreen() {
     };
 
     return (
-        <SafeAreaView style={styles.safeArea} edges={['top']}>
+            <View style={styles.modalContainer}>
             {/* Заголовок */}
             <View style={styles.header}>
-                <TouchableOpacity 
-                    style={styles.headerBackButton}
-                    onPress={handleCancel}
-                >
-                    <IconSymbol name="arrow.left" color="#333" size={24} />
-                </TouchableOpacity>
                 <Text style={styles.headerTitle}>
                     Новый товар
                 </Text>
@@ -673,12 +673,22 @@ export default function NewProductScreen() {
                     </View>
                 </View>
             </Modal>
-        </SafeAreaView>
+        </View>
+    );
+}
+
+export default function NewProductScreen(props: NewProductScreenProps) {
+    const handleClose = props.onClose ?? (() => router.back());
+
+    return (
+        <StandardModal visible onClose={handleClose}>
+            <NewProductContent {...props} onClose={handleClose} />
+        </StandardModal>
     );
 }
 
 const styles = StyleSheet.create({
-    safeArea: {
+    modalContainer: {
         flex: 1,
         backgroundColor: '#f5f5f5',
     },
@@ -689,9 +699,6 @@ const styles = StyleSheet.create({
         backgroundColor: '#fff',
         borderBottomWidth: 1,
         borderBottomColor: '#e0e0e0',
-    },
-    headerBackButton: {
-        marginRight: 12,
     },
     headerTitle: {
         flex: 1,
@@ -706,12 +713,18 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     scrollContent: {
+        paddingTop: 16,
         paddingBottom: 40,
+        paddingHorizontal: 0,
     },
     gallerySection: {
         backgroundColor: '#fff',
         paddingVertical: 16,
         marginBottom: 8,
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: '#e0e0e0',
+        overflow: 'hidden',
     },
     sectionTitle: {
         fontSize: 18,
@@ -762,7 +775,7 @@ const styles = StyleSheet.create({
         borderStyle: 'dashed',
         justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: '#fafafa',
+        backgroundColor: '#fff',
     },
     addImageText: {
         marginTop: 8,
@@ -773,6 +786,9 @@ const styles = StyleSheet.create({
         backgroundColor: '#fff',
         padding: 16,
         marginBottom: 8,
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: '#e0e0e0',
     },
     fieldContainer: {
         marginBottom: 20,
@@ -789,7 +805,7 @@ const styles = StyleSheet.create({
         borderRadius: 8,
         padding: 12,
         fontSize: 16,
-        backgroundColor: '#f9f9f9',
+        backgroundColor: '#fff',
     },
     textArea: {
         minHeight: 100,
@@ -803,7 +819,7 @@ const styles = StyleSheet.create({
         borderColor: '#ddd',
         borderRadius: 8,
         padding: 12,
-        backgroundColor: '#f9f9f9',
+        backgroundColor: '#fff',
     },
     categoryButtonText: {
         fontSize: 16,
@@ -815,7 +831,7 @@ const styles = StyleSheet.create({
     categoryGroup: {
         marginBottom: 24,
         backgroundColor: '#fff',
-        borderRadius: 12,
+        borderRadius: 16,
         padding: 16,
         borderWidth: 1,
         borderColor: '#e0e0e0',
@@ -874,7 +890,7 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         padding: 12,
         borderRadius: 8,
-        backgroundColor: '#f9f9f9',
+        backgroundColor: '#fff',
         borderWidth: 1,
         borderColor: '#e0e0e0',
     },
@@ -952,7 +968,7 @@ const styles = StyleSheet.create({
         borderRadius: 6,
         padding: 8,
         fontSize: 14,
-        backgroundColor: '#f9f9f9',
+        backgroundColor: '#fff',
         textAlign: 'right',
     },
     deleteCharButton: {
@@ -968,6 +984,9 @@ const styles = StyleSheet.create({
     actionsSection: {
         backgroundColor: '#fff',
         padding: 16,
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: '#e0e0e0',
     },
     saveButton: {
         backgroundColor: '#34C759',
@@ -1037,7 +1056,7 @@ const styles = StyleSheet.create({
         borderRadius: 8,
         padding: 12,
         fontSize: 16,
-        backgroundColor: '#f9f9f9',
+        backgroundColor: '#fff',
     },
     modalFooter: {
         flexDirection: 'row',

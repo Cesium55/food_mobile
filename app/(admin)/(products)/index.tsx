@@ -1,10 +1,12 @@
+import { ProductDetailContent } from "@/app/(admin)/(products)/[id]";
+import { NewProductContent } from "@/app/(admin)/(products)/new";
 import { TabScreen } from "@/components/TabScreen";
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import { useModal } from "@/contexts/ModalContext";
 import { useCategories } from "@/hooks/useCategories";
 import { Product, useProducts } from "@/hooks/useProducts";
 import { useSellerMe } from "@/hooks/useSeller";
 import { getImageUrl } from "@/utils/imageUtils";
-import { router } from "expo-router";
 import { useState } from "react";
 import {
     ActivityIndicator,
@@ -21,27 +23,13 @@ export default function ProductsScreen() {
     const { seller } = useSellerMe();
     const { categories, getCategoryById } = useCategories();
     const { products, loading: productsLoading, error: productsError } = useProducts(seller?.id);
+    const { openModal, closeModal } = useModal();
     const [searchQuery, setSearchQuery] = useState("");
-    const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
-
-    // Группировка товаров по категориям
-    const getCategoryIcon = (categoryId: number): string => {
-        const category = getCategoryById(categoryId);
-        if (!category) return '📦';
-        
-        const parentId = category.parent_category_id || categoryId;
-        const icons: { [key: number]: string } = {
-            1: '🥛', 2: '🥩', 3: '🥗', 4: '🍞',
-            5: '🥤', 6: '🌾', 7: '❄️', 8: '🍰',
-        };
-        return icons[parentId] || '📦';
-    };
 
     const filteredProducts = products.filter(product => {
         const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                             product.description.toLowerCase().includes(searchQuery.toLowerCase());
-        const matchesCategory = selectedCategoryId === null || product.category_ids.includes(selectedCategoryId);
-        return matchesSearch && matchesCategory;
+        return matchesSearch;
     });
 
     // Группировка по категориям (берем первую категорию товара для группировки)
@@ -56,15 +44,35 @@ export default function ProductsScreen() {
     }, {} as { [key: number]: Product[] });
 
     const handleProductPress = (productId: number) => {
-        router.push(`/(admin)/(products)/${productId}`);
+        openModal(<ProductDetailContent productId={productId} onClose={closeModal} />);
     };
 
     const handleAddProduct = () => {
-        router.push('/(admin)/(products)/new');
+        openModal(<NewProductContent onClose={closeModal} />);
     };
 
     // Получаем все категории, которые имеют товары
     const categoriesWithProducts = Object.keys(groupedProducts).map(Number);
+
+    if (productsLoading) {
+        return (
+            <TabScreen title="Товары">
+                <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+                    <Text style={{ fontSize: 16, color: '#666' }}>Загрузка данных...</Text>
+                </View>
+            </TabScreen>
+        );
+    }
+
+    if (productsError) {
+        return (
+            <TabScreen title="Товары">
+                <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+                    <Text style={{ fontSize: 16, color: '#ff3b30' }}>{productsError}</Text>
+                </View>
+            </TabScreen>
+        );
+    }
 
     return (
         <TabScreen title="Товары">
@@ -74,13 +82,15 @@ export default function ProductsScreen() {
                     <Text style={styles.headerTitle}>
                         Каталог товаров
                     </Text>
-                    <TouchableOpacity 
-                        style={styles.addButton}
-                        onPress={handleAddProduct}
-                    >
-                        <IconSymbol name="plus" size={20} color="#fff" />
-                        <Text style={styles.addButtonText}>Добавить</Text>
-                    </TouchableOpacity>
+                    <View style={styles.headerButtons}>
+                        <TouchableOpacity 
+                            style={styles.addButton}
+                            onPress={handleAddProduct}
+                        >
+                            <IconSymbol name="plus" size={20} color="#fff" />
+                            <Text style={styles.addButtonText}>Добавить</Text>
+                        </TouchableOpacity>
+                    </View>
                 </View>
 
                 {/* Поиск */}
@@ -104,141 +114,152 @@ export default function ProductsScreen() {
                     contentContainerStyle={styles.scrollContent}
                     showsVerticalScrollIndicator={false}
                 >
-                    {productsLoading ? (
-                        <View style={styles.loadingContainer}>
-                            <ActivityIndicator size="large" color="#34C759" />
-                            <Text style={styles.loadingText}>Загрузка товаров...</Text>
-                        </View>
-                    ) : productsError ? (
+                    <Text style={styles.countText}>
+                        Всего товаров: {filteredProducts.length}
+                    </Text>
+
+                    {categoriesWithProducts.length === 0 ? (
                         <View style={styles.emptyContainer}>
-                            <Text style={styles.emptyIcon}>⚠️</Text>
-                            <Text style={styles.emptyText}>Ошибка загрузки</Text>
-                            <Text style={styles.emptySubtext}>{productsError}</Text>
+                            <Text style={styles.emptyText}>
+                                {searchQuery ? "Товары не найдены" : "Нет товаров"}
+                            </Text>
+                            <Text style={styles.emptySubtext}>
+                                {searchQuery ? "Попробуйте изменить поисковый запрос" : "Нажмите 'Добавить' чтобы создать первый товар"}
+                            </Text>
                         </View>
                     ) : (
-                        <>
-                            <Text style={styles.countText}>
-                                Всего товаров: {filteredProducts.length}
-                            </Text>
+                        categoriesWithProducts.map(categoryId => {
+                            // Обработка товаров без категорий (categoryId = 0)
+                            if (categoryId === 0) {
+                                return (
+                                    <View key="no-category" style={styles.categorySection}>
+                                        <View style={styles.categoryHeader}>
+                                            <IconSymbol name="cube.box" size={20} color="#666" />
+                                            <Text style={styles.categoryName}>Без категории</Text>
+                                            <Text style={styles.categoryCount}>
+                                                {groupedProducts[categoryId].length}
+                                            </Text>
+                                        </View>
 
-                            {categoriesWithProducts.length === 0 ? (
-                                <View style={styles.emptyContainer}>
-                                    <Text style={styles.emptyIcon}>📦</Text>
-                                    <Text style={styles.emptyText}>
-                                        {searchQuery ? "Товары не найдены" : "Нет товаров"}
-                                    </Text>
-                                    <Text style={styles.emptySubtext}>
-                                        {searchQuery ? "Попробуйте изменить поисковый запрос" : "Нажмите 'Добавить' чтобы создать первый товар"}
-                                    </Text>
-                                </View>
-                            ) : (
-                                categoriesWithProducts.map(categoryId => {
-                                    // Обработка товаров без категорий (categoryId = 0)
-                                    if (categoryId === 0) {
+                                        {groupedProducts[categoryId].map(product => {
+                                            // Получаем первую валидную строку изображения
+                                            // images может быть массивом строк или объектов с path
+                                            const firstImage = Array.isArray(product.images) && product.images.length > 0
+                                                ? product.images[0]
+                                                : null;
+                                            
+                                            // Извлекаем path из объекта или используем строку напрямую
+                                            const imagePath = firstImage 
+                                                ? (typeof firstImage === 'string' ? firstImage : firstImage.path)
+                                                : null;
+                                            
+                                            const firstImageUrl = imagePath && typeof imagePath === 'string' && imagePath.length > 0
+                                                ? getImageUrl(imagePath)
+                                                : null;
+                                            
+                                            return (
+                                                <TouchableOpacity
+                                                    key={product.id}
+                                                    style={styles.productCard}
+                                                    activeOpacity={0.7}
+                                                    onPress={() => handleProductPress(product.id)}
+                                                >
+                                                    <View style={styles.productIcon}>
+                                                        {firstImageUrl ? (
+                                                            <Image
+                                                                source={{ uri: firstImageUrl }}
+                                                                style={styles.productImage}
+                                                                resizeMode="cover"
+                                                            />
+                                                        ) : (
+                                                            <View style={styles.productIconPlaceholder}>
+                                                                <IconSymbol name="photo" size={24} color="#999" />
+                                                            </View>
+                                                        )}
+                                                    </View>
+                                                    
+                                                    <View style={styles.productInfo}>
+                                                        <Text style={styles.productName}>{product.name}</Text>
+                                                        <Text style={styles.productDescription} numberOfLines={1}>
+                                                            {product.description}
+                                                        </Text>
+                                                    </View>
+
+                                                    <IconSymbol name="chevron.right" color="#999" size={20} />
+                                                </TouchableOpacity>
+                                            );
+                                        })}
+                                    </View>
+                                );
+                            }
+
+                            const category = getCategoryById(categoryId);
+                            if (!category) return null;
+
+                            return (
+                                <View key={categoryId} style={styles.categorySection}>
+                                    <View style={styles.categoryHeader}>
+                                        <IconSymbol name="tag" size={20} color="#666" />
+                                        <Text style={styles.categoryName}>{category.name}</Text>
+                                        <Text style={styles.categoryCount}>
+                                            {groupedProducts[categoryId].length}
+                                        </Text>
+                                    </View>
+
+                                    {groupedProducts[categoryId].map(product => {
+                                        // Получаем первую валидную строку изображения
+                                        // images может быть массивом строк или объектов с path
+                                        const firstImage = Array.isArray(product.images) && product.images.length > 0
+                                            ? product.images[0]
+                                            : null;
+                                        
+                                        // Извлекаем path из объекта или используем строку напрямую
+                                        const imagePath = firstImage 
+                                            ? (typeof firstImage === 'string' ? firstImage : firstImage.path)
+                                            : null;
+                                        
+                                        const firstImageUrl = imagePath && typeof imagePath === 'string' && imagePath.length > 0
+                                            ? getImageUrl(imagePath)
+                                            : null;
+                                        
                                         return (
-                                            <View key="no-category" style={styles.categorySection}>
-                                                <View style={styles.categoryHeader}>
-                                                    <Text style={styles.categoryIcon}>📦</Text>
-                                                    <Text style={styles.categoryName}>Без категории</Text>
-                                                    <Text style={styles.categoryCount}>
-                                                        {groupedProducts[categoryId].length}
+                                            <TouchableOpacity
+                                                key={product.id}
+                                                style={styles.productCard}
+                                                activeOpacity={0.7}
+                                                onPress={() => handleProductPress(product.id)}
+                                            >
+                                                <View style={styles.productIcon}>
+                                                    {firstImageUrl ? (
+                                                        <Image
+                                                            source={{ uri: firstImageUrl }}
+                                                            style={styles.productImage}
+                                                            resizeMode="cover"
+                                                            onError={(e) => {
+                                                                console.log('Image load error:', firstImageUrl, e.nativeEvent.error);
+                                                            }}
+                                                        />
+                                                    ) : (
+                                                        <View style={styles.productIconPlaceholder}>
+                                                            <IconSymbol name="photo" size={24} color="#999" />
+                                                        </View>
+                                                    )}
+                                                </View>
+                                                
+                                                <View style={styles.productInfo}>
+                                                    <Text style={styles.productName}>{product.name}</Text>
+                                                    <Text style={styles.productDescription} numberOfLines={1}>
+                                                        {product.description}
                                                     </Text>
                                                 </View>
 
-                                                {groupedProducts[categoryId].map(product => {
-                                                    const firstImageUrl = product.images && product.images.length > 0 
-                                                        ? getImageUrl(product.images[0]) 
-                                                        : null;
-                                                    
-                                                    return (
-                                                        <TouchableOpacity
-                                                            key={product.id}
-                                                            style={styles.productCard}
-                                                            activeOpacity={0.7}
-                                                            onPress={() => handleProductPress(product.id)}
-                                                        >
-                                                            <View style={styles.productIcon}>
-                                                                {firstImageUrl ? (
-                                                                    <Image
-                                                                        source={{ uri: firstImageUrl }}
-                                                                        style={styles.productImage}
-                                                                        resizeMode="cover"
-                                                                    />
-                                                                ) : (
-                                                                    <Text style={styles.productIconText}>📦</Text>
-                                                                )}
-                                                            </View>
-                                                            
-                                                            <View style={styles.productInfo}>
-                                                                <Text style={styles.productName}>{product.name}</Text>
-                                                                <Text style={styles.productDescription} numberOfLines={1}>
-                                                                    {product.description}
-                                                                </Text>
-                                                            </View>
-
-                                                            <IconSymbol name="chevron.right" color="#999" size={20} />
-                                                        </TouchableOpacity>
-                                                    );
-                                                })}
-                                            </View>
+                                                <IconSymbol name="chevron.right" color="#999" size={20} />
+                                            </TouchableOpacity>
                                         );
-                                    }
-
-                                    const category = getCategoryById(categoryId);
-                                    if (!category) return null;
-
-                                    return (
-                                        <View key={categoryId} style={styles.categorySection}>
-                                            <View style={styles.categoryHeader}>
-                                                <Text style={styles.categoryIcon}>{getCategoryIcon(categoryId)}</Text>
-                                                <Text style={styles.categoryName}>{category.name}</Text>
-                                                <Text style={styles.categoryCount}>
-                                                    {groupedProducts[categoryId].length}
-                                                </Text>
-                                            </View>
-
-                                            {groupedProducts[categoryId].map(product => {
-                                                const firstImageUrl = product.images && product.images.length > 0 
-                                                    ? getImageUrl(product.images[0]) 
-                                                    : null;
-                                                
-                                                return (
-                                                    <TouchableOpacity
-                                                        key={product.id}
-                                                        style={styles.productCard}
-                                                        activeOpacity={0.7}
-                                                        onPress={() => handleProductPress(product.id)}
-                                                    >
-                                                        <View style={styles.productIcon}>
-                                                            {firstImageUrl ? (
-                                                                <Image
-                                                                    source={{ uri: firstImageUrl }}
-                                                                    style={styles.productImage}
-                                                                    resizeMode="cover"
-                                                                />
-                                                            ) : (
-                                                                <Text style={styles.productIconText}>
-                                                                    {getCategoryIcon(categoryId)}
-                                                                </Text>
-                                                            )}
-                                                        </View>
-                                                        
-                                                        <View style={styles.productInfo}>
-                                                            <Text style={styles.productName}>{product.name}</Text>
-                                                            <Text style={styles.productDescription} numberOfLines={1}>
-                                                                {product.description}
-                                                            </Text>
-                                                        </View>
-
-                                                        <IconSymbol name="chevron.right" color="#999" size={20} />
-                                                    </TouchableOpacity>
-                                                );
-                                            })}
-                                        </View>
-                                    );
-                                })
-                            )}
-                        </>
+                                    })}
+                                </View>
+                            );
+                        })
                     )}
                 </ScrollView>
             </View>
@@ -249,6 +270,7 @@ export default function ProductsScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
+        backgroundColor: '#f5f5f5',
     },
     header: {
         flexDirection: 'row',
@@ -264,6 +286,10 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         color: '#333',
         flex: 1,
+    },
+    headerButtons: {
+        flexDirection: 'row',
+        gap: 8,
     },
     addButton: {
         flexDirection: 'row',
@@ -282,8 +308,10 @@ const styles = StyleSheet.create({
     searchContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#f5f5f5',
-        borderRadius: 10,
+        backgroundColor: '#fff',
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: '#e0e0e0',
         paddingHorizontal: 12,
         paddingVertical: 8,
         margin: 16,
@@ -296,31 +324,33 @@ const styles = StyleSheet.create({
         color: '#333',
     },
     scrollContent: {
-        padding: 16,
         paddingTop: 8,
         paddingBottom: 40,
+        paddingHorizontal: 0,
     },
     countText: {
         fontSize: 14,
         color: '#666',
         marginBottom: 16,
         fontStyle: 'italic',
+        paddingHorizontal: 16,
     },
     categorySection: {
         marginBottom: 24,
+        backgroundColor: '#fff',
+        borderRadius: 28,
+        borderWidth: 1,
+        borderColor: '#e0e0e0',
+        overflow: 'hidden',
     },
     categoryHeader: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingVertical: 8,
+        paddingVertical: 12,
         paddingHorizontal: 12,
-        backgroundColor: '#f8f8f8',
-        borderRadius: 8,
-        marginBottom: 8,
-    },
-    categoryIcon: {
-        fontSize: 24,
-        marginRight: 8,
+        borderBottomWidth: 1,
+        borderBottomColor: '#f0f0f0',
+        gap: 8,
     },
     categoryName: {
         flex: 1,
@@ -335,6 +365,34 @@ const styles = StyleSheet.create({
         paddingHorizontal: 8,
         paddingVertical: 2,
         borderRadius: 12,
+    },
+    productCard: {
+        flexDirection: 'row',
+        padding: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: '#f0f0f0',
+        alignItems: 'center',
+    },
+    productIcon: {
+        width: 50,
+        height: 50,
+        borderRadius: 8,
+        backgroundColor: '#f0f0f0',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 12,
+        overflow: 'hidden',
+    },
+    productImage: {
+        width: 50,
+        height: 50,
+        borderRadius: 8,
+    },
+    productIconPlaceholder: {
+        width: 50,
+        height: 50,
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     productInfo: {
         flex: 1,
@@ -353,10 +411,7 @@ const styles = StyleSheet.create({
     emptyContainer: {
         alignItems: 'center',
         paddingVertical: 60,
-    },
-    emptyIcon: {
-        fontSize: 64,
-        marginBottom: 16,
+        paddingHorizontal: 20,
     },
     emptyText: {
         fontSize: 18,
@@ -368,60 +423,5 @@ const styles = StyleSheet.create({
         fontSize: 14,
         color: '#999',
         textAlign: 'center',
-        paddingHorizontal: 40,
-    },
-    loadingContainer: {
-        alignItems: 'center',
-        paddingVertical: 60,
-    },
-    loadingText: {
-        marginTop: 16,
-        fontSize: 16,
-        color: '#666',
-    },
-    productCard: {
-        flexDirection: 'row',
-        backgroundColor: '#fff',
-        borderRadius: 12,
-        padding: 12,
-        marginBottom: 8,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.1,
-        shadowRadius: 2,
-        elevation: 2,
-        alignItems: 'center',
-    },
-    productIcon: {
-        width: 50,
-        height: 50,
-        borderRadius: 25,
-        backgroundColor: '#f0f0f0',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginRight: 12,
-        overflow: 'hidden',
-    },
-    productImage: {
-        width: 50,
-        height: 50,
-        borderRadius: 25,
-    },
-    productIconText: {
-        fontSize: 24,
-    },
-    productInfo: {
-        flex: 1,
-        justifyContent: 'center',
-    },
-    productName: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: '#333',
-        marginBottom: 2,
-    },
-    productDescription: {
-        fontSize: 14,
-        color: '#666',
     },
 });

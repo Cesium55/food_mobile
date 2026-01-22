@@ -372,7 +372,8 @@ const styles = StyleSheet.create({
         backgroundColor: "#f5f5f5",
     },
     scrollContent: {
-        padding: 16,
+        paddingVertical: 16,
+        paddingHorizontal: 0,
     },
     loadingContainer: {
         flex: 1,
@@ -393,9 +394,11 @@ const styles = StyleSheet.create({
     },
     orderInfoSection: {
         backgroundColor: "#fff",
-        borderRadius: 12,
+        borderRadius: 16,
         padding: 16,
         marginBottom: 16,
+        borderWidth: 1,
+        borderColor: "#e0e0e0",
         shadowColor: "#000",
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.1,
@@ -427,9 +430,11 @@ const styles = StyleSheet.create({
     },
     itemCard: {
         backgroundColor: "#fff",
-        borderRadius: 12,
+        borderRadius: 16,
         padding: 16,
         marginBottom: 12,
+        borderWidth: 1,
+        borderColor: "#e0e0e0",
         shadowColor: "#000",
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.1,

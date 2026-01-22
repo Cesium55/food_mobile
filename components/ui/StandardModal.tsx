@@ -105,11 +105,20 @@ export function StandardModal({ visible, onClose, children, footer, zIndex = 100
       enableDynamicSizing={false}
       maxDynamicContentSize={modalHeight}
       detached={false}
-      enableContentPanningGesture={true} // Разрешаем прокрутку контента
-      activeOffsetX={[-10, 10]} // Активируем жест только при вертикальном движении (игнорируем горизонтальное)
-      failOffsetX={[-50, 50]} // Отменяем жест при значительном горизонтальном движении
+      enableContentPanningGesture={false} // Отключаем возможность двигать модалку через контент - только через handle
       footerComponent={renderFooter}
     >
+      {/* Кнопка закрытия - фиксированная, не скроллится */}
+      <View style={styles.closeButtonContainer} pointerEvents="box-none">
+        <TouchableOpacity
+          style={styles.closeButton}
+          onPress={handleClose}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <IconSymbol name="xmark" color="#666" size={18} />
+        </TouchableOpacity>
+      </View>
+
       {/* Контент модалки с прокруткой */}
       <BottomSheetScrollView
         style={styles.scrollView}
@@ -123,17 +132,6 @@ export function StandardModal({ visible, onClose, children, footer, zIndex = 100
         enableOnAndroid={true}
         enableFooterMarginAdjustment={true} // Автоматически добавляет отступ для footer
       >
-        {/* Кнопка закрытия - всегда видимая, поверх контента */}
-        <View style={styles.closeButtonContainer} pointerEvents="box-none">
-          <TouchableOpacity
-            style={styles.closeButton}
-            onPress={handleClose}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          >
-            <IconSymbol name="xmark" color="#666" size={18} />
-          </TouchableOpacity>
-        </View>
-
         {children}
       </BottomSheetScrollView>
     </BottomSheet>
@@ -157,8 +155,9 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 20,
   },
   handleContainer: {
-    paddingTop: 4,
-    paddingBottom: 2,
+    paddingTop: 6,
+    paddingBottom: 6,
+    // backgroundColor: 'red'
   },
   handleIndicator: {
     backgroundColor: 'rgba(0, 0, 0, 0.3)',
@@ -169,9 +168,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollViewContent: {
-    paddingTop: 48,
+    paddingTop: 64,
     paddingBottom: 20,
-    paddingHorizontal: 16,
+    paddingHorizontal: 0,
   },
   footerContainer: {
     backgroundColor: '#fff',
@@ -187,7 +186,7 @@ const styles = StyleSheet.create({
   },
   closeButtonContainer: {
     position: 'absolute',
-    top: 0,
+    top: 8,
     right: 16,
     zIndex: 1000,
     width: 40,

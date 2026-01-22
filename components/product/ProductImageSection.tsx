@@ -2,13 +2,13 @@ import { Offer } from '@/hooks/useOffers';
 import { getImageUrl } from '@/utils/imageUtils';
 import React, { useRef, useState } from 'react';
 import {
-  Image,
-  NativeScrollEvent,
-  NativeSyntheticEvent,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View
+    Image,
+    NativeScrollEvent,
+    NativeSyntheticEvent,
+    ScrollView,
+    StyleSheet,
+    Text,
+    View
 } from 'react-native';
 
 interface ProductImageSectionProps {

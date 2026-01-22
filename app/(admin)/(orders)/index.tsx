@@ -331,12 +331,13 @@ export default function AdminOrdersScreen() {
                             </Text>
                         </View>
                     ) : (
-                        filteredOrders.map(order => (
-                            <TouchableOpacity
-                                key={order.id}
-                                style={styles.orderCard}
-                                onPress={() => handleOrderPress(order.id)}
-                            >
+                        <View style={styles.ordersSection}>
+                            {filteredOrders.map(order => (
+                                <TouchableOpacity
+                                    key={order.id}
+                                    style={styles.orderRow}
+                                    onPress={() => handleOrderPress(order.id)}
+                                >
                                 {/* Заголовок заказа */}
                                 <View style={styles.orderHeader}>
                                     <View style={styles.orderHeaderLeft}>
@@ -394,8 +395,9 @@ export default function AdminOrdersScreen() {
                                 <View style={styles.orderFooter}>
                                     <Text style={styles.orderTotal}>{order.totalAmount.toFixed(2)} ₽</Text>
                                 </View>
-                            </TouchableOpacity>
-                        ))
+                                </TouchableOpacity>
+                            ))}
+                        </View>
                     )}
                     <View style={{ height: 20 }} />
                 </ScrollView>
@@ -562,15 +564,16 @@ const styles = StyleSheet.create({
     },
     statsContainer: {
         flexDirection: 'row',
-        padding: 12,
+        paddingVertical: 12,
+        paddingHorizontal: 0,
         gap: 8,
         backgroundColor: '#fff',
     },
     statCard: {
         flex: 1,
-        backgroundColor: '#F8F9FA',
+        backgroundColor: '#fff',
         padding: 12,
-        borderRadius: 8,
+        borderRadius: 16,
         borderWidth: 1,
         borderColor: '#e0e0e0',
     },
@@ -603,17 +606,18 @@ const styles = StyleSheet.create({
         fontSize: 14,
         color: '#999',
     },
-    orderCard: {
+    ordersSection: {
         backgroundColor: '#fff',
-        marginHorizontal: 12,
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: '#e0e0e0',
+        overflow: 'hidden',
         marginTop: 12,
-        borderRadius: 12,
+    },
+    orderRow: {
         padding: 16,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 4,
-        elevation: 2,
+        borderBottomWidth: 1,
+        borderBottomColor: '#f0f0f0',
     },
     orderHeader: {
         flexDirection: 'row',

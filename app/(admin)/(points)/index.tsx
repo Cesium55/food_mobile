@@ -1,8 +1,10 @@
+import { PointDetailContent } from "@/app/(admin)/(points)/[id]";
+import { NewPointContent } from "@/app/(admin)/(points)/new";
 import { TabScreen } from "@/components/TabScreen";
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import { useModal } from "@/contexts/ModalContext";
 import { useSellerMe } from "@/hooks/useSeller";
 import { useShopPoints } from "@/hooks/useShopPoints";
-import { router } from "expo-router";
 import {
     ScrollView,
     StyleSheet,
@@ -14,13 +16,14 @@ import {
 export default function PointsScreen() {
     const { seller } = useSellerMe();
     const { shopPoints, loading, error } = useShopPoints(seller?.id);
+    const { openModal, closeModal } = useModal();
 
     const handlePointPress = (pointId: number) => {
-        router.push(`/(admin)/(points)/${pointId}`);
+        openModal(<PointDetailContent pointId={pointId} onClose={closeModal} />);
     };
 
     const handleAddPoint = () => {
-        router.push('/(admin)/(points)/new');
+        openModal(<NewPointContent onClose={closeModal} />);
     };
 
     if (loading) {
@@ -71,26 +74,30 @@ export default function PointsScreen() {
                         Всего точек: {shopPoints.length}
                     </Text>
 
-                    {shopPoints.map((point) => (
-                        <TouchableOpacity
-                            key={point.id}
-                            style={styles.pointCard}
-                            activeOpacity={0.7}
-                            onPress={() => handlePointPress(point.id)}
-                        >
-                            <View style={styles.pointIcon}>
-                                <Text style={styles.pointIconText}>🏪</Text>
-                            </View>
-                            
-                            <View style={styles.pointInfo}>
-                                <Text style={styles.pointName}>Торговая точка #{point.id}</Text>
-                                {point.city && <Text style={styles.pointCity}>🏙️ {point.city}</Text>}
-                                <Text style={styles.pointAddress}>📍 {point.address_formated || point.address_raw}</Text>
-                            </View>
+                    {shopPoints.length > 0 && (
+                        <View style={styles.pointsSection}>
+                            {shopPoints.map((point) => (
+                                <TouchableOpacity
+                                    key={point.id}
+                                    style={styles.pointRow}
+                                    activeOpacity={0.7}
+                                    onPress={() => handlePointPress(point.id)}
+                                >
+                                    <View style={styles.pointIcon}>
+                                        <Text style={styles.pointIconText}>🏪</Text>
+                                    </View>
+                                    
+                                    <View style={styles.pointInfo}>
+                                        <Text style={styles.pointName}>Торговая точка #{point.id}</Text>
+                                        {point.city && <Text style={styles.pointCity}>🏙️ {point.city}</Text>}
+                                        <Text style={styles.pointAddress}>📍 {point.address_formated || point.address_raw}</Text>
+                                    </View>
 
-                            <IconSymbol name="chevron.right" color="#999" size={20} />
-                        </TouchableOpacity>
-                    ))}
+                                    <IconSymbol name="chevron.right" color="#999" size={20} />
+                                </TouchableOpacity>
+                            ))}
+                        </View>
+                    )}
 
                     {shopPoints.length === 0 && (
                         <View style={styles.emptyContainer}>
@@ -110,6 +117,7 @@ export default function PointsScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
+        backgroundColor: '#f5f5f5',
     },
     header: {
         flexDirection: 'row',
@@ -168,8 +176,9 @@ const styles = StyleSheet.create({
         fontWeight: '600',
     },
     scrollContent: {
-        padding: 16,
+        paddingTop: 16,
         paddingBottom: 40,
+        paddingHorizontal: 0,
     },
     countText: {
         fontSize: 14,
@@ -177,17 +186,18 @@ const styles = StyleSheet.create({
         marginBottom: 16,
         fontStyle: 'italic',
     },
-    pointCard: {
-        flexDirection: 'row',
+    pointsSection: {
         backgroundColor: '#fff',
-        borderRadius: 12,
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: '#e0e0e0',
+        overflow: 'hidden',
+    },
+    pointRow: {
+        flexDirection: 'row',
         padding: 12,
-        marginBottom: 12,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.1,
-        shadowRadius: 2,
-        elevation: 2,
+        borderBottomWidth: 1,
+        borderBottomColor: '#f0f0f0',
         alignItems: 'center',
     },
     pointIcon: {

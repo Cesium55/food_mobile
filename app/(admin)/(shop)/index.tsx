@@ -513,6 +513,7 @@ export default function ShopScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
+        backgroundColor: '#f5f5f5',
     },
     centered: {
         justifyContent: 'center',
@@ -537,7 +538,7 @@ const styles = StyleSheet.create({
     editButton: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#E3F2FD',
+        backgroundColor: '#f5f7fa',
         paddingHorizontal: 16,
         paddingVertical: 8,
         borderRadius: 8,
@@ -549,10 +550,12 @@ const styles = StyleSheet.create({
         fontWeight: '600',
     },
     cancelButton: {
-        backgroundColor: '#FFEBEE',
+        backgroundColor: '#fff',
         paddingHorizontal: 16,
         paddingVertical: 8,
         borderRadius: 8,
+        borderWidth: 1,
+        borderColor: '#e0e0e0',
     },
     cancelButtonText: {
         color: '#ff3b30',
@@ -560,11 +563,17 @@ const styles = StyleSheet.create({
         fontWeight: '600',
     },
     scrollContent: {
-        padding: 16,
+        paddingTop: 16,
         paddingBottom: 40,
+        paddingHorizontal: 0,
     },
     section: {
         marginBottom: 24,
+        backgroundColor: '#fff',
+        padding: 16,
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: '#e0e0e0',
     },
     sectionTitle: {
         fontSize: 18,
@@ -584,7 +593,7 @@ const styles = StyleSheet.create({
         overflow: 'hidden',
         borderWidth: 2,
         borderColor: '#ddd',
-        backgroundColor: '#f5f5f5',
+        backgroundColor: '#fff',
         justifyContent: 'center',
         alignItems: 'center',
     },
@@ -645,7 +654,7 @@ const styles = StyleSheet.create({
         borderRadius: 8,
         padding: 12,
         fontSize: 16,
-        backgroundColor: '#f9f9f9',
+        backgroundColor: '#fff',
     },
     textArea: {
         minHeight: 100,
@@ -679,9 +688,11 @@ const styles = StyleSheet.create({
         fontWeight: '600',
     },
     changesIndicator: {
-        backgroundColor: '#FFF3CD',
-        borderColor: '#FFC107',
+        backgroundColor: '#fff',
+        borderColor: '#e0e0e0',
         borderWidth: 1,
+        borderLeftWidth: 4,
+        borderLeftColor: '#FFC107',
         borderRadius: 8,
         padding: 12,
         marginTop: 16,

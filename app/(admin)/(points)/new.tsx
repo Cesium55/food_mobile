@@ -1,3 +1,4 @@
+import { StandardModal } from "@/components/ui";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { API_ENDPOINTS } from "@/constants/api";
 import { getApiUrl } from "@/constants/env";
@@ -13,11 +14,16 @@ import {
     TouchableOpacity,
     View
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 
-export default function NewPointScreen() {
+interface NewPointScreenProps {
+    onClose?: () => void;
+}
+
+export function NewPointContent({ onClose }: NewPointScreenProps) {
     const [address, setAddress] = useState("");
     const [isLoading, setIsLoading] = useState(false);
+
+    const handleClose = onClose ?? (() => router.back());
 
     const handleCreate = async () => {
         if (!address.trim()) {
@@ -44,7 +50,7 @@ export default function NewPointScreen() {
                     "Торговая точка успешно создана!",
                     [{ 
                         text: "OK",
-                        onPress: () => router.back()
+                        onPress: handleClose
                     }]
                 );
             } else {
@@ -67,14 +73,14 @@ export default function NewPointScreen() {
                 {
                     text: "Да",
                     style: "destructive",
-                    onPress: () => router.back()
+                    onPress: handleClose
                 }
             ]
         );
     };
 
     return (
-        <SafeAreaView style={styles.safeArea} edges={['top']}>
+        <View style={styles.modalContainer}>
             {/* Заголовок */}
             <View style={styles.header}>
                 <TouchableOpacity 
@@ -136,12 +142,22 @@ export default function NewPointScreen() {
                     </TouchableOpacity>
                 </View>
             </ScrollView>
-        </SafeAreaView>
+        </View>
+    );
+}
+
+export default function NewPointScreen(props: NewPointScreenProps) {
+    const handleClose = props.onClose ?? (() => router.back());
+
+    return (
+        <StandardModal visible onClose={handleClose}>
+            <NewPointContent {...props} onClose={handleClose} />
+        </StandardModal>
     );
 }
 
 const styles = StyleSheet.create({
-    safeArea: {
+    modalContainer: {
         flex: 1,
         backgroundColor: '#f5f5f5',
     },
@@ -169,13 +185,18 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     scrollContent: {
+        paddingTop: 16,
         paddingBottom: 40,
+        paddingHorizontal: 0,
     },
     infoSection: {
         backgroundColor: '#fff',
         padding: 16,
         marginBottom: 8,
         marginTop: 16,
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: '#e0e0e0',
     },
     infoText: {
         fontSize: 14,
@@ -198,12 +219,15 @@ const styles = StyleSheet.create({
         borderRadius: 8,
         padding: 12,
         fontSize: 16,
-        backgroundColor: '#f9f9f9',
+        backgroundColor: '#fff',
         minHeight: 80,
     },
     actionsSection: {
         backgroundColor: '#fff',
         padding: 16,
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: '#e0e0e0',
     },
     createButton: {
         backgroundColor: '#34C759',
