@@ -1,6 +1,7 @@
 import { CartItem as CartItemType } from "@/hooks/useCart";
 import { useOffers } from "@/hooks/useOffers";
 import { getFirstImageUrl } from "@/utils/imageUtils";
+import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useRouter, useSegments } from "expo-router";
 import { useState } from "react";
 import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
@@ -52,6 +53,7 @@ export function CartItem({ item, status, selected = true, onIncrease, onDecrease
 
   const expiryColors = getExpiryColor();
   const isInactive = status.isInactive;
+  const isAtMax = item.maxQuantity !== undefined && item.quantity >= item.maxQuantity;
 
   const handleProductPress = () => {
     // Определяем текущую вкладку
@@ -60,19 +62,7 @@ export function CartItem({ item, status, selected = true, onIncrease, onDecrease
   };
 
   return (
-    <View style={[styles.cartItem, isInactive && styles.inactiveItem, !selected && styles.unselectedItem]}>
-      {/* Чекбокс */}
-      {onToggleSelection && (
-        <TouchableOpacity
-          style={styles.checkbox}
-          onPress={() => onToggleSelection(item.id)}
-          activeOpacity={0.7}
-        >
-          <View style={[styles.checkboxInner, selected && styles.checkboxChecked]}>
-            {selected && <Text style={styles.checkmark}>✓</Text>}
-          </View>
-        </TouchableOpacity>
-      )}
+    <View style={[styles.cartItem, isInactive && styles.inactiveItem]}>
       
       <TouchableOpacity 
         style={styles.imageButton}
@@ -140,16 +130,8 @@ export function CartItem({ item, status, selected = true, onIncrease, onDecrease
           </Text>
         </View>
         
-        {/* Кнопки количества или удаления */}
-        {isInactive ? (
-          <TouchableOpacity 
-            style={styles.removeButton}
-            onPress={() => onRemove(item.id)}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.removeButtonText}>🗑️ Удалить</Text>
-          </TouchableOpacity>
-        ) : (
+        {/* Кнопки количества */}
+        {!isInactive && (
           <View style={styles.quantityControls}>
             <TouchableOpacity 
               style={styles.quantityButton}
@@ -162,11 +144,12 @@ export function CartItem({ item, status, selected = true, onIncrease, onDecrease
             <Text style={styles.quantityText}>{item.quantity}</Text>
             
             <TouchableOpacity 
-              style={styles.quantityButton}
+              style={[styles.quantityButton, isAtMax && styles.quantityButtonDisabled]}
               onPress={() => onIncrease(item.id)}
+              disabled={isAtMax}
               activeOpacity={0.7}
             >
-              <Text style={styles.quantityButtonText}>+</Text>
+              <Text style={[styles.quantityButtonText, isAtMax && styles.quantityButtonTextDisabled]}>+</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -179,6 +162,27 @@ export function CartItem({ item, status, selected = true, onIncrease, onDecrease
             : 'Рассчитывается'
           }
         </Text>
+      </View>
+
+      <View style={styles.actions}>
+        <TouchableOpacity
+          style={styles.removeIconButton}
+          onPress={() => onRemove(item.id)}
+          activeOpacity={0.7}
+        >
+          <IconSymbol name="trash" color="#777" size={16} />
+        </TouchableOpacity>
+        {onToggleSelection && (
+          <TouchableOpacity
+            style={styles.checkbox}
+            onPress={() => onToggleSelection(item.id)}
+            activeOpacity={0.7}
+          >
+            <View style={[styles.checkboxInner, selected && styles.checkboxChecked]}>
+              {selected && <Text style={styles.checkmark}>✓</Text>}
+            </View>
+          </TouchableOpacity>
+        )}
       </View>
     </View>
   );
@@ -201,11 +205,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F5F5F5',
     opacity: 0.7,
   },
-  unselectedItem: {
-    opacity: 0.5,
-  },
   checkbox: {
-    marginRight: 12,
     justifyContent: 'center',
   },
   checkboxInner: {
@@ -346,18 +346,6 @@ const styles = StyleSheet.create({
     color: '#333',
     paddingHorizontal: 16,
   },
-  removeButton: {
-    backgroundColor: '#FF5252',
-    borderRadius: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    alignSelf: 'flex-start',
-  },
-  removeButtonText: {
-    color: '#fff',
-    fontSize: 13,
-    fontWeight: 'bold',
-  },
   itemPriceContainer: {
     justifyContent: 'center',
     alignItems: 'flex-end',
@@ -367,6 +355,27 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     color: '#333',
+  },
+  actions: {
+    marginLeft: 12,
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  removeIconButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  quantityButtonDisabled: {
+    backgroundColor: '#F0F0F0',
+  },
+  quantityButtonTextDisabled: {
+    color: '#BDBDBD',
   },
 });
 

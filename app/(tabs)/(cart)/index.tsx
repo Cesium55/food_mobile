@@ -4,12 +4,13 @@ import { ShopGroup } from "@/components/cart/ShopGroup";
 import { expiredItemValidator } from "@/components/cart/types";
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
-import { useCart, CartItem } from "@/hooks/useCart";
+import { useCart } from "@/hooks/useCart";
 import { useOffers } from "@/hooks/useOffers";
-import { useShops } from "@/hooks/useShops";
-import { useShopPoint } from "@/hooks/useShopPoints";
 import { usePublicSeller } from "@/hooks/usePublicSeller";
+import { useShopPoint } from "@/hooks/useShopPoints";
+import { useShops } from "@/hooks/useShops";
 import { createOrderFromCart, getCurrentPendingPurchase, getPurchaseById } from "@/services/orderService";
+import { useNavigation } from "@react-navigation/native";
 import { useFocusEffect, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
@@ -93,8 +94,8 @@ export default function Cart() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const router = useRouter();
+  const navigation = useNavigation();
   const scrollViewRef = useRef<ScrollView>(null);
-  
   const { 
     getCartByShops, 
     getTotalAmount, 
@@ -110,6 +111,7 @@ export default function Cart() {
     getCachedOrder,
     clearCachedOrder,
     restoreItemsFromOrder,
+    refreshCart,
   } = useCart();
   
   const { getOfferById } = useOffers();
@@ -118,7 +120,6 @@ export default function Cart() {
   const [currentOrder, setCurrentOrder] = useState<{ id: number; total: number } | null>(null);
   const [isCheckingOrder, setIsCheckingOrder] = useState(true);
   const [isCreatingOrder, setIsCreatingOrder] = useState(false);
-  const [focusKey, setFocusKey] = useState(0);
   
   // Простые функции для изменения количества
   const handleIncrease = (itemId: number) => {
@@ -231,6 +232,12 @@ export default function Cart() {
         if (isCancelled) return;
         
         try {
+          await refreshCart({ showLoading: true, reset: true });
+          if (!isCancelled) {
+            requestAnimationFrame(() => {
+              scrollViewRef.current?.scrollTo({ y: 0, animated: false });
+            });
+          }
           const cachedOrder = await getCachedOrder();
           if (cachedOrder) {
             try {
@@ -292,14 +299,30 @@ export default function Cart() {
 
       checkOrders();
 
-      // Пересоздаем компонент при каждом фокусе для сброса прокрутки
-      setFocusKey(prev => prev + 1);
-
       return () => {
         isCancelled = true;
       };
-    }, [restoreItemsFromOrder, clearCachedOrder, getCachedOrder])
+    }, [restoreItemsFromOrder, clearCachedOrder, getCachedOrder, refreshCart])
   );
+
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('tabPress', () => {
+      refreshCart({ showLoading: true, reset: true });
+      requestAnimationFrame(() => {
+        scrollViewRef.current?.scrollTo({ y: 0, animated: false });
+      });
+    });
+
+    return unsubscribe;
+  }, [navigation, refreshCart]);
+
+  useEffect(() => {
+    if (!isLoading) {
+      requestAnimationFrame(() => {
+        scrollViewRef.current?.scrollTo({ y: 0, animated: false });
+      });
+    }
+  }, [isLoading]);
 
 
   if (isCheckingOrder || isLoading) {
@@ -399,10 +422,9 @@ export default function Cart() {
   }
 
   return (
-    <TabScreen key={`tab-${focusKey}`}>
-      <View key={`container-${focusKey}`} style={styles.container}>
+    <TabScreen>
+      <View style={styles.container}>
         <ScrollView 
-          key={`scroll-${focusKey}`}
           ref={scrollViewRef}
           style={styles.scrollView} 
           contentContainerStyle={styles.scrollContent}

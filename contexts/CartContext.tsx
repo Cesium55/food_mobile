@@ -2,7 +2,7 @@ import { CartGroup, CartItem } from '@/hooks/useCart';
 import { Offer } from '@/hooks/useOffers';
 import { getCurrentPrice } from '@/utils/pricingUtils';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 
 // Интерфейс для сериализации в AsyncStorage
 interface CartItemStorage {
@@ -17,6 +17,7 @@ interface CartItemStorage {
   discount: number;
   quantity: number;
   expiresDate: string; // ISO string для сериализации
+  maxQuantity?: number;
 }
 
 const CART_STORAGE_KEY = '@cart_items';
@@ -103,6 +104,7 @@ const loadCartFromStorage = async (): Promise<CartItem[]> => {
             ...item,
             expiresDate: date,
             sellerId: item.sellerId, // Сохраняем sellerId при загрузке
+            maxQuantity: typeof item.maxQuantity === 'number' ? item.maxQuantity : undefined,
           };
         } catch {
           return {
@@ -151,6 +153,7 @@ interface CartContextType {
   getCachedOrder: () => Promise<CachedOrder | null>;
   clearCachedOrder: () => Promise<void>;
   restoreItemsFromOrder: (items: CartItem[]) => Promise<void>;
+  refreshCart: (options?: { showLoading?: boolean; reset?: boolean }) => Promise<void>;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
@@ -160,36 +163,70 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [selectedItems, setSelectedItems] = useState<Set<number>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
 
-  // Загружаем корзину при инициализации
-  useEffect(() => {
-    const loadCart = async () => {
+  // Загружаем выбранные товары при инициализации
+  const loadSelectedItems = useCallback(async (): Promise<Set<number>> => {
+    try {
+      const storedData = await AsyncStorage.getItem(SELECTED_ITEMS_STORAGE_KEY);
+      if (!storedData) {
+        console.log('[CartContext] Нет сохраненных выбранных товаров');
+        return new Set();
+      }
+      
+      const selectedIds: number[] = JSON.parse(storedData);
+      if (!Array.isArray(selectedIds)) {
+        console.log('[CartContext] Некорректные данные выбранных товаров');
+        return new Set();
+      }
+      
+      console.log('[CartContext] Загружены выбранные товары:', selectedIds);
+      return new Set(selectedIds);
+    } catch (error) {
+      console.error('[CartContext] Ошибка загрузки выбранных товаров:', error);
+      return new Set();
+    }
+  }, []);
+
+  const refreshCart = useCallback(async (options?: { showLoading?: boolean; reset?: boolean }) => {
+    const showLoading = options?.showLoading ?? false;
+    const reset = options?.reset ?? false;
+    if (showLoading) {
       setIsLoading(true);
-      console.log('[CartContext] Начало загрузки корзины');
-      
-      const loadedItems = await loadCartFromStorage();
-      console.log('[CartContext] Загружено товаров:', loadedItems.length);
-      setCartItems(loadedItems);
-      
-      // Загружаем сохраненные выбранные товары
-      const loadedSelectedItems = await loadSelectedItems();
-      
-      // Фильтруем выбранные товары - оставляем только те, которые есть в корзине
-      const validSelectedItems = new Set<number>();
-      loadedItems.forEach(item => {
-        if (loadedSelectedItems.has(item.id)) {
-          validSelectedItems.add(item.id);
-        }
-      });
-      
-      console.log('[CartContext] Восстановлено выбранных товаров:', validSelectedItems.size, 'из', loadedSelectedItems.size);
-      setSelectedItems(validSelectedItems);
-      
+    }
+    if (reset) {
+      setCartItems([]);
+      setSelectedItems(new Set());
+    }
+
+    console.log('[CartContext] Начало загрузки корзины');
+    
+    const loadedItems = await loadCartFromStorage();
+    console.log('[CartContext] Загружено товаров:', loadedItems.length);
+    setCartItems(loadedItems);
+    
+    // Загружаем сохраненные выбранные товары
+    const loadedSelectedItems = await loadSelectedItems();
+    
+    // Фильтруем выбранные товары - оставляем только те, которые есть в корзине
+    const validSelectedItems = new Set<number>();
+    loadedItems.forEach(item => {
+      if (loadedSelectedItems.has(item.id)) {
+        validSelectedItems.add(item.id);
+      }
+    });
+    
+    console.log('[CartContext] Восстановлено выбранных товаров:', validSelectedItems.size, 'из', loadedSelectedItems.size);
+    setSelectedItems(validSelectedItems);
+
+    if (showLoading) {
       setIsLoading(false);
       console.log('[CartContext] Загрузка корзины завершена');
-    };
-    
-    loadCart();
-  }, []);
+    }
+  }, [loadSelectedItems]);
+
+  // Загружаем корзину при инициализации
+  useEffect(() => {
+    refreshCart({ showLoading: true });
+  }, [refreshCart]);
 
   // Сохраняем корзину при каждом изменении
   useEffect(() => {
@@ -213,29 +250,6 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       saveSelectedItems();
     }
   }, [selectedItems, isLoading]);
-
-  // Загружаем выбранные товары при инициализации
-  const loadSelectedItems = async (): Promise<Set<number>> => {
-    try {
-      const storedData = await AsyncStorage.getItem(SELECTED_ITEMS_STORAGE_KEY);
-      if (!storedData) {
-        console.log('[CartContext] Нет сохраненных выбранных товаров');
-        return new Set();
-      }
-      
-      const selectedIds: number[] = JSON.parse(storedData);
-      if (!Array.isArray(selectedIds)) {
-        console.log('[CartContext] Некорректные данные выбранных товаров');
-        return new Set();
-      }
-      
-      console.log('[CartContext] Загружены выбранные товары:', selectedIds);
-      return new Set(selectedIds);
-    } catch (error) {
-      console.error('[CartContext] Ошибка загрузки выбранных товаров:', error);
-      return new Set();
-    }
-  };
 
   // НЕ выбираем товары автоматически - только пользователь может управлять галочками
 
@@ -267,11 +281,17 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const existingItem = prevItems.find(item => item.offerId === offer.id);
       
       if (existingItem) {
+        const maxCount = Number.isFinite(offer.count) ? offer.count : undefined;
+        if (maxCount !== undefined && maxCount <= existingItem.quantity) {
+          return prevItems;
+        }
         // Если товар уже есть, увеличиваем количество (но не больше доступного количества)
-        const newQuantity = Math.min(existingItem.quantity + 1, offer.count);
+        const newQuantity = maxCount !== undefined
+          ? Math.min(existingItem.quantity + 1, maxCount)
+          : existingItem.quantity + 1;
         const updatedItems = prevItems.map(item =>
           item.id === existingItem.id
-            ? { ...item, quantity: newQuantity }
+            ? { ...item, quantity: newQuantity, maxQuantity: maxCount ?? item.maxQuantity }
             : item
         );
         
@@ -310,6 +330,10 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
           ? Math.round(((originalCostNum - finalPriceNum) / originalCostNum) * 100)
           : 0;
 
+        const maxCount = Number.isFinite(offer.count) ? offer.count : undefined;
+        if (maxCount !== undefined && maxCount <= 0) {
+          return prevItems;
+        }
         const newItemId = Date.now(); // Генерируем уникальный ID
         const newItem: CartItem = {
           id: newItemId,
@@ -323,6 +347,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
           discount: finalDiscount,
           quantity: 1,
           expiresDate: expiresDate,
+          maxQuantity: maxCount,
         };
         
         // Автоматически выбираем новый товар при добавлении
@@ -342,10 +367,14 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setCartItems(prevItems =>
       prevItems.map(item => {
         if (item.id === itemId) {
-          const newQuantity = maxQuantity 
-            ? Math.min(item.quantity + 1, maxQuantity)
+          const effectiveMax = maxQuantity ?? item.maxQuantity;
+          if (effectiveMax !== undefined && effectiveMax <= item.quantity) {
+            return item;
+          }
+          const newQuantity = effectiveMax !== undefined
+            ? Math.min(item.quantity + 1, effectiveMax)
             : item.quantity + 1;
-          return { ...item, quantity: newQuantity };
+          return { ...item, quantity: newQuantity, maxQuantity: effectiveMax ?? item.maxQuantity };
         }
         return item;
       })
@@ -429,7 +458,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   // Кэшировать заказ (изъять товары из корзины)
-  const cacheOrder = async (purchaseId: number, items: CartItem[]) => {
+  const cacheOrder = useCallback(async (purchaseId: number, items: CartItem[]) => {
     try {
       // Сохраняем состояние выбора ДО удаления товаров
       const selectedIds = Array.from(selectedItems).filter(id => 
@@ -454,10 +483,10 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (error) {
       console.error('Ошибка кэширования заказа:', error);
     }
-  };
+  }, [selectedItems]);
 
   // Получить кэшированный заказ
-  const getCachedOrder = async (): Promise<CachedOrder | null> => {
+  const getCachedOrder = useCallback(async (): Promise<CachedOrder | null> => {
     try {
       const cachedData = await AsyncStorage.getItem(ORDER_CACHE_KEY);
       if (!cachedData) return null;
@@ -466,19 +495,19 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.error('Ошибка получения кэшированного заказа:', error);
       return null;
     }
-  };
+  }, []);
 
   // Очистить кэш заказа
-  const clearCachedOrder = async () => {
+  const clearCachedOrder = useCallback(async () => {
     try {
       await AsyncStorage.removeItem(ORDER_CACHE_KEY);
     } catch (error) {
       console.error('Ошибка очистки кэша заказа:', error);
     }
-  };
+  }, []);
 
   // Восстановить товары из заказа в корзину
-  const restoreItemsFromOrder = async (items: CartItem[]) => {
+  const restoreItemsFromOrder = useCallback(async (items: CartItem[]) => {
     if (!items || items.length === 0) return;
     
     // Получаем кэш заказа чтобы восстановить состояние выбора
@@ -546,7 +575,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       return restored;
     });
-  };
+  }, []);
 
   const value: CartContextType = {
     cartItems,
@@ -569,6 +598,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     getCachedOrder,
     clearCachedOrder,
     restoreItemsFromOrder,
+    refreshCart,
   };
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;

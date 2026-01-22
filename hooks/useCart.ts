@@ -11,6 +11,7 @@ export interface CartItem {
   discount: number; // Процент скидки
   quantity: number;
   expiresDate: Date;
+  maxQuantity?: number; // Доступное количество на складе
   selected?: boolean; // Выбран ли товар для покупки
 }
 
