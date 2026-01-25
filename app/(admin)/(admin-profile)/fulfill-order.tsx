@@ -254,7 +254,9 @@ export default function FulfillOrderScreen() {
                             <View style={styles.itemHeader}>
                                 <Text style={styles.itemName}>{item.product_name}</Text>
                                 <Text style={styles.itemCost}>
-                                    {item.cost_at_purchase.toFixed(2)} ₽
+                                    {item.cost_at_purchase 
+                                        ? parseFloat(item.cost_at_purchase).toFixed(2) 
+                                        : '0.00'} ₽
                                 </Text>
                             </View>
                             <Text style={styles.itemQuantity}>
