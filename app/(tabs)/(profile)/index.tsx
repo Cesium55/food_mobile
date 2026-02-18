@@ -131,6 +131,12 @@ export default function Profile() {
                         href="/(tabs)/(profile)/history"
                         iconName="history"
                         text="History"
+                    />
+                    <View style={styles.divider} />
+                    <FullWidthLink
+                        href="/(tabs)/(profile)/support"
+                        iconName="paperplane.fill"
+                        text="Поддержка"
                         isLast={true}
                     />
                 </View>

@@ -1,6 +1,7 @@
 import { API_ENDPOINTS } from '@/constants/api';
 import { getApiUrl } from '@/constants/env';
 import { authFetch } from '@/utils/authFetch';
+import { getImageUrl } from '@/utils/imageUtils';
 
 export interface ImageFile {
   uri: string;
@@ -120,6 +121,17 @@ export const uploadSellerImage = async (
 
     const url = `${getApiUrl(API_ENDPOINTS.SELLERS.UPLOAD_IMAGE(sellerId))}?order=${order}`;
 
+    console.log('[Seller Image Upload] Начало загрузки:', {
+      sellerId,
+      uploadUrl: url,
+      imageFile: {
+        uri: imageFile.uri,
+        type: imageFile.type,
+        name: imageFile.name,
+      },
+      order,
+    });
+
     const response = await authFetch(url, {
       method: 'POST',
       body: formData,
@@ -128,12 +140,34 @@ export const uploadSellerImage = async (
 
     if (response.ok) {
       const data = await response.json();
-      return data.data || data;
+      const uploadedImage = data.data || data;
+      
+      // Формируем полный URL для логирования
+      const imageUrl = getImageUrl(uploadedImage.path);
+      
+      console.log('[Seller Image Upload] Успешно загружено:', {
+        sellerId,
+        imageId: uploadedImage.id,
+        path: uploadedImage.path,
+        fullUrl: imageUrl,
+        order: uploadedImage.order,
+      });
+      
+      return uploadedImage;
     } else {
       const errorText = await response.text();
+      console.error('[Seller Image Upload] Ошибка загрузки:', {
+        sellerId,
+        status: response.status,
+        error: errorText,
+      });
       return null;
     }
   } catch (error) {
+    console.error('[Seller Image Upload] Исключение при загрузке:', {
+      sellerId,
+      error: error instanceof Error ? error.message : String(error),
+    });
     return null;
   }
 };

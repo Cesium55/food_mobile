@@ -46,6 +46,7 @@ app-example
 /android
 
 *.localinfo
+agents.md
 .env
 *.apk
 *.aab

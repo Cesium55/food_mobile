@@ -121,6 +121,14 @@ export const API_ENDPOINTS = {
     CANCEL: (id: number) => `/payments/${id}/cancel`,
     STATUS: (id: number) => `/payments/${id}/status`,
   },
+
+  // Поддержка
+  SUPPORT: {
+    MASTER_CHAT: '/support/master-chat',
+    MESSAGES: '/support/master-chat/messages',
+    MARK_READ: '/support/master-chat/messages/read',
+    WS: '/support/master-chat/ws',
+  },
 } as const;
 
 // Функция для получения полного URL endpoint'а

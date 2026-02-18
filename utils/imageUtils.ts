@@ -31,7 +31,17 @@ export const getImageUrl = (imagePath: string | null | undefined): string | null
   // Убираем конечный слеш из префикса, если он есть
   const cleanPrefix = s3Prefix.endsWith('/') ? s3Prefix.slice(0, -1) : s3Prefix;
   
-  return `${cleanPrefix}/${cleanPath}`;
+  const fullUrl = `${cleanPrefix}/${cleanPath}`;
+  
+  // Логируем URL для изображений продавца
+  if (cleanPath.includes('sellers/') || cleanPath.startsWith('sellers/')) {
+    console.log('[Seller Image URL]', {
+      path: cleanPath,
+      fullUrl: fullUrl,
+    });
+  }
+  
+  return fullUrl;
 };
 
 /**

@@ -13,6 +13,7 @@ interface ProfileScreenWrapperProps {
   onBackPress?: () => void;
   onRefresh?: () => void | Promise<void>;
   refreshing?: boolean;
+  useScrollView?: boolean;
 }
 
 export function ProfileScreenWrapper({ 
@@ -21,7 +22,8 @@ export function ProfileScreenWrapper({
   showBackButton = true,
   onBackPress,
   onRefresh,
-  refreshing = false
+  refreshing = false,
+  useScrollView = true,
 }: ProfileScreenWrapperProps) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
@@ -58,8 +60,7 @@ export function ProfileScreenWrapper({
         </View>
       </View>
 
-      {/* Контент */}
-      
+      {useScrollView ? (
         <ScrollView 
           style={styles.content} 
           contentContainerStyle={styles.scrollContent}
@@ -77,6 +78,11 @@ export function ProfileScreenWrapper({
         ><View style={styles.contentWrapper}>
           {children}</View>
         </ScrollView>
+      ) : (
+        <View style={styles.content}>
+          <View style={styles.contentWrapper}>{children}</View>
+        </View>
+      )}
       
     </SafeAreaView>
   );
