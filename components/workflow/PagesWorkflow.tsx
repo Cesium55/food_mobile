@@ -31,6 +31,7 @@ export function PagesWorkflow({
   onExit,
 }: PagesWorkflowProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [history, setHistory] = useState<number[]>([]);
   const [isResolvingInitialPage, setIsResolvingInitialPage] = useState(true);
   const [isPageInitializing, setIsPageInitializing] = useState(false);
   const busRef = useRef(new WorkflowEventBus());
@@ -38,8 +39,10 @@ export function PagesWorkflow({
   const currentPage = pages[currentIndex];
 
   const goBack = useCallback(() => {
-    if (currentIndex > 0) {
-      setCurrentIndex((prevIndex) => Math.max(prevIndex - 1, 0));
+    const previousIndex = history[history.length - 1];
+    if (typeof previousIndex === "number") {
+      setHistory((prev) => prev.slice(0, -1));
+      setCurrentIndex(previousIndex);
       return;
     }
 
@@ -54,7 +57,7 @@ export function PagesWorkflow({
     }
 
     router.replace(exitTo);
-  }, [currentIndex, exitTo, firstPageBackTo]);
+  }, [exitTo, firstPageBackTo, history]);
 
   const exitWorkflow = useCallback(
     async (target = exitTo) => {
@@ -64,7 +67,7 @@ export function PagesWorkflow({
     [exitTo, onExit]
   );
 
-  const goNext = useCallback(async () => {
+  const goNext = useCallback(async (options?: { skipHistory?: boolean }) => {
     if (currentIndex >= pages.length - 1) {
       await exitWorkflow();
       return;
@@ -72,6 +75,9 @@ export function PagesWorkflow({
 
     const nextIndex = currentIndex + 1;
     await onAdvance?.(currentIndex, nextIndex);
+    if (!options?.skipHistory) {
+      setHistory((prev) => [...prev, currentIndex]);
+    }
     setCurrentIndex(nextIndex);
   }, [currentIndex, exitWorkflow, onAdvance, pages.length]);
 
@@ -99,6 +105,7 @@ export function PagesWorkflow({
       try {
         const initialPage = await resolveInitialPage?.();
         if (!isCancelled) {
+          setHistory([]);
           setCurrentIndex(toPageIndex(initialPage, pageIds));
         }
       } finally {

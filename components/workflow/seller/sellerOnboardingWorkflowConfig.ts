@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import type { WorkflowPageDefinition } from "@/components/workflow/types";
 import { SellerOnboardingIntroPage } from "@/components/workflow/seller/SellerOnboardingIntroPage";
+import { SellerOnboardingEmailPage } from "@/components/workflow/seller/SellerOnboardingEmailPage";
 import { SellerOnboardingAgreementsPage } from "@/components/workflow/seller/SellerOnboardingAgreementsPage";
 import { SellerOnboardingDataPage } from "@/components/workflow/seller/SellerOnboardingDataPage";
 import { SellerOnboardingSuccessPage } from "@/components/workflow/seller/SellerOnboardingSuccessPage";
@@ -11,6 +12,10 @@ export function useSellerOnboardingWorkflowPages(): WorkflowPageDefinition[] {
       {
         id: "seller-intro",
         Component: SellerOnboardingIntroPage,
+      },
+      {
+        id: "seller-email",
+        Component: SellerOnboardingEmailPage,
       },
       {
         id: "seller-agreements",

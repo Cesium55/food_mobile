@@ -1,18 +1,34 @@
 import { Button } from "@/components/ui/Button";
+import { useSellerOnboardingContext } from "@/components/workflow/seller/SellerOnboardingContext";
 import type { WorkflowPageProps } from "@/components/workflow/types";
 import { ProfileScreenWrapper } from "@/components/profile/ProfileScreenWrapper";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 
 type OrgType = "IP" | "OOO";
 
 export function SellerOnboardingDataPage(props: WorkflowPageProps) {
+  const { request, loadingRequest, submittingRequest, submitRequest } = useSellerOnboardingContext();
   const [fullName, setFullName] = useState("");
   const [shortName, setShortName] = useState("");
   const [description, setDescription] = useState("");
   const [inn, setInn] = useState("");
   const [ogrn, setOgrn] = useState("");
   const [orgType, setOrgType] = useState<OrgType>("IP");
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!request) {
+      return;
+    }
+
+    setFullName(request.full_name || "");
+    setShortName(request.short_name || "");
+    setDescription(request.description || "");
+    setInn(request.inn || "");
+    setOgrn(request.ogrn || "");
+    setOrgType(request.is_IP ? "IP" : "OOO");
+  }, [request]);
 
   const canContinue = useMemo(() => {
     return (
@@ -24,6 +40,23 @@ export function SellerOnboardingDataPage(props: WorkflowPageProps) {
       orgType.length > 0
     );
   }, [description, fullName, inn, ogrn, orgType, shortName]);
+
+  const handleSubmit = async () => {
+    setSubmitError(null);
+    try {
+      await submitRequest({
+        full_name: fullName.trim(),
+        short_name: shortName.trim(),
+        description: description.trim(),
+        inn: inn.trim(),
+        ogrn: ogrn.trim(),
+        is_IP: orgType === "IP",
+      });
+      props.emit("next");
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : "Не удалось отправить заявку");
+    }
+  };
 
   return (
     <ProfileScreenWrapper
@@ -100,13 +133,14 @@ export function SellerOnboardingDataPage(props: WorkflowPageProps) {
         <View style={styles.submit}>
           <Button
             disabled={!canContinue}
-            loading={props.isInitializing}
-            onPress={() => props.emit("next")}
+            loading={props.isInitializing || submittingRequest || loadingRequest}
+            onPress={handleSubmit}
             fullWidth
           >
-            Далее
+            Отправить заявку
           </Button>
         </View>
+        {!!submitError && <Text style={styles.error}>{submitError}</Text>}
       </View>
     </ProfileScreenWrapper>
   );
@@ -164,5 +198,10 @@ const styles = StyleSheet.create({
   },
   submit: {
     marginTop: 18,
+  },
+  error: {
+    marginTop: 10,
+    color: "#DC2626",
+    fontSize: 14,
   },
 });

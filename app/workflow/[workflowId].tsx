@@ -1,5 +1,6 @@
 import { PagesWorkflow } from "@/components/workflow/PagesWorkflow";
 import { useDemoWorkflowPages } from "@/components/workflow/demo/demoWorkflowConfig";
+import { SellerOnboardingProvider } from "@/components/workflow/seller/SellerOnboardingContext";
 import { useSellerOnboardingWorkflowPages } from "@/components/workflow/seller/sellerOnboardingWorkflowConfig";
 import { getWorkflowProgress, saveWorkflowProgress } from "@/services/workflowStateService";
 import type { Href } from "expo-router";
@@ -20,7 +21,7 @@ export default function WorkflowScreen() {
   const sellerOnboardingPages = useSellerOnboardingWorkflowPages();
   const pages = workflowId === "seller-onboarding" ? sellerOnboardingPages : demoPages;
 
-  return (
+  const workflowElement = (
     <PagesWorkflow
       workflowId={workflowId}
       pages={pages}
@@ -38,4 +39,10 @@ export default function WorkflowScreen() {
       }
     />
   );
+
+  if (workflowId === "seller-onboarding") {
+    return <SellerOnboardingProvider>{workflowElement}</SellerOnboardingProvider>;
+  }
+
+  return workflowElement;
 }

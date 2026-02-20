@@ -11,6 +11,7 @@ export const API_ENDPOINTS = {
   AUTH: {
     LOGIN: '/auth/login',
     REGISTER: '/auth/register',
+    BIND_EMAIL: '/auth/bind-email',
     REFRESH: '/auth/refresh',
     LOGOUT: '/auth/logout',
     PROFILE: '/auth',
@@ -46,6 +47,7 @@ export const API_ENDPOINTS = {
   // Продавцы
   SELLERS: {
     BASE: '/sellers',
+    REGISTRATION_REQUEST: '/sellers/registration-request',
     POPULAR: '/sellers/popular',
     NEARBY: '/sellers/nearby',
     BY_CATEGORY: '/sellers/category',

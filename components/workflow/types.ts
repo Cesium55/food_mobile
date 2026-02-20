@@ -10,7 +10,7 @@ export interface WorkflowEvent {
 }
 
 export interface WorkflowControls {
-  next: () => Promise<void> | void;
+  next: (options?: { skipHistory?: boolean }) => Promise<void> | void;
   back: () => void;
   exit: (target?: Href) => Promise<void> | void;
   emit: (eventName: string, payload?: unknown) => void;

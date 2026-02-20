@@ -1,8 +1,9 @@
 import { Button } from "@/components/ui/Button";
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import { useSellerOnboardingContext } from "@/components/workflow/seller/SellerOnboardingContext";
 import type { WorkflowPageProps } from "@/components/workflow/types";
 import { ProfileScreenWrapper } from "@/components/profile/ProfileScreenWrapper";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Linking, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 interface AgreementItem {
@@ -18,7 +19,10 @@ const AGREEMENTS: AgreementItem[] = [
 ];
 
 export function SellerOnboardingAgreementsPage(props: WorkflowPageProps) {
+  const { next } = props;
+  const { request, submittingRequest, submitRequest } = useSellerOnboardingContext();
   const [checked, setChecked] = useState<Record<string, boolean>>({});
+  const [errorText, setErrorText] = useState<string | null>(null);
 
   const allChecked = useMemo(
     () => AGREEMENTS.every((item) => checked[item.id]),
@@ -27,6 +31,24 @@ export function SellerOnboardingAgreementsPage(props: WorkflowPageProps) {
 
   const toggle = (id: string) => {
     setChecked((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  useEffect(() => {
+    if (request?.terms_accepted) {
+      void next({ skipHistory: true });
+    }
+  }, [next, request?.terms_accepted]);
+
+  const handleContinue = async () => {
+    setErrorText(null);
+    try {
+      await submitRequest({
+        terms_accepted: true,
+      });
+      await props.next();
+    } catch (error) {
+      setErrorText(error instanceof Error ? error.message : "Не удалось принять условия");
+    }
   };
 
   return (
@@ -58,12 +80,13 @@ export function SellerOnboardingAgreementsPage(props: WorkflowPageProps) {
 
         <Button
           disabled={!allChecked}
-          loading={props.isInitializing}
-          onPress={() => props.emit("next")}
+          loading={props.isInitializing || submittingRequest}
+          onPress={handleContinue}
           fullWidth
         >
           Далее
         </Button>
+        {!!errorText && <Text style={styles.error}>{errorText}</Text>}
       </View>
     </ProfileScreenWrapper>
   );
@@ -125,5 +148,10 @@ const styles = StyleSheet.create({
     color: "#007AFF",
     fontSize: 14,
     fontWeight: "600",
+  },
+  error: {
+    marginTop: 10,
+    color: "#DC2626",
+    fontSize: 14,
   },
 });
