@@ -10,7 +10,7 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_BASE_URL": "https://gembos.ru",
+        "EXPO_PUBLIC_API_BASE_URL": "https://food.creeone.ru",
         "EXPO_PUBLIC_API_TIMEOUT": "10000",
         "EXPO_PUBLIC_AUTH_TOKEN_KEY": "auth_token",
         "EXPO_PUBLIC_REFRESH_TOKEN_KEY": "refresh_token",
@@ -27,7 +27,7 @@
     "preview": {
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_API_BASE_URL": "https://gembos.ru",
+        "EXPO_PUBLIC_API_BASE_URL": "https://food.creeone.ru",
         "EXPO_PUBLIC_API_TIMEOUT": "15000",
         "EXPO_PUBLIC_AUTH_TOKEN_KEY": "auth_token_staging",
         "EXPO_PUBLIC_REFRESH_TOKEN_KEY": "refresh_token_staging",
@@ -44,7 +44,7 @@
     "production": {
       "autoIncrement": true,
       "env": {
-        "EXPO_PUBLIC_API_BASE_URL": "https://gembos.ru",
+        "EXPO_PUBLIC_API_BASE_URL": "https://food.creeone.ru",
         "EXPO_PUBLIC_API_TIMEOUT": "20000",
         "EXPO_PUBLIC_AUTH_TOKEN_KEY": "auth_token",
         "EXPO_PUBLIC_REFRESH_TOKEN_KEY": "refresh_token",

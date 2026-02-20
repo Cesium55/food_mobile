@@ -56,6 +56,18 @@ export default function Profile() {
         router.replace('/(admin)/(admin-profile)');
     };
 
+    const handleStartSellerOnboarding = () => {
+        router.push({
+            pathname: '/workflow/[workflowId]',
+            params: {
+                workflowId: 'seller-onboarding',
+                persist: '0',
+                exitTo: '/(tabs)/(profile)/support',
+                firstBackTo: '/(tabs)/(profile)',
+            },
+        });
+    };
+
     const handleLogout = async () => {
         Alert.alert(
             'Выход',
@@ -147,6 +159,13 @@ export default function Profile() {
                         <Text style={styles.adminButtonText}>Перейти в режим администратора</Text>
                     </TouchableOpacity>
                 )}
+
+                {/* Кнопка старта процесса регистрации продавца - только для обычных пользователей */}
+                {!user.is_seller && (
+                    <TouchableOpacity style={styles.sellerOnboardingButton} onPress={handleStartSellerOnboarding}>
+                        <Text style={styles.sellerOnboardingButtonText}>Хочу стать продавцом</Text>
+                    </TouchableOpacity>
+                )}
                 
                 {/* Кнопка выхода */}
                 <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
@@ -170,6 +189,18 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     adminButtonText: {
+        color: '#fff',
+        fontSize: 16,
+        fontWeight: '600',
+    },
+    sellerOnboardingButton: {
+        backgroundColor: '#34C759',
+        borderRadius: 28,
+        padding: 16,
+        marginTop: 10,
+        alignItems: 'center',
+    },
+    sellerOnboardingButtonText: {
         color: '#fff',
         fontSize: 16,
         fontWeight: '600',

@@ -59,6 +59,17 @@ function extractData<T>(payload: any): T {
   return (payload?.data || payload) as T;
 }
 
+function createEmptySupportChat(): SupportChat {
+  const now = new Date().toISOString();
+  return {
+    user_id: 0,
+    is_closed: false,
+    created_at: now,
+    updated_at: now,
+    messages: [],
+  };
+}
+
 export async function getMasterSupportChat(): Promise<SupportChat> {
   const response = await authFetch(getApiUrl(API_ENDPOINTS.SUPPORT.MASTER_CHAT), {
     method: HTTP_METHODS.GET,
@@ -66,6 +77,9 @@ export async function getMasterSupportChat(): Promise<SupportChat> {
   });
 
   if (!response.ok) {
+    if (response.status === 404) {
+      return createEmptySupportChat();
+    }
     const errorText = await response.text();
     throw new Error(`Ошибка загрузки чата поддержки: ${response.status} ${errorText}`);
   }
@@ -136,4 +150,3 @@ export async function openSupportWebSocket(): Promise<WebSocket> {
     },
   });
 }
-

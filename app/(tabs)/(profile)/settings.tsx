@@ -2,6 +2,7 @@ import { ProfileScreenWrapper } from "@/components/profile/ProfileScreenWrapper"
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useModal } from "@/contexts/ModalContext";
 import { configureNotifications, getFCMToken, initializeFirebase, sendFCMTokenToServer } from "@/services/firebaseService";
+import { router } from "expo-router";
 import { useState } from "react";
 import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
@@ -112,6 +113,27 @@ export default function Settings() {
         }
     };
 
+    const handleOpenTestWorkflow = () => {
+        router.push({
+            pathname: "/workflow/[workflowId]",
+            params: {
+                workflowId: "settings-test-workflow",
+                exitTo: "/(tabs)/(home)",
+            },
+        });
+    };
+
+    const handleOpenTestWorkflowWithoutState = () => {
+        router.push({
+            pathname: "/workflow/[workflowId]",
+            params: {
+                workflowId: "settings-test-workflow-no-state",
+                exitTo: "/(tabs)/(home)",
+                persist: "0",
+            },
+        });
+    };
+
     return (
         <ProfileScreenWrapper title="Settings">
             <View style={styles.container}>
@@ -144,6 +166,22 @@ export default function Settings() {
                     >
                         <IconSymbol name="plus" color="#333" size={20} />
                         <Text style={[styles.buttonText, styles.buttonTextOutline]}>Открыть тестовую модалку</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity 
+                        style={[styles.button, styles.buttonOutline]} 
+                        onPress={handleOpenTestWorkflow}
+                    >
+                        <IconSymbol name="list.bullet.rectangle" color="#333" size={20} />
+                        <Text style={[styles.buttonText, styles.buttonTextOutline]}>Запустить тестовый workflow</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity 
+                        style={[styles.button, styles.buttonOutline]} 
+                        onPress={handleOpenTestWorkflowWithoutState}
+                    >
+                        <IconSymbol name="rectangle.stack.badge.minus" color="#333" size={20} />
+                        <Text style={[styles.buttonText, styles.buttonTextOutline]}>Workflow без сохранения</Text>
                     </TouchableOpacity>
                 </View>
             </View>

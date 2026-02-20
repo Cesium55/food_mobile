@@ -83,6 +83,14 @@ export default function RootLayout() {
                       animationDuration: 400,
                     }} 
                   />
+                  <Stack.Screen
+                    name="workflow/[workflowId]"
+                    options={{
+                      headerShown: false,
+                      animation: 'slide_from_right',
+                      animationDuration: 250,
+                    }}
+                  />
                   <Stack.Screen 
                     name="modal" 
                     options={{ 
