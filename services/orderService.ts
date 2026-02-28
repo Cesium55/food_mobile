@@ -45,6 +45,73 @@ export interface Purchase {
   ttl: number; // Время бронирования в секундах
 }
 
+export type SellerPurchaseStatus = 'pending' | 'confirmed' | 'cancelled' | 'completed';
+export type SellerPurchaseFulfillmentStatus = 'fulfilled' | 'not_fulfilled' | 'unprocessed' | null;
+
+export interface SellerPurchaseOffer {
+  offer_id: number;
+  quantity: number;
+  cost_at_purchase: string;
+  fulfillment_status: SellerPurchaseFulfillmentStatus;
+  fulfilled_quantity: number | null;
+  fulfilled_by_seller_id: number | null;
+  unfulfilled_reason: string | null;
+  offer?: {
+    id?: number;
+    product_id?: number;
+    shop_id?: number;
+    expires_date?: string | null;
+    original_cost?: string;
+    current_cost?: string;
+    count?: number;
+    reserved_count?: number;
+    product?: {
+      id?: number;
+      name?: string;
+      description?: string;
+      article?: string | null;
+      code?: string | null;
+    };
+  } | null;
+}
+
+export interface SellerPurchase {
+  id: number;
+  user_id: number;
+  status: SellerPurchaseStatus;
+  total_cost: string;
+  created_at: string;
+  updated_at: string;
+  purchase_offers: SellerPurchaseOffer[];
+  offer_results?: OfferResult[];
+  ttl: number;
+}
+
+export interface SellerPurchasesPagination {
+  page: number;
+  page_size: number;
+  total_items: number;
+  total_pages: number;
+  has_next: boolean;
+  has_previous: boolean;
+}
+
+export interface SellerPurchasesResponse {
+  items: SellerPurchase[];
+  pagination: SellerPurchasesPagination;
+}
+
+export interface GetSellerPurchasesParams {
+  page?: number;
+  page_size?: number;
+  status?: SellerPurchaseStatus;
+  fulfillment_status?: Exclude<SellerPurchaseFulfillmentStatus, null>;
+  min_created_at?: string;
+  max_created_at?: string;
+  min_updated_at?: string;
+  max_updated_at?: string;
+}
+
 export interface OfferResult {
   offer_id: number;
   status: 'success' | 'not_found' | 'insufficient_quantity' | 'expired';
@@ -356,6 +423,78 @@ export async function getPurchasesHistory(): Promise<CreateOrderResponse[]> {
   return getPurchasesByStatus();
 }
 
+/**
+ * Получает покупки текущего авторизованного продавца
+ * @param params - Параметры пагинации и фильтрации
+ * @returns Promise с покупками и метаданными пагинации
+ */
+export async function getSellerPurchases(
+  params: GetSellerPurchasesParams = {}
+): Promise<SellerPurchasesResponse> {
+  const query = new URLSearchParams();
+
+  if (params.page !== undefined) query.append('page', String(params.page));
+  if (params.page_size !== undefined) query.append('page_size', String(params.page_size));
+  if (params.status !== undefined) query.append('status', params.status);
+  if (params.fulfillment_status !== undefined) {
+    query.append('fulfillment_status', params.fulfillment_status);
+  }
+  if (params.min_created_at) query.append('min_created_at', params.min_created_at);
+  if (params.max_created_at) query.append('max_created_at', params.max_created_at);
+  if (params.min_updated_at) query.append('min_updated_at', params.min_updated_at);
+  if (params.max_updated_at) query.append('max_updated_at', params.max_updated_at);
+
+  const endpoint = API_ENDPOINTS.PURCHASES.SELLER_LIST;
+  const url = query.toString() ? `${getApiUrl(endpoint)}?${query.toString()}` : getApiUrl(endpoint);
+
+  const response = await authFetch(url, {
+    method: 'GET',
+    requireAuth: true,
+  });
+
+  if (response.status === 401 || response.status === 403) {
+    throw new Error('Нет доступа к покупкам продавца');
+  }
+
+  if (response.status === 400) {
+    const errorText = await response.text();
+    throw new Error(`Неверные параметры фильтрации: ${errorText}`);
+  }
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Ошибка загрузки покупок продавца: ${response.status} ${errorText}`);
+  }
+
+  const responseData = await response.json();
+  const rawItems = Array.isArray(responseData.data) ? responseData.data : [];
+  const rawPagination = responseData.pagination || {};
+
+  const items: SellerPurchase[] = rawItems.map((item: any) => ({
+    id: item.id,
+    user_id: item.user_id,
+    status: item.status,
+    total_cost: item.total_cost,
+    created_at: item.created_at,
+    updated_at: item.updated_at,
+    purchase_offers: Array.isArray(item.purchase_offers) ? item.purchase_offers : [],
+    offer_results: Array.isArray(item.offer_results) ? item.offer_results : [],
+    ttl: item.ttl ?? 0,
+  }));
+
+  return {
+    items,
+    pagination: {
+      page: rawPagination.page ?? params.page ?? 1,
+      page_size: rawPagination.page_size ?? params.page_size ?? 20,
+      total_items: rawPagination.total_items ?? items.length,
+      total_pages: rawPagination.total_pages ?? 1,
+      has_next: Boolean(rawPagination.has_next),
+      has_previous: Boolean(rawPagination.has_previous),
+    },
+  };
+}
+
 // Типы для верификации токена и выдачи заказа
 export interface VerifyTokenItem {
   purchase_offer_id: number;
@@ -495,4 +634,3 @@ export async function fulfillPurchase(
     fulfilled_items: rawData.fulfilled_items || rawData.fulfilledItems || [],
   };
 }
-

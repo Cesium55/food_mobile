@@ -72,6 +72,7 @@ export const API_ENDPOINTS = {
     CREATE_WITH_PARTIAL_SUCCESS: '/purchases/with-partial-success',
     CURRENT_PENDING: '/purchases/current-pending',
     LIST: '/purchases',
+    SELLER_LIST: '/purchases/seller',
     TOKEN: (purchaseId: number) => `/purchases/${purchaseId}/token`,
     VERIFY_TOKEN: '/purchases/verify-token',
     FULFILL: (purchaseId: number) => `/purchases/${purchaseId}/fulfill`,

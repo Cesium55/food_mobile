@@ -78,7 +78,7 @@ export const ShopsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             id: point.id,
             sellerId: point.seller_id,
             name: point.address_formated || point.address_raw || 'Торговая точка',
-            shortName: point.address_formated?.split(',')[0] || point.address_raw?.split(',')[0] || 'Точка',
+            shortName: getReadableShortName(point.address_formated || point.address_raw),
             fullName: point.address_formated || point.address_raw || `Торговая точка #${point.id}`,
             address: point.address_formated || point.address_raw || '',
             latitude: point.latitude,
@@ -160,3 +160,23 @@ export const useShops = (sellerId?: number) => {
 };
 
 
+  const getReadableShortName = (address?: string): string => {
+    if (!address) {
+      return 'Точка';
+    }
+
+    const parts = address
+      .split(',')
+      .map((part: string) => part.trim())
+      .filter(Boolean);
+
+    if (parts.length === 0) {
+      return 'Точка';
+    }
+
+    if (parts.length >= 2) {
+      return `${parts[parts.length - 2]}, ${parts[parts.length - 1]}`;
+    }
+
+    return parts[0];
+  };

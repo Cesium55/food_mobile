@@ -13,14 +13,14 @@ import React, { useEffect, useState } from "react";
 import { ActivityIndicator, Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 // Компонент для отображения группы товаров продавца
-function SellerGroup({ 
-  sellerId, 
-  shopId, 
-  items 
-}: { 
-  sellerId: number; 
-  shopId: number; 
-  items: Array<{ offerId: number; productName: string; quantity: number; currentCost: string; originalCost: string; shopId: number; fulfilledQuantity: number; fulfillmentStatus?: string; imageUrl: string | null }> 
+function SellerGroup({
+  sellerId,
+  shopId,
+  items
+}: {
+  sellerId: number;
+  shopId: number;
+  items: Array<{ offerId: number; productName: string; quantity: number; currentCost: string; originalCost: string; shopId: number; fulfilledQuantity: number; fulfillmentStatus?: string; imageUrl: string | null }>
 }) {
   const { seller } = usePublicSeller(sellerId);
   const { shopPoint } = useShopPoint(shopId);
@@ -339,16 +339,18 @@ export default function OrderPaidScreen() {
       || `Товар #${po.offer.product_id}`;
     
     // Получаем sellerId из оффера или из данных API
-    const sellerId = offer?.sellerId || (po.offer as any)?.product?.seller_id || null;
-    const shopId = offer?.shopId || po.offer.shop_id;
+    const sellerId = offer?.sellerId ?? (po.offer as any)?.product?.seller_id ?? null;
+    const shopId = offer?.shopId ?? po.offer.shop_id;
     
     if (!sellerId) {
       // Если sellerId не найден, пропускаем товар или используем fallback
       return groups;
     }
     
-    if (!groups[sellerId]) {
-      groups[sellerId] = {
+    const groupKey = `${sellerId}:${shopId}`;
+
+    if (!groups[groupKey]) {
+      groups[groupKey] = {
         sellerId: sellerId,
         shopId: shopId,
         items: [],
@@ -359,7 +361,7 @@ export default function OrderPaidScreen() {
     const productImages = (po.offer as any)?.product?.images || offer?.productImages || [];
     const imageUrl = getFirstImageUrl(productImages);
 
-    groups[sellerId].items.push({
+    groups[groupKey].items.push({
       offerId: po.offer_id,
       productName: productName,
       quantity: po.quantity,
@@ -372,7 +374,7 @@ export default function OrderPaidScreen() {
     });
 
     return groups;
-  }, {} as Record<number, { sellerId: number; shopId: number; items: Array<{ offerId: number; productName: string; quantity: number; currentCost: string; originalCost: string; shopId: number; fulfilledQuantity: number; fulfillmentStatus?: string; imageUrl: string | null }> }>);
+  }, {} as Record<string, { sellerId: number; shopId: number; items: Array<{ offerId: number; productName: string; quantity: number; currentCost: string; originalCost: string; shopId: number; fulfilledQuantity: number; fulfillmentStatus?: string; imageUrl: string | null }> }>);
 
   const sellerGroupsArray = Object.values(sellerGroups);
 
@@ -432,7 +434,7 @@ export default function OrderPaidScreen() {
 
         {/* Товары по продавцам */}
         {sellerGroupsArray.map((group) => (
-          <SellerGroup key={group.sellerId} sellerId={group.sellerId} shopId={group.shopId} items={group.items} />
+          <SellerGroup key={`${group.sellerId}-${group.shopId}`} sellerId={group.sellerId} shopId={group.shopId} items={group.items} />
         ))}
 
         {/* Итого */}
@@ -707,4 +709,3 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 });
-
