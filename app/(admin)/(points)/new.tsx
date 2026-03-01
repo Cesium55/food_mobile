@@ -1,5 +1,4 @@
-import { StandardModal } from "@/components/ui";
-import { IconSymbol } from "@/components/ui/icon-symbol";
+import { ScreenWrapper } from "@/components/screen/ScreenWrapper";
 import { API_ENDPOINTS } from "@/constants/api";
 import { getApiUrl } from "@/constants/env";
 import { authFetch } from "@/utils/authFetch";
@@ -80,21 +79,8 @@ export function NewPointContent({ onClose }: NewPointScreenProps) {
     };
 
     return (
-        <View style={styles.modalContainer}>
-            {/* Заголовок */}
-            <View style={styles.header}>
-                <TouchableOpacity 
-                    style={styles.headerBackButton}
-                    onPress={handleCancel}
-                >
-                    <IconSymbol name="arrow.left" color="#333" size={24} />
-                </TouchableOpacity>
-                <Text style={styles.headerTitle}>
-                    Новая торговая точка
-                </Text>
-                <View style={styles.headerSpacer} />
-            </View>
-
+        <ScreenWrapper title="Новая торговая точка" useScrollView={false}>
+            <View style={styles.modalContainer}>
             <ScrollView 
                 style={styles.scrollView}
                 contentContainerStyle={styles.scrollContent}
@@ -142,18 +128,13 @@ export function NewPointContent({ onClose }: NewPointScreenProps) {
                     </TouchableOpacity>
                 </View>
             </ScrollView>
-        </View>
+            </View>
+        </ScreenWrapper>
     );
 }
 
 export default function NewPointScreen(props: NewPointScreenProps) {
-    const handleClose = props.onClose ?? (() => router.back());
-
-    return (
-        <StandardModal visible onClose={handleClose}>
-            <NewPointContent {...props} onClose={handleClose} />
-        </StandardModal>
-    );
+    return <NewPointContent {...props} />;
 }
 
 const styles = StyleSheet.create({
@@ -256,4 +237,6 @@ const styles = StyleSheet.create({
         fontWeight: '600',
     },
 });
+
+
 

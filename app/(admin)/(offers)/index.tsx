@@ -1,8 +1,5 @@
-import { OfferDetailContent } from "@/app/(admin)/(offers)/[id]";
-import { NewOfferContent } from "@/app/(admin)/(offers)/new";
 import { TabScreen } from "@/components/TabScreen";
 import { IconSymbol } from "@/components/ui/icon-symbol";
-import { useModal } from "@/contexts/ModalContext";
 import { useCategories } from "@/hooks/useCategories";
 import { Offer, useOffers } from "@/hooks/useOffers";
 import { useProducts } from "@/hooks/useProducts";
@@ -10,6 +7,7 @@ import { useSellerMe } from "@/hooks/useSeller";
 import { useShops } from "@/hooks/useShops";
 import { getImageUrl } from "@/utils/imageUtils";
 import { getCurrentPrice } from "@/utils/pricingUtils";
+import { router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Image, RefreshControl, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 
@@ -24,7 +22,6 @@ export default function OffersScreen() {
     const { shops, loading: shopsLoading, refetch: refetchShops } = useShops(seller?.id);
     const { loading: categoriesLoading } = useCategories();
     const { offers, loading: offersLoading, error: offersError, fetchOffersForAdmin } = useOffers();
-    const { openModal, closeModal } = useModal();
     const { products, refetch: refetchProducts } = useProducts(seller?.id);
     
     const [searchQuery, setSearchQuery] = useState("");
@@ -108,16 +105,18 @@ export default function OffersScreen() {
     }, [sortedOffers, shops]);
 
     const handleOfferPress = (offerId: number) => {
-        openModal(<OfferDetailContent offerId={offerId} onClose={closeModal} />);
+        router.push(`/(admin)/(offers)/${offerId}`);
     };
 
     const handleAddOffer = () => {
         const targetShop = shops[0];
         if (targetShop) {
-            openModal(<NewOfferContent shopId={targetShop.id} onClose={closeModal} />);
+            router.push({
+                pathname: "/(admin)/(offers)/new",
+                params: { shopId: String(targetShop.id) },
+            });
         } else {
-            // Если магазинов нет, открываем модалку без предустановленного магазина
-            openModal(<NewOfferContent onClose={closeModal} />);
+            router.push('/(admin)/(offers)/new');
         }
     };
 

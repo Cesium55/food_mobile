@@ -1,12 +1,10 @@
-import { ProductDetailContent } from "@/app/(admin)/(products)/[id]";
-import { NewProductContent } from "@/app/(admin)/(products)/new";
 import { TabScreen } from "@/components/TabScreen";
 import { IconSymbol } from "@/components/ui/icon-symbol";
-import { useModal } from "@/contexts/ModalContext";
 import { useCategories } from "@/hooks/useCategories";
 import { Product, useProducts } from "@/hooks/useProducts";
 import { useSellerMe } from "@/hooks/useSeller";
 import { getImageUrl } from "@/utils/imageUtils";
+import { router } from "expo-router";
 import { useState } from "react";
 import {
     ActivityIndicator,
@@ -24,7 +22,6 @@ export default function ProductsScreen() {
     const { seller } = useSellerMe();
     const { categories, getCategoryById } = useCategories();
     const { products, loading: productsLoading, error: productsError, refetch } = useProducts(seller?.id);
-    const { openModal, closeModal } = useModal();
     const [searchQuery, setSearchQuery] = useState("");
     const [refreshing, setRefreshing] = useState(false);
 
@@ -53,11 +50,11 @@ export default function ProductsScreen() {
     }, {} as { [key: number]: Product[] });
 
     const handleProductPress = (productId: number) => {
-        openModal(<ProductDetailContent productId={productId} onClose={closeModal} />);
+        router.push(`/(admin)/(products)/${productId}`);
     };
 
     const handleAddProduct = () => {
-        openModal(<NewProductContent onClose={closeModal} />);
+        router.push('/(admin)/(products)/new');
     };
 
     const handleRefresh = async () => {

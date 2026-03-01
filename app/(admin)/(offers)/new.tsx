@@ -1,4 +1,4 @@
-import { StandardModal } from "@/components/ui";
+import { ScreenWrapper } from "@/components/screen/ScreenWrapper";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useOffers } from "@/hooks/useOffers";
 import { usePricingStrategies } from "@/hooks/usePricingStrategies";
@@ -191,13 +191,8 @@ export function NewOfferContent({ shopId: shopIdProp, onClose }: NewOfferScreenP
     };
 
     return (
-        <View style={styles.modalContainer}>
-                {/* Заголовок */}
-                <View style={styles.header}>
-                    <Text style={styles.headerTitle}>Новое предложение</Text>
-                    <View style={styles.headerSpacer} />
-                </View>
-
+        <ScreenWrapper title="Новое предложение" useScrollView={false}>
+            <View style={styles.modalContainer}>
                 <ScrollView
                     style={styles.scrollView}
                     contentContainerStyle={styles.scrollContent}
@@ -696,60 +691,35 @@ export function NewOfferContent({ shopId: shopIdProp, onClose }: NewOfferScreenP
 
                     <View style={{ height: 40 }} />
                 </ScrollView>
-        </View>
+            </View>
+        </ScreenWrapper>
     );
 }
 
 export default function NewOfferScreen(props: NewOfferScreenProps) {
-    const handleClose = props.onClose ?? (() => router.back());
-
-    return (
-        <StandardModal visible onClose={handleClose}>
-            <NewOfferContent {...props} onClose={handleClose} />
-        </StandardModal>
-    );
+    return <NewOfferContent {...props} />;
 }
 
 const styles = StyleSheet.create({
     modalContainer: {
         flex: 1,
-        backgroundColor: '#fff',
+        backgroundColor: '#f5f5f5',
     },
     scrollView: {
         flex: 1,
     },
-    header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingHorizontal: 16,
-        paddingVertical: 12,
-        backgroundColor: '#fff',
-        borderBottomWidth: 1,
-        borderBottomColor: '#d0d0d0',
-    },
-    headerTitle: {
-        fontSize: 18,
-        fontWeight: '700',
-        color: '#333',
-        flex: 1,
-    },
-    headerSpacer: {
-        width: 40,
-    },
     scrollContent: {
+        paddingTop: 16,
+        paddingBottom: 40,
         paddingHorizontal: 0,
-        paddingVertical: 16,
     },
     infoSection: {
         backgroundColor: '#fff',
         padding: 16,
-        borderRadius: 0,
-        borderTopWidth: 1,
-        borderBottomWidth: 1,
-        borderColor: '#d0d0d0',
-        marginBottom: 0,
-        marginHorizontal: 0,
+        marginBottom: 8,
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: '#e0e0e0',
     },
     sectionTitle: {
         fontSize: 18,
@@ -1003,7 +973,12 @@ const styles = StyleSheet.create({
         marginTop: 4,
     },
     actionsSection: {
-        marginTop: 8,
+        backgroundColor: '#fff',
+        padding: 16,
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: '#e0e0e0',
+        marginTop: 0,
     },
     createButton: {
         backgroundColor: '#007AFF',
@@ -1129,4 +1104,6 @@ const styles = StyleSheet.create({
         fontStyle: 'italic',
     },
 });
+
+
 

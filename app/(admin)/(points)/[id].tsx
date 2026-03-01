@@ -1,4 +1,4 @@
-import { StandardModal } from "@/components/ui";
+import { ScreenWrapper } from "@/components/screen/ScreenWrapper";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useShopPoint } from "@/hooks/useShopPoints";
 import { getImageUrl } from "@/utils/imageUtils";
@@ -33,29 +33,25 @@ export function PointDetailContent({ pointId: pointIdProp, onClose }: PointDetai
 
     if (loading) {
         return (
-            <View style={styles.modalContainer}>
-                <View style={styles.header}>
-                    <Text style={styles.headerTitle}>Загрузка...</Text>
-                    <View style={styles.headerSpacer} />
-                </View>
+            <ScreenWrapper title="Торговая точка" useScrollView={false}>
+                <View style={styles.modalContainer}>
                 <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
                     <Text style={{ fontSize: 16, color: '#666' }}>Загрузка данных...</Text>
                 </View>
-            </View>
+                </View>
+            </ScreenWrapper>
         );
     }
 
     if (error || !shopPoint) {
         return (
-            <View style={styles.modalContainer}>
-                <View style={styles.header}>
-                    <Text style={styles.headerTitle}>Ошибка</Text>
-                    <View style={styles.headerSpacer} />
-                </View>
+            <ScreenWrapper title="Торговая точка" useScrollView={false}>
+                <View style={styles.modalContainer}>
                 <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
                     <Text style={{ fontSize: 16, color: '#ff3b30' }}>{error || 'Торговая точка не найдена'}</Text>
                 </View>
-            </View>
+                </View>
+            </ScreenWrapper>
         );
     }
 
@@ -156,29 +152,8 @@ export function PointDetailContent({ pointId: pointIdProp, onClose }: PointDetai
     };
 
     return (
+        <ScreenWrapper title={`Торговая точка #${shopPoint.id}`} useScrollView={false}>
             <View style={styles.modalContainer}>
-            {/* Заголовок */}
-            <View style={styles.header}>
-                <Text style={styles.headerTitle} numberOfLines={1}>
-                    Торговая точка #{shopPoint.id}
-                </Text>
-                {!isEditing ? (
-                    <TouchableOpacity 
-                        style={styles.headerEditButton}
-                        onPress={handleEdit}
-                    >
-                        <IconSymbol name="pencil" size={20} color="#007AFF" />
-                    </TouchableOpacity>
-                ) : (
-                    <TouchableOpacity 
-                        style={styles.headerCancelButton}
-                        onPress={handleCancel}
-                    >
-                        <Text style={styles.headerCancelText}>Отмена</Text>
-                    </TouchableOpacity>
-                )}
-            </View>
-
             <ScrollView 
                 style={styles.scrollView}
                 contentContainerStyle={styles.scrollContent}
@@ -186,6 +161,23 @@ export function PointDetailContent({ pointId: pointIdProp, onClose }: PointDetai
                 keyboardShouldPersistTaps="handled"
                 keyboardDismissMode="on-drag"
             >
+                <View style={styles.inlineHeaderActions}>
+                    {!isEditing ? (
+                        <TouchableOpacity 
+                            style={styles.headerEditButton}
+                            onPress={handleEdit}
+                        >
+                            <IconSymbol name="pencil" size={20} color="#007AFF" />
+                        </TouchableOpacity>
+                    ) : (
+                        <TouchableOpacity 
+                            style={styles.headerCancelButton}
+                            onPress={handleCancel}
+                        >
+                            <Text style={styles.headerCancelText}>Отмена</Text>
+                        </TouchableOpacity>
+                    )}
+                </View>
                 {/* Галерея изображений */}
                 <View style={styles.gallerySection}>
                     <Text style={styles.sectionTitle}>Фотографии точки</Text>
@@ -303,18 +295,13 @@ export function PointDetailContent({ pointId: pointIdProp, onClose }: PointDetai
                     </View>
                 )}
             </ScrollView>
-        </View>
+            </View>
+        </ScreenWrapper>
     );
 }
 
 export default function PointDetailScreen(props: PointDetailScreenProps) {
-    const handleClose = props.onClose ?? (() => router.back());
-
-    return (
-        <StandardModal visible onClose={handleClose}>
-            <PointDetailContent {...props} onClose={handleClose} />
-        </StandardModal>
-    );
+    return <PointDetailContent {...props} />;
 }
 
 const styles = StyleSheet.create({
@@ -356,6 +343,12 @@ const styles = StyleSheet.create({
         paddingTop: 16,
         paddingBottom: 40,
         paddingHorizontal: 0,
+    },
+    inlineHeaderActions: {
+        flexDirection: 'row',
+        justifyContent: 'flex-end',
+        paddingHorizontal: 16,
+        marginBottom: 8,
     },
     gallerySection: {
         backgroundColor: '#fff',
@@ -531,4 +524,5 @@ const styles = StyleSheet.create({
         fontWeight: '600',
     },
 });
+
 

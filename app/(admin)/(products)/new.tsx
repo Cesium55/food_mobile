@@ -1,4 +1,4 @@
-import { StandardModal } from "@/components/ui";
+import { ScreenWrapper } from "@/components/screen/ScreenWrapper";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { API_ENDPOINTS } from "@/constants/api";
 import { getApiUrl } from "@/constants/env";
@@ -422,15 +422,8 @@ export function NewProductContent({ onClose }: NewProductScreenProps) {
     };
 
     return (
+        <ScreenWrapper title="Новый товар" useScrollView={false}>
             <View style={styles.modalContainer}>
-            {/* Заголовок */}
-            <View style={styles.header}>
-                <Text style={styles.headerTitle}>
-                    Новый товар
-                </Text>
-                <View style={styles.headerSpacer} />
-            </View>
-
             <ScrollView 
                 style={styles.scrollView}
                 contentContainerStyle={styles.scrollContent}
@@ -674,17 +667,12 @@ export function NewProductContent({ onClose }: NewProductScreenProps) {
                 </View>
             </Modal>
         </View>
+        </ScreenWrapper>
     );
 }
 
 export default function NewProductScreen(props: NewProductScreenProps) {
-    const handleClose = props.onClose ?? (() => router.back());
-
-    return (
-        <StandardModal visible onClose={handleClose}>
-            <NewProductContent {...props} onClose={handleClose} />
-        </StandardModal>
-    );
+    return <NewProductContent {...props} />;
 }
 
 const styles = StyleSheet.create({
@@ -1093,4 +1081,6 @@ const styles = StyleSheet.create({
         fontWeight: '600',
     },
 });
+
+
 

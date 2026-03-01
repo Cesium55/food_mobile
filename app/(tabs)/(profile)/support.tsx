@@ -1,4 +1,4 @@
-import { ProfileScreenWrapper } from '@/components/profile/ProfileScreenWrapper';
+import { ScreenWrapper } from "@/components/screen/ScreenWrapper";
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import {
   SupportMessage,
@@ -257,7 +257,7 @@ export default function SupportScreen() {
   }, []);
 
   return (
-    <ProfileScreenWrapper title="Поддержка" onRefresh={loadChat} refreshing={loading} useScrollView={false}>
+    <ScreenWrapper title="Поддержка" onRefresh={loadChat} refreshing={loading} useScrollView={false}>
       <KeyboardAvoidingView
         style={styles.container}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -353,7 +353,7 @@ export default function SupportScreen() {
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
-    </ProfileScreenWrapper>
+    </ScreenWrapper>
   );
 }
 
@@ -506,3 +506,4 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
 });
+

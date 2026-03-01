@@ -1,4 +1,4 @@
-import { StandardModal } from "@/components/ui";
+import { ScreenWrapper } from "@/components/screen/ScreenWrapper";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { Offer, useOffers } from "@/hooks/useOffers";
 import { usePricingStrategies } from "@/hooks/usePricingStrategies";
@@ -107,26 +107,30 @@ export function OfferDetailContent({ offerId: offerIdProp, onClose }: OfferDetai
 
     if (offersLoading || shopsLoading || loadingOffer) {
         return (
-            <View style={styles.modalContainer}>
-                <View style={styles.loadingContainer}>
-                    <ActivityIndicator size="large" color="#007AFF" />
-                    <Text style={styles.loadingText}>Загрузка данных...</Text>
+            <ScreenWrapper title="Предложение" useScrollView={false}>
+                <View style={styles.modalContainer}>
+                    <View style={styles.loadingContainer}>
+                        <ActivityIndicator size="large" color="#007AFF" />
+                        <Text style={styles.loadingText}>Загрузка данных...</Text>
+                    </View>
                 </View>
-            </View>
+            </ScreenWrapper>
         );
     }
 
     if (!offer && !loadingOffer && !offersLoading) {
         return (
-            <View style={styles.modalContainer}>
-                <View style={styles.errorContainer}>
-                    <Text style={styles.errorIcon}>⚠️</Text>
-                    <Text style={styles.errorText}>Предложение не найдено</Text>
-                    <TouchableOpacity style={styles.backButton} onPress={handleClose}>
-                        <Text style={styles.backButtonText}>Вернуться назад</Text>
-                    </TouchableOpacity>
+            <ScreenWrapper title="Предложение" useScrollView={false}>
+                <View style={styles.modalContainer}>
+                    <View style={styles.errorContainer}>
+                        <Text style={styles.errorIcon}>⚠️</Text>
+                        <Text style={styles.errorText}>Предложение не найдено</Text>
+                        <TouchableOpacity style={styles.backButton} onPress={handleClose}>
+                            <Text style={styles.backButtonText}>Вернуться назад</Text>
+                        </TouchableOpacity>
+                    </View>
                 </View>
-            </View>
+            </ScreenWrapper>
         );
     }
 
@@ -295,12 +299,10 @@ export function OfferDetailContent({ offerId: offerIdProp, onClose }: OfferDetai
     };
 
     return (
-        <View style={styles.modalContainer}>
-            {/* Заголовок */}
-            <View style={styles.header}>
-                <View style={styles.headerTop}>
+        <ScreenWrapper title={`Предложение #${offer.id}`} useScrollView={false}>
+            <View style={styles.modalContainer}>
+                <View style={styles.inlineHeaderActions}>
                     <View style={styles.headerLeft}>
-                        <Text style={styles.headerTitle}>Предложение #{offer.id}</Text>
                         {isExpired && (
                             <View style={styles.expiredBadge}>
                                 <Text style={styles.expiredBadgeText}>Просрочено</Text>
@@ -323,7 +325,6 @@ export function OfferDetailContent({ offerId: offerIdProp, onClose }: OfferDetai
                         </TouchableOpacity>
                     )}
                 </View>
-            </View>
 
             {/* Контент */}
             {!isEditing ? (
@@ -709,37 +710,26 @@ export function OfferDetailContent({ offerId: offerIdProp, onClose }: OfferDetai
                     <View style={{ height: 40 }} />
                 </ScrollView>
             )}
-        </View>
+            </View>
+        </ScreenWrapper>
     );
 }
 
 export default function OfferDetailScreen(props: OfferDetailScreenProps) {
-    const handleClose = props.onClose ?? (() => router.back());
-
-    return (
-        <StandardModal visible onClose={handleClose}>
-            <OfferDetailContent {...props} onClose={handleClose} />
-        </StandardModal>
-    );
+    return <OfferDetailContent {...props} />;
 }
 
 const styles = StyleSheet.create({
     modalContainer: {
         flex: 1,
-        backgroundColor: '#fff',
+        backgroundColor: '#f5f5f5',
     },
-    header: {
-        backgroundColor: '#fff',
-        borderBottomWidth: 1,
-        borderBottomColor: '#e9ecef',
-    },
-    headerTop: {
+    inlineHeaderActions: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
         paddingHorizontal: 16,
-        paddingTop: 16,
-        paddingBottom: 12,
+        marginBottom: 8,
     },
     headerLeft: {
         flex: 1,
@@ -747,11 +737,6 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         gap: 8,
         flexWrap: 'wrap',
-    },
-    headerTitle: {
-        fontSize: 20,
-        fontWeight: '700',
-        color: '#333',
     },
     expiredBadge: {
         backgroundColor: '#FF3B30',
@@ -1171,3 +1156,5 @@ const styles = StyleSheet.create({
         textAlign: 'center',
     },
 });
+
+

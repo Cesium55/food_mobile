@@ -1,4 +1,4 @@
-import { ProfileScreenWrapper } from "@/components/profile/ProfileScreenWrapper";
+import { ScreenWrapper } from "@/components/screen/ScreenWrapper";
 import { QRCodeDisplay } from "@/components/qr/QRCodeDisplay";
 import { createShopModal } from "@/components/yandex_maps_webview";
 import { useModal } from "@/contexts/ModalContext";
@@ -277,29 +277,29 @@ export default function OrderPaidScreen() {
 
   if (loading) {
     return (
-      <ProfileScreenWrapper title="Заказ оплачен">
+      <ScreenWrapper title="Заказ оплачен">
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#4CAF50" />
           <Text style={styles.loadingText}>Загрузка заказа...</Text>
         </View>
-      </ProfileScreenWrapper>
+      </ScreenWrapper>
     );
   }
 
   if (!orderData || !orderData.purchase) {
     return (
-      <ProfileScreenWrapper title="Заказ оплачен">
+      <ScreenWrapper title="Заказ оплачен">
         <View style={styles.container}>
           <Text style={styles.errorText}>Заказ не найден</Text>
         </View>
-      </ProfileScreenWrapper>
+      </ScreenWrapper>
     );
   }
 
   // Если заказ отменен, показываем специальное сообщение
   if (orderData.purchase.status === 'cancelled') {
     return (
-      <ProfileScreenWrapper title="Заказ отменен">
+      <ScreenWrapper title="Заказ отменен">
         <View style={styles.container}>
           <View style={styles.cancelledSection}>
             <Text style={styles.cancelledIcon}>❌</Text>
@@ -322,7 +322,7 @@ export default function OrderPaidScreen() {
             </View>
           </View>
         </View>
-      </ProfileScreenWrapper>
+      </ScreenWrapper>
     );
   }
 
@@ -391,7 +391,7 @@ export default function OrderPaidScreen() {
   const totalDiscount = originalTotal - totalAmount;
 
   return (
-    <ProfileScreenWrapper title="Заказ оплачен">
+    <ScreenWrapper title="Заказ оплачен">
       <View style={styles.container}>
         {/* Информация о времени оплаты */}
         {paymentDate && (
@@ -459,7 +459,7 @@ export default function OrderPaidScreen() {
           </View>
         </View>
       </View>
-    </ProfileScreenWrapper>
+    </ScreenWrapper>
   );
 }
 
@@ -709,3 +709,4 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 });
+

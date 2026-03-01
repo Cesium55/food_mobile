@@ -1,4 +1,4 @@
-import { ProfileScreenWrapper } from "@/components/profile/ProfileScreenWrapper";
+import { ScreenWrapper } from "@/components/screen/ScreenWrapper";
 import { useOrders } from "@/hooks/useOrders";
 import { useOffers } from "@/hooks/useOffers";
 import { useFocusEffect, useRouter } from "expo-router";
@@ -60,7 +60,7 @@ export default function History() {
   );
 
   return (
-    <ProfileScreenWrapper 
+    <ScreenWrapper 
       title="История заказов"
       onRefresh={refetchOrders}
       refreshing={loading}
@@ -164,7 +164,7 @@ export default function History() {
           })
         )}
       </View>
-    </ProfileScreenWrapper>
+    </ScreenWrapper>
   );
 }
 
@@ -288,3 +288,4 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
 });
+

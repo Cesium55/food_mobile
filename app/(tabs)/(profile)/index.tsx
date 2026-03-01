@@ -1,7 +1,7 @@
 import { FullWidthLink } from "@/components/FullWidthLink";
 import { UserCard } from "@/components/UserCard";
 import { CurrentOrders } from "@/components/profile/CurrentOrders";
-import { ProfileScreenWrapper } from "@/components/profile/ProfileScreenWrapper";
+import { ScreenWrapper } from "@/components/screen/ScreenWrapper";
 import { log } from "@/constants/config";
 import { useOrders } from "@/hooks/useOrders";
 import { useUser } from "@/hooks/useUser";
@@ -100,7 +100,7 @@ export default function Profile() {
     };
 
     return (
-        <ProfileScreenWrapper 
+        <ScreenWrapper 
             title="Профиль" 
             showBackButton={true}
             onBackPress={() => {
@@ -172,7 +172,7 @@ export default function Profile() {
                     <Text style={styles.logoutButtonText}>Выйти из аккаунта</Text>
                 </TouchableOpacity>
             </View>
-        </ProfileScreenWrapper>
+        </ScreenWrapper>
     );
 }
 
@@ -245,3 +245,4 @@ const styles = StyleSheet.create({
         marginHorizontal: 16,
     },
 });
+

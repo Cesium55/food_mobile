@@ -1,10 +1,8 @@
-import { PointDetailContent } from "@/app/(admin)/(points)/[id]";
-import { NewPointContent } from "@/app/(admin)/(points)/new";
 import { TabScreen } from "@/components/TabScreen";
 import { IconSymbol } from "@/components/ui/icon-symbol";
-import { useModal } from "@/contexts/ModalContext";
 import { useSellerMe } from "@/hooks/useSeller";
 import { useShopPoints } from "@/hooks/useShopPoints";
+import { router } from "expo-router";
 import {
     ScrollView,
     StyleSheet,
@@ -16,14 +14,13 @@ import {
 export default function PointsScreen() {
     const { seller } = useSellerMe();
     const { shopPoints, loading, error } = useShopPoints(seller?.id);
-    const { openModal, closeModal } = useModal();
 
     const handlePointPress = (pointId: number) => {
-        openModal(<PointDetailContent pointId={pointId} onClose={closeModal} />);
+        router.push(`/(admin)/(points)/${pointId}`);
     };
 
     const handleAddPoint = () => {
-        openModal(<NewPointContent onClose={closeModal} />);
+        router.push('/(admin)/(points)/new');
     };
 
     if (loading) {

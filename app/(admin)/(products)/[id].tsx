@@ -1,4 +1,4 @@
-import { StandardModal } from "@/components/ui";
+import { ScreenWrapper } from "@/components/screen/ScreenWrapper";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { API_ENDPOINTS } from "@/constants/api";
 import { getApiUrl } from "@/constants/env";
@@ -518,31 +518,8 @@ export function ProductDetailContent({ productId: productIdProp, onClose }: Prod
     };
 
     return (
+        <ScreenWrapper title={product?.name || "Товар"} useScrollView={false}>
             <View style={styles.modalContainer}>
-            {/* Заголовок */}
-            <View style={styles.header}>
-                <Text style={styles.headerTitle} numberOfLines={1}>
-                    {product?.name || 'Загрузка...'}
-                </Text>
-                {!isEditing && product ? (
-                    <TouchableOpacity 
-                        style={styles.headerEditButton}
-                        onPress={handleEdit}
-                    >
-                        <IconSymbol name="pencil" size={20} color="#007AFF" />
-                    </TouchableOpacity>
-                ) : isEditing && product ? (
-                    <TouchableOpacity 
-                        style={styles.headerCancelButton}
-                        onPress={handleCancel}
-                    >
-                        <Text style={styles.headerCancelText}>Отмена</Text>
-                    </TouchableOpacity>
-                ) : (
-                    <View style={styles.headerSpacer} />
-                )}
-            </View>
-
             {loading ? (
                 <View style={styles.loadingContainer}>
                     <ActivityIndicator size="large" color="#007AFF" />
@@ -567,6 +544,23 @@ export function ProductDetailContent({ productId: productIdProp, onClose }: Prod
                     keyboardShouldPersistTaps="handled"
                     keyboardDismissMode="on-drag"
                 >
+                <View style={styles.inlineHeaderActions}>
+                    {!isEditing && product ? (
+                        <TouchableOpacity 
+                            style={styles.headerEditButton}
+                            onPress={handleEdit}
+                        >
+                            <IconSymbol name="pencil" size={20} color="#007AFF" />
+                        </TouchableOpacity>
+                    ) : isEditing && product ? (
+                        <TouchableOpacity 
+                            style={styles.headerCancelButton}
+                            onPress={handleCancel}
+                        >
+                            <Text style={styles.headerCancelText}>Отмена</Text>
+                        </TouchableOpacity>
+                    ) : null}
+                </View>
                 {/* Галерея изображений */}
                 <View style={styles.gallerySection}>
                     <Text style={styles.sectionTitle}>Фотографии товара</Text>
@@ -913,18 +907,13 @@ export function ProductDetailContent({ productId: productIdProp, onClose }: Prod
                     </View>
                 </View>
             </Modal>
-        </View>
+            </View>
+        </ScreenWrapper>
     );
 }
 
 export default function ProductDetailScreen(props: ProductDetailScreenProps) {
-    const handleClose = props.onClose ?? (() => router.back());
-
-    return (
-        <StandardModal visible onClose={handleClose}>
-            <ProductDetailContent {...props} onClose={handleClose} />
-        </StandardModal>
-    );
+    return <ProductDetailContent {...props} />;
 }
 
 const styles = StyleSheet.create({
@@ -969,6 +958,12 @@ const styles = StyleSheet.create({
         paddingTop: 16,
         paddingBottom: 40,
         paddingHorizontal: 0,
+    },
+    inlineHeaderActions: {
+        flexDirection: 'row',
+        justifyContent: 'flex-end',
+        paddingHorizontal: 16,
+        marginBottom: 8,
     },
     gallerySection: {
         backgroundColor: '#fff',
@@ -1469,4 +1464,6 @@ const styles = StyleSheet.create({
         fontWeight: '600',
     },
 });
+
+
 

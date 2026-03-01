@@ -1,4 +1,5 @@
-import { ProfileScreenWrapper } from "@/components/profile/ProfileScreenWrapper";
+import { ScreenWrapper } from "@/components/screen/ScreenWrapper";
+import { SettingsInputsModalContent } from "@/components/profile/SettingsInputsModalContent";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useModal } from "@/contexts/ModalContext";
 import { configureNotifications, getFCMToken, initializeFirebase, sendFCMTokenToServer } from "@/services/firebaseService";
@@ -52,6 +53,10 @@ export default function Settings() {
 
     const handleOpenModal = () => {
         openModal(<TestModal level={1} />);
+    };
+
+    const handleOpenInputsModal = () => {
+        openModal(<SettingsInputsModalContent />);
     };
 
     const handleGetToken = async () => {
@@ -135,8 +140,20 @@ export default function Settings() {
     };
 
     return (
-        <ProfileScreenWrapper title="Settings">
+        <ScreenWrapper title="Settings">
             <View style={styles.container}>
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Формы</Text>
+
+                    <TouchableOpacity
+                        style={[styles.button, styles.buttonOutline]}
+                        onPress={handleOpenInputsModal}
+                    >
+                        <IconSymbol name="list.bullet" color="#333" size={20} />
+                        <Text style={[styles.buttonText, styles.buttonTextOutline]}>Открыть модалку с 10 инпутами</Text>
+                    </TouchableOpacity>
+                </View>
+
                 <View style={styles.section}>
                     <Text style={styles.sectionTitle}>Debug</Text>
                     
@@ -185,7 +202,7 @@ export default function Settings() {
                     </TouchableOpacity>
                 </View>
             </View>
-        </ProfileScreenWrapper>
+        </ScreenWrapper>
     );
 }
 
@@ -299,3 +316,4 @@ const styles = StyleSheet.create({
         height: 100,
     },
 });
+

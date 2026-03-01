@@ -1,5 +1,6 @@
 import { TabScreen } from '@/components/TabScreen';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { StandardModal } from '@/components/ui/StandardModal';
 import { useSellerMe } from '@/hooks/useSeller';
 import { useOffers } from '@/hooks/useOffers';
 import { useShops } from '@/hooks/useShops';
@@ -17,7 +18,6 @@ import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Modal,
   ScrollView,
   StyleSheet,
   Text,
@@ -305,30 +305,17 @@ export default function AdminOrdersScreen() {
         )}
       </View>
 
-      <Modal
+      <StandardModal
         visible={showFilters}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setShowFilters(false)}
+        onClose={() => setShowFilters(false)}
+        heightPercent={0.8}
       >
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setShowFilters(false)}
-        >
-          <TouchableOpacity
-            style={styles.filterModal}
-            activeOpacity={1}
-            onPress={(event) => event.stopPropagation()}
-          >
+          <View style={styles.filterModal}>
             <View style={styles.filterHeader}>
               <Text style={styles.filterTitle}>Фильтры</Text>
-              <TouchableOpacity onPress={() => setShowFilters(false)}>
-                <IconSymbol name="xmark" size={24} color="#666" />
-              </TouchableOpacity>
             </View>
 
-            <ScrollView style={styles.filterContent}>
+            <View style={styles.filterContent}>
               <View style={styles.filterSection}>
                 <Text style={styles.filterSectionTitle}>Период</Text>
                 <View style={styles.timePeriodButtons}>
@@ -384,7 +371,7 @@ export default function AdminOrdersScreen() {
                   </TouchableOpacity>
                 ))}
               </View>
-            </ScrollView>
+            </View>
 
             <View style={styles.filterActions}>
               <TouchableOpacity style={styles.clearButton} onPress={handleClearFilters}>
@@ -394,9 +381,8 @@ export default function AdminOrdersScreen() {
                 <Text style={styles.applyButtonText}>Применить</Text>
               </TouchableOpacity>
             </View>
-          </TouchableOpacity>
-        </TouchableOpacity>
-      </Modal>
+          </View>
+      </StandardModal>
     </TabScreen>
   );
 }
@@ -621,21 +607,10 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#333',
   },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
-  },
   filterModal: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    maxHeight: '80%',
-    paddingBottom: 20,
+    backgroundColor: '#fff'
   },
   filterHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
     padding: 20,
     borderBottomWidth: 1,
@@ -647,7 +622,7 @@ const styles = StyleSheet.create({
     color: '#333',
   },
   filterContent: {
-    maxHeight: 400,
+    paddingBottom: 8,
   },
   filterSection: {
     padding: 16,

@@ -1,6 +1,6 @@
 import BottomSheet, { BottomSheetFooter, BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import React, { useCallback, useEffect, useMemo, useRef } from 'react';
-import { Dimensions, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { BackHandler, Dimensions, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { IconSymbol } from './icon-symbol';
 
 interface StandardModalProps {
@@ -10,18 +10,27 @@ interface StandardModalProps {
   footer?: React.ReactNode;
   zIndex?: number;
   isTopModal?: boolean; // Флаг, указывающий, является ли эта модалка верхней в стеке
+  heightPercent?: number;
 }
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-export function StandardModal({ visible, onClose, children, footer, zIndex = 1000, isTopModal = true }: StandardModalProps) {
+export function StandardModal({
+  visible,
+  onClose,
+  children,
+  footer,
+  zIndex = 1000,
+  isTopModal = true,
+  heightPercent = 0.9,
+}: StandardModalProps) {
   const bottomSheetRef = useRef<BottomSheet>(null);
   const wasOpenedRef = useRef<boolean>(false); // Отслеживаем, была ли модалка уже открыта
   const previousIsTopModalRef = useRef<boolean>(isTopModal); // Отслеживаем предыдущее значение isTopModal
   
-  // Используем числовое значение в пикселях для точного контроля высоты (90%)
-  const modalHeight = SCREEN_HEIGHT * 0.9;
-  const snapPoints = useMemo(() => [modalHeight], []);
+  // Используем числовое значение в пикселях для точного контроля высоты.
+  const modalHeight = SCREEN_HEIGHT * heightPercent;
+  const snapPoints = useMemo(() => [modalHeight], [modalHeight]);
 
 
   useEffect(() => {
@@ -52,6 +61,19 @@ export function StandardModal({ visible, onClose, children, footer, zIndex = 100
       bottomSheetRef.current?.close();
     }
   }, [visible, isTopModal]);
+
+  useEffect(() => {
+    if (!visible || !isTopModal) return;
+
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      bottomSheetRef.current?.close();
+      return true;
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, [visible, isTopModal, onClose]);
 
   const handleSheetChanges = useCallback((index: number) => {
     // Закрываем модалку только если она верхняя в стеке
