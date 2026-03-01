@@ -12,16 +12,12 @@ import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Keyboard,
-  KeyboardAvoidingView,
-  KeyboardEvent,
-  Platform,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  View,
+  View
 } from 'react-native';
 
 function sortMessages(messages: SupportMessage[]): SupportMessage[] {
@@ -69,7 +65,6 @@ export default function SupportScreen() {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [errorText, setErrorText] = useState<string | null>(null);
-  const [androidKeyboardOffset, setAndroidKeyboardOffset] = useState(0);
 
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -237,32 +232,8 @@ export default function SupportScreen() {
     }
   }, [messages.length]);
 
-  useEffect(() => {
-    if (Platform.OS !== 'android') return;
-
-    const onShow = (event: KeyboardEvent) => {
-      setAndroidKeyboardOffset(event.endCoordinates?.height ?? 0);
-    };
-    const onHide = () => {
-      setAndroidKeyboardOffset(0);
-    };
-
-    const showSub = Keyboard.addListener('keyboardDidShow', onShow);
-    const hideSub = Keyboard.addListener('keyboardDidHide', onHide);
-
-    return () => {
-      showSub.remove();
-      hideSub.remove();
-    };
-  }, []);
-
   return (
     <ScreenWrapper title="Поддержка" onRefresh={loadChat} refreshing={loading} useScrollView={false}>
-      <KeyboardAvoidingView
-        style={styles.container}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        enabled={Platform.OS === 'ios'}
-      >
         <View style={styles.messagesSection}>
           {loading ? (
             <View style={styles.loaderContainer}>
@@ -329,12 +300,7 @@ export default function SupportScreen() {
 
         {!!errorText && <Text style={styles.errorText}>{errorText}</Text>}
 
-        <View
-          style={[
-            styles.inputContainer,
-            Platform.OS === 'android' && { marginBottom: androidKeyboardOffset },
-          ]}
-        >
+        <View style={styles.inputContainer}>
           <TextInput
             value={inputValue}
             onChangeText={setInputValue}
@@ -352,7 +318,6 @@ export default function SupportScreen() {
             <IconSymbol name="paperplane.fill" size={18} color="#fff" />
           </TouchableOpacity>
         </View>
-      </KeyboardAvoidingView>
     </ScreenWrapper>
   );
 }

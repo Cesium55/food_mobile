@@ -1,5 +1,5 @@
 import { ReactNode } from "react";
-import { StyleSheet } from "react-native";
+import { KeyboardAvoidingView, Platform, StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ScreenContent } from "./ScreenContent";
 import { ScreenTopBar } from "./ScreenTopBar";
@@ -13,6 +13,8 @@ interface ScreenWrapperProps {
   onRefresh?: () => void | Promise<void>;
   refreshing?: boolean;
   useScrollView?: boolean;
+  avoidKeyboard?: boolean;
+  keyboardVerticalOffset?: number;
 }
 
 export function ScreenWrapper({
@@ -24,7 +26,19 @@ export function ScreenWrapper({
   onRefresh,
   refreshing = false,
   useScrollView = true,
+  avoidKeyboard = true,
+  keyboardVerticalOffset,
 }: ScreenWrapperProps) {
+  const content = (
+    <ScreenContent
+      useScrollView={useScrollView}
+      onRefresh={onRefresh}
+      refreshing={refreshing}
+    >
+      {children}
+    </ScreenContent>
+  );
+
   return (
     <SafeAreaView style={styles.safeArea} edges={["top"]}>
       {showTopBar && (
@@ -34,13 +48,17 @@ export function ScreenWrapper({
           onBackPress={onBackPress}
         />
       )}
-      <ScreenContent
-        useScrollView={useScrollView}
-        onRefresh={onRefresh}
-        refreshing={refreshing}
-      >
-        {children}
-      </ScreenContent>
+      {avoidKeyboard ? (
+        <KeyboardAvoidingView
+          style={styles.keyboardContainer}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          keyboardVerticalOffset={0}
+        >
+          {content}
+        </KeyboardAvoidingView>
+      ) : (
+        content
+      )}
     </SafeAreaView>
   );
 }
@@ -50,5 +68,8 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#eee",
     overflow: "visible",
+  },
+  keyboardContainer: {
+    flex: 1,
   },
 });
