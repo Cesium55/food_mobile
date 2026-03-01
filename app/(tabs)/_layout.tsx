@@ -1,6 +1,7 @@
 import { Tabs, usePathname } from 'expo-router';
 import React from 'react';
 import { Text } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { HapticTab } from '@/components/haptic-tab';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -11,6 +12,7 @@ export default function TabLayout() {
   const colorScheme = 'light';
   const pathname = usePathname();
   const isProfileScreen = pathname?.includes('(profile)');
+  const insets = useSafeAreaInsets();
 
   return (
     <Tabs
@@ -27,6 +29,8 @@ export default function TabLayout() {
           : {
               backgroundColor: Colors.light.background,
               paddingTop: 8,
+              paddingBottom: Math.max(insets.bottom, 8),
+              height: 56 + Math.max(insets.bottom, 8),
             },
       }}>
       <Tabs.Screen
