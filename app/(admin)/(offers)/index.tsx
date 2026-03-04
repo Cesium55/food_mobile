@@ -183,6 +183,8 @@ export default function OffersScreen() {
                     <TextInput
                         style={styles.searchInput}
                         placeholder="Поиск предложений..."
+                        placeholderTextColor="#999"
+                        keyboardAppearance="dark"
                         value={searchQuery}
                         onChangeText={setSearchQuery}
                     />

@@ -531,10 +531,24 @@ export interface VerifyTokenItem {
   offer_id: number;
   quantity: number;
   fulfilled_quantity: number;
+  refunded_quantity?: number | null;
   fulfillment_status: string;
+  fulfilled_at?: string | null;
   product_name: string;
   shop_point_id: number;
   cost_at_purchase: string; // decimal формат
+  offer_result?: {
+    id: number;
+    offer_id: number;
+    status: 'success' | 'not_found' | 'insufficient_quantity' | 'expired' | string;
+    requested_quantity: number;
+    processed_quantity: number;
+    available_quantity: number;
+    refund_id: number | null;
+    refunded_quantity: number;
+    money_flow_status: string | null;
+    message: string;
+  } | null;
 }
 
 export interface VerifyTokenResponse {
@@ -607,11 +621,55 @@ export async function verifyToken(token: string): Promise<VerifyTokenResponse> {
 
   const responseData = await response.json();
   const rawData = responseData.data || responseData;
+  const rawItems = Array.isArray(rawData.items) ? rawData.items : [];
+
+  const items: VerifyTokenItem[] = rawItems.map((item: any) => {
+    const quantity = Number(item.quantity ?? item.requested_quantity ?? 0);
+    const fulfilledQuantity = Number(item.fulfilled_quantity ?? 0);
+
+    // Бэкенд может отдавать возвраты в разных местах.
+    const refundedQuantity = Number(
+      item.refunded_quantity ??
+        item.total_refunded_quantity ??
+        item.purchase_offer_result?.refunded_quantity ??
+        item.purchase_offer_result?.total_refunded_quantity ??
+        item.offer_result?.refunded_quantity ??
+        item.offer_result?.total_refunded_quantity ??
+        0
+    );
+
+    return {
+      purchase_offer_id: Number(item.purchase_offer_id ?? item.purchaseOfferId ?? 0),
+      offer_id: Number(item.offer_id ?? item.offerId ?? 0),
+      quantity: Number.isFinite(quantity) ? quantity : 0,
+      fulfilled_quantity: Number.isFinite(fulfilledQuantity) ? fulfilledQuantity : 0,
+      refunded_quantity: Number.isFinite(refundedQuantity) ? refundedQuantity : 0,
+      fulfillment_status: String(item.fulfillment_status ?? item.fulfillmentStatus ?? ''),
+      fulfilled_at: item.fulfilled_at ?? null,
+      product_name: String(item.product_name ?? item.productName ?? 'Товар'),
+      shop_point_id: Number(item.shop_point_id ?? item.shopPointId ?? 0),
+      cost_at_purchase: String(item.cost_at_purchase ?? item.costAtPurchase ?? '0.00'),
+      offer_result: item.offer_result
+        ? {
+            id: Number(item.offer_result.id ?? 0),
+            offer_id: Number(item.offer_result.offer_id ?? 0),
+            status: String(item.offer_result.status ?? ''),
+            requested_quantity: Number(item.offer_result.requested_quantity ?? 0),
+            processed_quantity: Number(item.offer_result.processed_quantity ?? 0),
+            available_quantity: Number(item.offer_result.available_quantity ?? 0),
+            refund_id: item.offer_result.refund_id ?? null,
+            refunded_quantity: Number(item.offer_result.refunded_quantity ?? 0),
+            money_flow_status: item.offer_result.money_flow_status ?? null,
+            message: String(item.offer_result.message ?? ''),
+          }
+        : null,
+    };
+  });
 
   return {
     purchase_id: rawData.purchase_id || rawData.purchaseId,
     status: rawData.status,
-    items: rawData.items || [],
+    items,
     total_cost: rawData.total_cost || rawData.totalCost || '0.00',
   };
 }

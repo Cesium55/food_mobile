@@ -113,6 +113,8 @@ export default function PhoneInput({
         onChangeText={handleChangeText}
         keyboardType="phone-pad"
         placeholder="+7 (XXX) XXX-XX-XX"
+        placeholderTextColor="#999"
+        keyboardAppearance="light"
         autoCapitalize="none"
         autoCorrect={false}
       />
@@ -131,6 +133,7 @@ const styles = StyleSheet.create({
     padding: 12,
     fontSize: 16,
     backgroundColor: '#f9f9f9',
+    color: '#1A1A1A',
   },
   inputError: {
     borderColor: '#ff4444',

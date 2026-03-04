@@ -342,6 +342,8 @@ export default function SupportScreen() {
             value={inputValue}
             onChangeText={setInputValue}
             placeholder="Введите сообщение"
+            placeholderTextColor="#9CA3AF"
+            keyboardAppearance="dark"
             style={styles.input}
             editable={!sending}
             multiline

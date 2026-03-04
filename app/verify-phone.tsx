@@ -173,6 +173,8 @@ export default function VerifyPhone() {
                 setError(null); // Очищаем ошибку при вводе
               }}
               placeholder="000000"
+              placeholderTextColor="#999"
+              keyboardAppearance="dark"
               keyboardType="number-pad"
               autoCapitalize="none"
               autoCorrect={false}
@@ -285,6 +287,7 @@ const styles = StyleSheet.create({
     padding: 12,
     fontSize: 24,
     backgroundColor: '#f9f9f9',
+    color: '#1A1A1A',
     textAlign: 'center',
     letterSpacing: 8,
     fontWeight: '600',

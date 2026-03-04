@@ -13,17 +13,19 @@ import {
     View,
 } from "react-native";
 
-type FulfillmentStatus = "fulfilled" | "partially_fulfilled" | "unfulfilled";
+type FulfillmentStatus = "fulfilled" | "partially_fulfilled";
 
 interface ItemFulfillment {
     purchase_offer_id: number;
     offer_id: number;
     quantity: number;
     fulfilled_quantity: number;
+    refunded_quantity?: number | null;
     fulfillment_status: string;
     product_name: string;
     shop_point_id: number;
     cost_at_purchase: string; // decimal формат
+    offer_result?: VerifyTokenItem["offer_result"];
     // Локальное состояние для формы
     selectedStatus: FulfillmentStatus;
     inputQuantity: string;
@@ -40,6 +42,21 @@ export default function FulfillOrderScreen() {
         total_cost: string; // decimal формат
     } | null>(null);
     const [items, setItems] = useState<ItemFulfillment[]>([]);
+
+    const getRefundedQuantity = (item: ItemFulfillment) => {
+        const fromOfferResult = Number(item.offer_result?.refunded_quantity ?? 0);
+        if (fromOfferResult > 0) {
+            return fromOfferResult;
+        }
+        return Number(item.refunded_quantity) || 0;
+    };
+
+    const getAvailableQuantity = (item: ItemFulfillment) => {
+        const total = Number(item.quantity) || 0;
+        const alreadyFulfilled = Number(item.fulfilled_quantity) || 0;
+        const alreadyRefunded = getRefundedQuantity(item);
+        return Math.max(0, total - alreadyFulfilled - alreadyRefunded);
+    };
 
     useEffect(() => {
         const loadOrderData = async () => {
@@ -58,7 +75,10 @@ export default function FulfillOrderScreen() {
                 const initializedItems: ItemFulfillment[] = data.items.map((item) => ({
                     ...item,
                     selectedStatus: "fulfilled" as FulfillmentStatus,
-                    inputQuantity: item.quantity.toString(),
+                    inputQuantity: Math.max(
+                        0,
+                        item.quantity - (item.fulfilled_quantity || 0) - getRefundedQuantity(item)
+                    ).toString(),
                 }));
                 setItems(initializedItems);
             } catch (error: any) {
@@ -76,13 +96,11 @@ export default function FulfillOrderScreen() {
     const handleStatusChange = (index: number, status: FulfillmentStatus) => {
         const updatedItems = [...items];
         updatedItems[index].selectedStatus = status;
+        const maxAvailable = getAvailableQuantity(updatedItems[index]);
         
-        // Если статус "unfulfilled", сбрасываем количество
-        if (status === "unfulfilled") {
-            updatedItems[index].inputQuantity = "0";
-        } else if (status === "fulfilled") {
-            // Если полностью выдан, ставим полное количество
-            updatedItems[index].inputQuantity = updatedItems[index].quantity.toString();
+        if (status === "fulfilled") {
+            // Если полностью выдан, ставим максимум доступного с учетом уже выданного/возвращенного
+            updatedItems[index].inputQuantity = maxAvailable.toString();
         }
         
         setItems(updatedItems);
@@ -90,24 +108,7 @@ export default function FulfillOrderScreen() {
 
     const handleQuantityChange = (index: number, value: string) => {
         const updatedItems = [...items];
-        const numValue = parseInt(value, 10);
-        
-        if (isNaN(numValue) || numValue < 0) {
-            updatedItems[index].inputQuantity = "0";
-        } else if (numValue > updatedItems[index].quantity) {
-            updatedItems[index].inputQuantity = updatedItems[index].quantity.toString();
-        } else {
-            updatedItems[index].inputQuantity = value;
-        }
-        
-        // Автоматически обновляем статус на основе количества
-        if (numValue === 0) {
-            updatedItems[index].selectedStatus = "unfulfilled";
-        } else if (numValue === updatedItems[index].quantity) {
-            updatedItems[index].selectedStatus = "fulfilled";
-        } else {
-            updatedItems[index].selectedStatus = "partially_fulfilled";
-        }
+        updatedItems[index].inputQuantity = value.replace(/[^\d]/g, "");
         
         setItems(updatedItems);
     };
@@ -119,17 +120,26 @@ export default function FulfillOrderScreen() {
             setSubmitting(true);
 
             // Формируем данные для отправки
-            const fulfillItems: FulfillItemRequest[] = items.map((item) => {
+            const fulfillItems: FulfillItemRequest[] = items
+                .map((item) => {
+                const maxAvailable = getAvailableQuantity(item);
+                if (maxAvailable === 0) {
+                    return null;
+                }
+
                 const fulfilledQty = parseInt(item.inputQuantity, 10);
                 let status: FulfillItemRequest["status"] = "fulfilled";
                 let unfulfilledReason: string | undefined;
 
-                if (fulfilledQty === 0) {
-                    status = "unfulfilled";
-                    unfulfilledReason = "Товар не выдан";
-                } else if (fulfilledQty < item.quantity) {
+                if (Number.isNaN(fulfilledQty) || fulfilledQty <= 0 || fulfilledQty > maxAvailable) {
+                    throw new Error(
+                        `Проверьте количество для товара "${item.product_name}". Допустимо от 1 до ${maxAvailable}.`
+                    );
+                }
+
+                if (fulfilledQty < maxAvailable || item.selectedStatus === "partially_fulfilled") {
                     status = "partially_fulfilled";
-                    unfulfilledReason = `Выдано ${fulfilledQty} из ${item.quantity}`;
+                    unfulfilledReason = `Выдано ${fulfilledQty} из ${maxAvailable}`;
                 }
 
                 return {
@@ -139,7 +149,13 @@ export default function FulfillOrderScreen() {
                     fulfilled_quantity: fulfilledQty,
                     unfulfilled_reason: unfulfilledReason,
                 };
-            });
+            })
+            .filter((item): item is FulfillItemRequest => item !== null);
+
+            if (fulfillItems.length === 0) {
+                Alert.alert("Нет доступных позиций", "Все товары уже выданы или возвращены.");
+                return;
+            }
 
             const result = await fulfillPurchase(orderData.purchase_id, {
                 items: fulfillItems,
@@ -149,10 +165,6 @@ export default function FulfillOrderScreen() {
             const allFulfilled = result.fulfilled_items.every(
                 (item) => item.status === "fulfilled"
             );
-            const someFulfilled = result.fulfilled_items.some(
-                (item) => item.fulfilled_quantity > 0
-            );
-
             if (allFulfilled) {
                 Alert.alert(
                     "Успешно",
@@ -164,21 +176,10 @@ export default function FulfillOrderScreen() {
                         },
                     ]
                 );
-            } else if (someFulfilled) {
-                Alert.alert(
-                    "Частично выполнено",
-                    "Некоторые товары выданы. Проверьте детали.",
-                    [
-                        {
-                            text: "OK",
-                            onPress: () => router.replace('/(admin)/(admin-profile)'),
-                        },
-                    ]
-                );
             } else {
                 Alert.alert(
                     "Заказ обработан",
-                    "Товары не выданы. Для невыданных позиций будет оформлен возврат по правилам API.",
+                    "Некоторые товары выданы частично. Проверьте детали.",
                     [
                         {
                             text: "OK",
@@ -255,6 +256,12 @@ export default function FulfillOrderScreen() {
                             <Text style={styles.itemQuantity}>
                                 Уже выдано: {item.fulfilled_quantity} шт.
                             </Text>
+                            <Text style={styles.itemQuantity}>
+                                Уже возвращено: {getRefundedQuantity(item)} шт.
+                            </Text>
+                            <Text style={styles.itemQuantity}>
+                                Доступно к выдаче: {getAvailableQuantity(item)} шт.
+                            </Text>
 
                             {/* Статус выдачи */}
                             <View style={styles.statusSection}>
@@ -298,45 +305,29 @@ export default function FulfillOrderScreen() {
                                             Частично
                                         </Text>
                                     </TouchableOpacity>
-                                    <TouchableOpacity
-                                        style={[
-                                            styles.statusButton,
-                                            item.selectedStatus === "unfulfilled" &&
-                                                styles.statusButtonActive,
-                                        ]}
-                                        onPress={() => handleStatusChange(index, "unfulfilled")}
-                                    >
-                                        <Text
-                                            style={[
-                                                styles.statusButtonText,
-                                                item.selectedStatus === "unfulfilled" &&
-                                                    styles.statusButtonTextActive,
-                                            ]}
-                                        >
-                                            Не выдан
-                                        </Text>
-                                    </TouchableOpacity>
                                 </View>
                             </View>
 
                             {/* Количество для выдачи */}
-                            {item.selectedStatus !== "unfulfilled" && (
-                                <View style={styles.quantitySection}>
-                                    <Text style={styles.quantityLabel}>
-                                        Количество к выдаче:
-                                    </Text>
-                                    <TextInput
-                                        style={styles.quantityInput}
-                                        value={item.inputQuantity}
-                                        onChangeText={(value) => handleQuantityChange(index, value)}
-                                        keyboardType="numeric"
-                                        editable={item.selectedStatus !== "fulfilled"}
-                                    />
-                                    <Text style={styles.quantityHint}>
-                                        Максимум: {item.quantity} шт.
-                                    </Text>
-                                </View>
-                            )}
+                            <View style={styles.quantitySection}>
+                                <Text style={styles.quantityLabel}>
+                                    Количество к выдаче:
+                                </Text>
+                                <TextInput
+                                    style={styles.quantityInput}
+                                    value={item.inputQuantity}
+                                    onChangeText={(value) => handleQuantityChange(index, value)}
+                                    keyboardType="numeric"
+                                    autoCorrect={false}
+                                    spellCheck={false}
+                                    editable={item.selectedStatus !== "fulfilled" && getAvailableQuantity(item) > 0}
+                                />
+                                <Text style={styles.quantityHint}>
+                                    {getAvailableQuantity(item) > 0
+                                        ? `Допустимо: от 1 до ${getAvailableQuantity(item)} шт.`
+                                        : "Эта позиция уже полностью обработана"}
+                                </Text>
+                            </View>
                         </View>
                     ))}
                 </View>

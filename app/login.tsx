@@ -157,6 +157,8 @@ export default function Login() {
               value={password}
               onChangeText={setPassword}
               placeholder="Введите пароль"
+              placeholderTextColor="#999"
+              keyboardAppearance="dark"
               secureTextEntry
               autoCapitalize="none"
               autoCorrect={false}
@@ -264,6 +266,7 @@ const styles = StyleSheet.create({
     padding: 12,
     fontSize: 16,
     backgroundColor: '#f9f9f9',
+    color: '#1A1A1A',
   },
   inputError: {
     borderColor: '#ff4444',
