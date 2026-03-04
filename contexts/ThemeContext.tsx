@@ -3,13 +3,8 @@
  * Предоставляет доступ к текущей теме и функции переключения
  */
 
-import { darkTheme, lightTheme, Theme } from '@/constants/theme';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
-import { Appearance, ColorSchemeName } from 'react-native';
-
-// Ключ для сохранения настройки в AsyncStorage
-const THEME_STORAGE_KEY = '@app:theme_mode';
+import { lightTheme, Theme } from '@/constants/theme';
+import React, { createContext, ReactNode, useContext, useState } from 'react';
 
 // Типы темы
 export type ThemeMode = 'light' | 'dark' | 'auto';
@@ -36,55 +31,27 @@ interface ThemeProviderProps {
  */
 export function ThemeProvider({ children }: ThemeProviderProps) {
   const [themeMode, setThemeModeState] = useState<ThemeMode>('light');
-  const [systemTheme, setSystemTheme] = useState<ColorSchemeName>(Appearance.getColorScheme());
 
-  // Определяем текущую тему на основе режима и системных настроек
+  // Приложение работает только в светлой теме независимо от системных настроек.
   const getActiveTheme = (): Theme => {
-    if (themeMode === 'auto') {
-      return systemTheme === 'dark' ? darkTheme : lightTheme;
-    }
-    return themeMode === 'dark' ? darkTheme : lightTheme;
+    return lightTheme;
   };
 
   const theme = getActiveTheme();
   const isDark = theme.isDark;
 
-  // Загружаем сохраненную тему при монтировании
-  useEffect(() => {
-    loadSavedTheme();
-    
-    // Подписываемся на изменения системной темы
-    const subscription = Appearance.addChangeListener(({ colorScheme }) => {
-      setSystemTheme(colorScheme);
-    });
-
-    return () => subscription.remove();
-  }, []);
-
-  // Загрузка сохраненной темы
-  const loadSavedTheme = async () => {
-    try {
-      const savedTheme = await AsyncStorage.getItem(THEME_STORAGE_KEY);
-      if (savedTheme && (savedTheme === 'light' || savedTheme === 'dark' || savedTheme === 'auto')) {
-        setThemeModeState(savedTheme);
-      }
-    } catch (error) {
-    }
-  };
-
   // Установка темы
   const setThemeMode = async (mode: ThemeMode) => {
-    try {
-      setThemeModeState(mode);
-      await AsyncStorage.setItem(THEME_STORAGE_KEY, mode);
-    } catch (error) {
+    if (mode !== 'light') {
+      setThemeModeState('light');
+      return;
     }
+    setThemeModeState('light');
   };
 
   // Переключение между светлой и темной темой
   const toggleTheme = async () => {
-    const newMode = isDark ? 'light' : 'dark';
-    await setThemeMode(newMode);
+    await setThemeMode('light');
   };
 
   const value: ThemeContextType = {
