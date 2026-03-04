@@ -87,7 +87,7 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     gap: AVATAR_SIZE * 0.1875,
-    paddingHorizontal: 10,
+    paddingHorizontal: 0,
     paddingVertical: 4,
   },
   sellerItem: {
