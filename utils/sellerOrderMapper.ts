@@ -46,6 +46,19 @@ export function mapSellerPurchaseToOrder(
   getShopById: (id: number) => Shop | undefined,
   getOfferById?: (id: number) => Offer | undefined
 ): SellerOrder {
+  const offerResultBuckets = (purchase.offer_results || []).reduce<Record<number, any[]>>(
+    (acc, result) => {
+      const offerId = Number(result.offer_id);
+      if (!acc[offerId]) {
+        acc[offerId] = [];
+      }
+      acc[offerId].push(result);
+      return acc;
+    },
+    {}
+  );
+  const offerResultCursor: Record<number, number> = {};
+
   const items: SellerOrderItem[] = purchase.purchase_offers.map((purchaseOffer, index) => {
     const offer = getOfferById?.(purchaseOffer.offer_id);
     const shopId = purchaseOffer.offer?.shop_id ?? offer?.shopId ?? null;
@@ -54,19 +67,14 @@ export function mapSellerPurchaseToOrder(
       purchaseOffer.offer?.product?.name ||
       offer?.productName ||
       `Товар #${purchaseOffer.offer?.product_id ?? purchaseOffer.offer_id}`;
+    const offerId = Number(purchaseOffer.offer_id);
+    const cursor = offerResultCursor[offerId] ?? 0;
+    const matchedOfferResult = offerResultBuckets[offerId]?.[cursor];
+    offerResultCursor[offerId] = cursor + 1;
 
-    const purchaseOfferResultId =
-      purchaseOffer.purchase_offer_result?.id ??
-      purchaseOffer.purchase_offer_result_id ??
-      null;
-    const refundedQuantity =
-      purchaseOffer.purchase_offer_result?.refunded_quantity ??
-      purchaseOffer.refunded_quantity ??
-      0;
-    const moneyFlowStatus =
-      purchaseOffer.purchase_offer_result?.money_flow_status ??
-      purchaseOffer.money_flow_status ??
-      null;
+    const purchaseOfferResultId = matchedOfferResult?.id ?? null;
+    const refundedQuantity = Number(matchedOfferResult?.refunded_quantity || 0);
+    const moneyFlowStatus = matchedOfferResult?.money_flow_status ?? null;
 
     return {
       id: index + 1,
@@ -82,7 +90,7 @@ export function mapSellerPurchaseToOrder(
       fulfilledQuantity: purchaseOffer.fulfilled_quantity,
       unfulfilledReason: purchaseOffer.unfulfilled_reason,
       purchaseOfferResultId,
-      refundedQuantity: Number(refundedQuantity) || 0,
+      refundedQuantity,
       moneyFlowStatus,
     };
   });

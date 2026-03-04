@@ -174,8 +174,10 @@ export default function AdminOrdersScreen() {
     return colors[status];
   };
 
-  const getItemBadge = (item: { refundedQuantity: number; quantity: number; fulfillmentStatus: any }) => {
-    const isFullyRefunded = item.quantity > 0 && item.refundedQuantity >= item.quantity;
+  const getItemBadge = (item: { refundedQuantity: number; quantity: number; fulfillmentStatus: any; moneyFlowStatus: string | null }) => {
+    const isFullyRefunded =
+      item.moneyFlowStatus === 'at_user' ||
+      (item.quantity > 0 && item.refundedQuantity >= item.quantity);
     const isPartiallyRefunded = item.refundedQuantity > 0 && item.refundedQuantity < item.quantity;
 
     if (isFullyRefunded) {
@@ -335,11 +337,12 @@ export default function AdminOrdersScreen() {
         )}
       </View>
 
-      <StandardModal
-        visible={showFilters}
-        onClose={() => setShowFilters(false)}
-        heightPercent={0.8}
-      >
+      {showFilters && (
+        <StandardModal
+          visible={showFilters}
+          onClose={() => setShowFilters(false)}
+          heightPercent={0.8}
+        >
           <View style={styles.filterModal}>
             <View style={styles.filterHeader}>
               <Text style={styles.filterTitle}>Фильтры</Text>
@@ -412,7 +415,8 @@ export default function AdminOrdersScreen() {
               </TouchableOpacity>
             </View>
           </View>
-      </StandardModal>
+        </StandardModal>
+      )}
     </TabScreen>
   );
 }

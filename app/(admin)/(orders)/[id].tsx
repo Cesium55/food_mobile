@@ -180,8 +180,10 @@ export default function OrderDetailScreen() {
     return null;
   };
 
-  const getItemBadge = (item: { refundedQuantity: number; quantity: number; fulfillmentStatus: any }) => {
-    const isFullyRefunded = item.quantity > 0 && item.refundedQuantity >= item.quantity;
+  const getItemBadge = (item: { refundedQuantity: number; quantity: number; fulfillmentStatus: any; moneyFlowStatus: string | null }) => {
+    const isFullyRefunded =
+      item.moneyFlowStatus === 'at_user' ||
+      (item.quantity > 0 && item.refundedQuantity >= item.quantity);
     const isPartiallyRefunded = item.refundedQuantity > 0 && item.refundedQuantity < item.quantity;
 
     if (isFullyRefunded) {
@@ -198,7 +200,10 @@ export default function OrderDetailScreen() {
     };
   };
 
-  const getRefundableLeft = (item: { quantity: number; refundedQuantity: number }) => {
+  const getRefundableLeft = (item: { quantity: number; refundedQuantity: number; moneyFlowStatus: string | null }) => {
+    if (item.moneyFlowStatus === 'at_user') {
+      return 0;
+    }
     const alreadyRefunded = item.refundedQuantity ?? 0;
     return Math.max(0, item.quantity - alreadyRefunded);
   };

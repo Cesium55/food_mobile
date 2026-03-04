@@ -193,6 +193,7 @@ export default function OrderPaidScreen() {
         setLoading(true);
         // Загружаем данные заказа
         const purchase = await getPurchaseById(parseInt(params.purchaseId));
+        const purchaseOfferResults = (purchase as any).offer_results || [];
         
         // Если заказ отменен, не загружаем платеж
         if (purchase.status === 'cancelled') {
@@ -260,15 +261,17 @@ export default function OrderPaidScreen() {
             purchase_offers: purchase.purchase_offers || [],
             ttl: purchase.ttl || 0,
           },
-          offer_results: purchase.purchase_offers?.map(po => ({
-            offer_id: po.offer_id,
-            status: 'success' as const,
-            quantity: po.quantity,
-            current_cost: po.offer?.current_cost || po.cost_at_purchase || '0.00',
-            original_cost: po.offer?.original_cost || po.cost_at_purchase || '0.00',
-            requested_quantity: po.quantity,
-            message: '',
-          })) || [],
+          offer_results: purchaseOfferResults.length > 0
+            ? purchaseOfferResults
+            : purchase.purchase_offers?.map(po => ({
+                offer_id: po.offer_id,
+                status: 'success' as const,
+                quantity: po.quantity,
+                current_cost: po.offer?.current_cost || po.cost_at_purchase || '0.00',
+                original_cost: po.offer?.original_cost || po.cost_at_purchase || '0.00',
+                requested_quantity: po.quantity,
+                message: '',
+              })) || [],
           total_processed: purchase.purchase_offers?.length || 0,
           total_failed: 0,
         };
@@ -346,9 +349,26 @@ export default function OrderPaidScreen() {
   }
 
   const purchase = orderData.purchase;
+  const offerResultBuckets = (orderData.offer_results || []).reduce<Record<number, any[]>>(
+    (acc, result: any) => {
+      const offerId = Number(result.offer_id);
+      if (!acc[offerId]) {
+        acc[offerId] = [];
+      }
+      acc[offerId].push(result);
+      return acc;
+    },
+    {}
+  );
+  const offerResultCursor: Record<number, number> = {};
+
   // Группируем товары по продавцам из purchase_offers
   const sellerGroups = purchase.purchase_offers.reduce((groups, po) => {
     const offer = getOfferById(po.offer_id);
+    const offerId = Number(po.offer_id);
+    const cursor = offerResultCursor[offerId] ?? 0;
+    const matchedOfferResult = offerResultBuckets[offerId]?.[cursor];
+    offerResultCursor[offerId] = cursor + 1;
     
     // Используем данные из API напрямую, если оффер не загружен
     const productName = (po.offer as any)?.product?.name 
@@ -387,15 +407,8 @@ export default function OrderPaidScreen() {
       shopId: shopId,
       fulfilledQuantity: (po as any).fulfilled_quantity || 0,
       fulfillmentStatus: (po as any).fulfillment_status,
-      refundedQuantity: Number(
-        (po as any).purchase_offer_result?.refunded_quantity ??
-        (po as any).refunded_quantity ??
-        0
-      ) || 0,
-      moneyFlowStatus:
-        (po as any).purchase_offer_result?.money_flow_status ??
-        (po as any).money_flow_status ??
-        null,
+      refundedQuantity: Number((matchedOfferResult as any)?.refunded_quantity || 0),
+      moneyFlowStatus: (matchedOfferResult as any)?.money_flow_status ?? null,
       imageUrl: imageUrl,
     });
 

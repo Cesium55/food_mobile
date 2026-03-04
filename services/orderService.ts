@@ -54,6 +54,7 @@ export interface Purchase {
   created_at: string;
   updated_at: string;
   purchase_offers: PurchaseOffer[];
+  offer_results?: OfferResult[];
   ttl: number; // Время бронирования в секундах
 }
 
@@ -379,6 +380,7 @@ export async function getPurchaseById(purchaseId: number): Promise<Purchase> {
       created_at: rawData.created_at,
       updated_at: rawData.updated_at,
       purchase_offers: rawData.purchase_offers || [],
+      offer_results: rawData.offer_results || [],
       ttl: rawData.ttl || 0,
     };
 

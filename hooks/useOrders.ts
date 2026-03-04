@@ -33,9 +33,29 @@ export const useOrders = () => {
   const { getOfferById } = useOffers();
   const { getShopById } = useShops();
 
+  const createOfferResultMatcher = (offerResults?: any[]) => {
+    const buckets = (offerResults || []).reduce<Record<number, any[]>>((acc, result) => {
+      const offerId = Number(result.offer_id);
+      if (!acc[offerId]) {
+        acc[offerId] = [];
+      }
+      acc[offerId].push(result);
+      return acc;
+    }, {});
+    const cursor: Record<number, number> = {};
+
+    return (offerId: number) => {
+      const idx = cursor[offerId] ?? 0;
+      const matched = buckets[offerId]?.[idx];
+      cursor[offerId] = idx + 1;
+      return matched;
+    };
+  };
+
   // Преобразуем CreateOrderResponse в Order
   const convertToOrder = useCallback((orderData: CreateOrderResponse): Order => {
     const purchase = orderData.purchase;
+    const takeOfferResult = createOfferResultMatcher(orderData.offer_results as any[]);
     const items: OrderItem[] = [];
     const shopsSet = new Set<string>();
 
@@ -51,11 +71,9 @@ export const useOrders = () => {
       const productName = (po.offer as any)?.product?.name 
         || offer?.productName 
         || `Товар #${po.offer.product_id}`;
-      const refundedQuantity = Number(
-        po?.purchase_offer_result?.refunded_quantity ?? po?.refunded_quantity ?? 0
-      ) || 0;
-      const moneyFlowStatus =
-        po?.purchase_offer_result?.money_flow_status ?? po?.money_flow_status ?? null;
+      const matched = takeOfferResult(Number(po.offer_id));
+      const refundedQuantity = Number(matched?.refunded_quantity || 0);
+      const moneyFlowStatus = matched?.money_flow_status ?? null;
       
       items.push({
         id: index + 1,
@@ -123,6 +141,7 @@ export const useOrders = () => {
       // Используем convertToOrder напрямую, чтобы избежать проблем с зависимостями
       const ordersList = history.map(orderData => {
         const purchase = orderData.purchase;
+        const takeOfferResult = createOfferResultMatcher(orderData.offer_results as any[]);
         const items: OrderItem[] = [];
         const shopsSet = new Set<string>();
 
@@ -137,11 +156,9 @@ export const useOrders = () => {
           const productName = (po.offer as any)?.product?.name 
             || offer?.productName 
             || `Товар #${po.offer.product_id}`;
-          const refundedQuantity = Number(
-            po?.purchase_offer_result?.refunded_quantity ?? po?.refunded_quantity ?? 0
-          ) || 0;
-          const moneyFlowStatus =
-            po?.purchase_offer_result?.money_flow_status ?? po?.money_flow_status ?? null;
+          const matched = takeOfferResult(Number(po.offer_id));
+          const refundedQuantity = Number(matched?.refunded_quantity || 0);
+          const moneyFlowStatus = matched?.money_flow_status ?? null;
           
           items.push({
             id: index + 1,
@@ -211,6 +228,7 @@ export const useOrders = () => {
       const allPaid = [...paid, ...confirmed];
       const ordersList = allPaid.map(orderData => {
         const purchase = orderData.purchase;
+        const takeOfferResult = createOfferResultMatcher(orderData.offer_results as any[]);
         const items: OrderItem[] = [];
         const shopsSet = new Set<string>();
 
@@ -225,11 +243,9 @@ export const useOrders = () => {
           const productName = (po.offer as any)?.product?.name 
             || offer?.productName 
             || `Товар #${po.offer.product_id}`;
-          const refundedQuantity = Number(
-            po?.purchase_offer_result?.refunded_quantity ?? po?.refunded_quantity ?? 0
-          ) || 0;
-          const moneyFlowStatus =
-            po?.purchase_offer_result?.money_flow_status ?? po?.money_flow_status ?? null;
+          const matched = takeOfferResult(Number(po.offer_id));
+          const refundedQuantity = Number(matched?.refunded_quantity || 0);
+          const moneyFlowStatus = matched?.money_flow_status ?? null;
           
           items.push({
             id: index + 1,
@@ -334,6 +350,7 @@ export const useOrders = () => {
       const allPaid = [...paid, ...confirmed];
       const ordersList = allPaid.map(orderData => {
         const purchase = orderData.purchase;
+        const takeOfferResult = createOfferResultMatcher(orderData.offer_results as any[]);
         const items: OrderItem[] = [];
         const shopsSet = new Set<string>();
 
@@ -348,11 +365,9 @@ export const useOrders = () => {
           const productName = (po.offer as any)?.product?.name 
             || offer?.productName 
             || `Товар #${po.offer.product_id}`;
-          const refundedQuantity = Number(
-            po?.purchase_offer_result?.refunded_quantity ?? po?.refunded_quantity ?? 0
-          ) || 0;
-          const moneyFlowStatus =
-            po?.purchase_offer_result?.money_flow_status ?? po?.money_flow_status ?? null;
+          const matched = takeOfferResult(Number(po.offer_id));
+          const refundedQuantity = Number(matched?.refunded_quantity || 0);
+          const moneyFlowStatus = matched?.money_flow_status ?? null;
           
           items.push({
             id: index + 1,
