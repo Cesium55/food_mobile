@@ -12,6 +12,8 @@ import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Keyboard,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -19,6 +21,7 @@ import {
   TouchableOpacity,
   View
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 function sortMessages(messages: SupportMessage[]): SupportMessage[] {
   return [...messages].sort((a, b) => {
@@ -65,6 +68,8 @@ export default function SupportScreen() {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [errorText, setErrorText] = useState<string | null>(null);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const insets = useSafeAreaInsets();
 
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -232,8 +237,37 @@ export default function SupportScreen() {
     }
   }, [messages.length]);
 
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+
+    const showSub = Keyboard.addListener(showEvent, (event) => {
+      setKeyboardHeight(event.endCoordinates.height);
+    });
+
+    const hideSub = Keyboard.addListener(hideEvent, () => {
+      setKeyboardHeight(0);
+    });
+
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
+
+  const keyboardOffset = Platform.OS === 'ios'
+    ? Math.max(0, keyboardHeight - insets.bottom)
+    : keyboardHeight;
+
   return (
-    <ScreenWrapper title="Поддержка" onRefresh={loadChat} refreshing={loading} useScrollView={false}>
+    <ScreenWrapper
+      title="Поддержка"
+      onRefresh={loadChat}
+      refreshing={loading}
+      useScrollView={false}
+      avoidKeyboard={false}
+    >
+      <View style={[styles.screenContent, { paddingBottom: keyboardOffset }]}>
         <View style={styles.messagesSection}>
           {loading ? (
             <View style={styles.loaderContainer}>
@@ -244,7 +278,10 @@ export default function SupportScreen() {
             <ScrollView
               ref={scrollRef}
               style={styles.scroll}
-              contentContainerStyle={styles.scrollContent}
+              contentContainerStyle={[
+                styles.scrollContent,
+                messages.length > 0 && styles.scrollContentBottom,
+              ]}
               showsVerticalScrollIndicator={false}
               onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}
             >
@@ -318,11 +355,18 @@ export default function SupportScreen() {
             <IconSymbol name="paperplane.fill" size={18} color="#fff" />
           </TouchableOpacity>
         </View>
+      </View>
     </ScreenWrapper>
   );
 }
 
 const styles = StyleSheet.create({
+  screenContent: {
+    flex: 1,
+    marginTop: -40,
+    paddingTop: 40,
+    backgroundColor: '#eee',
+  },
   container: {
     flex: 1,
     paddingTop: 20,
@@ -347,8 +391,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
+    flexGrow: 1,
     paddingHorizontal: 12,
     paddingVertical: 12,
+  },
+  scrollContentBottom: {
+    justifyContent: 'flex-end',
   },
   emptyContainer: {
     paddingVertical: 40,

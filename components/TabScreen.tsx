@@ -36,7 +36,6 @@ export function TabScreen({
   const segments = useSegments();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const insets = useSafeAreaInsets();
-  const styles = createStyles(colors, insets.top);
 
   // Определяем, находимся ли мы в админ-режиме
   // Проверяем через сегменты пути (более надежно) и pathname
@@ -59,6 +58,7 @@ export function TabScreen({
   const shouldShowTopBar = showTopBar !== undefined 
     ? showTopBar 
     : !isAdminMode;
+  const styles = createStyles(colors, insets.top);
   
   // Отладочный вывод (можно убрать после проверки)
   // console.log('TabScreen Debug:', { pathname, segments, isAdminMode, shouldShowTopBar, showTopBar });

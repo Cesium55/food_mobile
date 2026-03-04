@@ -119,18 +119,6 @@ export default function Profile() {
             <View style={styles.container}>
                 <UserCard user={user} />
                 
-                {/* Текущие заказы */}
-                {loading ? (
-                    <View style={styles.loadingContainer}>
-                        <ActivityIndicator size="small" color="#4CAF50" />
-                        <Text style={styles.loadingText}>Загрузка заказов...</Text>
-                    </View>
-                ) : currentOrders.length > 0 ? (
-                    <View style={styles.ordersSection}>
-                        <CurrentOrders orders={currentOrders} />
-                    </View>
-                ) : null}
-                
                 <View style={styles.menuSection}>
                     <FullWidthLink 
                         href="/(tabs)/(profile)/settings"
@@ -159,6 +147,18 @@ export default function Profile() {
                         <Text style={styles.adminButtonText}>Перейти в режим администратора</Text>
                     </TouchableOpacity>
                 )}
+
+                {/* Текущие заказы */}
+                {loading ? (
+                    <View style={styles.loadingContainer}>
+                        <ActivityIndicator size="small" color="#4CAF50" />
+                        <Text style={styles.loadingText}>Загрузка заказов...</Text>
+                    </View>
+                ) : currentOrders.length > 0 ? (
+                    <View style={styles.ordersSection}>
+                        <CurrentOrders orders={currentOrders} />
+                    </View>
+                ) : null}
 
                 {/* Кнопка старта процесса регистрации продавца - только для обычных пользователей */}
                 {!user.is_seller && (

@@ -111,6 +111,7 @@ export function MiniOfferCard({ offer, distance, onPress, showCheaperBadge = fal
         shopImageUri={shopImageUri}
         shopInitial={shopInitial}
         timeLeftText={timeLeftText}
+        discountPercent={offer.discount}
         hasDynamicPricing={hasDynamicPricing}
         willBecomeCheaper={willBecomeCheaper}
       />

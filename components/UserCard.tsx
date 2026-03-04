@@ -16,28 +16,18 @@ interface UserCardProps {
 export function UserCard({ user }: UserCardProps) {
   return (
     <View style={styles.userCard}>
-      <View style={styles.userIconContainer}>
-        <IconSymbol 
-          name="person.circle.fill" 
-          size={60} 
-          color="#007AFF" 
-          style={styles.userIcon}
-        />
-      </View>
-      <Text style={styles.userEmail}>
-        {user.phone || user.email || 'Не указан'}
-      </Text>
-      <View style={styles.statusContainer}>
-        <View style={[styles.statusBadge, user.verified ? styles.verified : styles.unverified]}>
-          <Text style={styles.statusText}>
-            {user.verified ? 'Verified' : 'Unverified'}
-          </Text>
+      <View style={styles.userRow}>
+        <View style={styles.userIconContainer}>
+          <IconSymbol 
+            name="person.circle.fill" 
+            size={48} 
+            color="#007AFF" 
+            style={styles.userIcon}
+          />
         </View>
-        <View style={[styles.statusBadge, user.active ? styles.active : styles.inactive]}>
-          <Text style={styles.statusText}>
-            {user.active ? 'Active' : 'Inactive'}
-          </Text>
-        </View>
+        <Text style={styles.userEmail} numberOfLines={1}>
+          {user.phone || user.email || 'Не указан'}
+        </Text>
       </View>
     </View>
   );
@@ -47,50 +37,26 @@ const styles = StyleSheet.create({
   userCard: {
     backgroundColor: '#ffffff',
     borderRadius: 28,
-    padding: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
     marginBottom: 12,
   },
+  userRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   userIconContainer: {
-    alignSelf: 'center',
-    marginBottom: 15,
+    marginRight: 10,
     borderRadius: 28,
     overflow: 'hidden',
   },
   userIcon: {
-    alignSelf: 'center',
+    alignSelf: 'flex-start',
   },
   userEmail: {
+    flex: 1,
     fontSize: 18,
     fontWeight: '600',
     color: '#333',
-    marginBottom: 15,
-    textAlign: 'center',
-  },
-  statusContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 10,
-  },
-  statusBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-  },
-  verified: {
-    backgroundColor: '#d4edda',
-  },
-  unverified: {
-    backgroundColor: '#f8d7da',
-  },
-  active: {
-    backgroundColor: '#d1ecf1',
-  },
-  inactive: {
-    backgroundColor: '#f5c6cb',
-  },
-  statusText: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: '#495057',
   },
 });

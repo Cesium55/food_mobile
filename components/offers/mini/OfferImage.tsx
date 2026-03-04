@@ -11,11 +11,12 @@ interface OfferImageProps {
   shopImageUri: string | null;
   shopInitial: string;
   timeLeftText: string;
+  discountPercent?: number;
   hasDynamicPricing?: boolean;
   willBecomeCheaper?: boolean;
 }
 
-export function OfferImage({ imageUri, shopImageUri, shopInitial, timeLeftText, hasDynamicPricing = false, willBecomeCheaper = false }: OfferImageProps) {
+export function OfferImage({ imageUri, shopImageUri, shopInitial, timeLeftText, discountPercent = 0, hasDynamicPricing = false, willBecomeCheaper = false }: OfferImageProps) {
   const styles = useThemedStyles(createStyles);
   const [imageError, setImageError] = useState(false);
   const [shopImageError, setShopImageError] = useState(false);
@@ -40,6 +41,13 @@ export function OfferImage({ imageUri, shopImageUri, shopInitial, timeLeftText, 
         </View>
       )}
       
+      {/* Бейдж скидки */}
+      {discountPercent > 0 && (
+        <View style={styles.discountBadge}>
+          <Text style={styles.discountText}>-{discountPercent}%</Text>
+        </View>
+      )}
+
       {/* Плашка "Станет дешевле" для товаров с динамической ценой, которые могут подешеветь */}
       {willBecomeCheaper && (
         <View style={styles.dynamicPricingBadge}>
@@ -127,10 +135,27 @@ const createStyles = (tokens: any) => {
       color: colors.common.white,
     },
     
+    discountBadge: {
+      position: 'absolute',
+      top: spacing.sm,
+      right: spacing.sm,
+      backgroundColor: '#FF5252',
+      paddingHorizontal: spacing.sm,
+      paddingVertical: spacing.xs,
+      borderRadius: borderRadius.sm,
+      zIndex: 120,
+      elevation: 12,
+    },
+    discountText: {
+      fontSize: typography.fontSize.xs,
+      fontFamily: typography.fontFamily.semibold,
+      color: colors.common.white,
+    },
+
     // Плашка "Станет дешевле"
     dynamicPricingBadge: {
       position: 'absolute',
-      top: spacing.sm,
+      top: spacing.sm + 24,
       right: spacing.sm,
       backgroundColor: '#2196F3', // Синий цвет
       paddingHorizontal: spacing.sm,

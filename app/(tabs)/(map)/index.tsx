@@ -12,7 +12,7 @@ export default function Map() {
   }, [status, coords, error]);
 
   return (
-    <TabScreen useScrollView={false}>
+    <TabScreen>
       <View style={styles.mapContainer}>
         <YandexMapsWebView />
       </View>
@@ -23,6 +23,7 @@ export default function Map() {
 const styles = StyleSheet.create({
   mapContainer: {
     flex: 1,
+    marginTop: -40,
   },
 });
 

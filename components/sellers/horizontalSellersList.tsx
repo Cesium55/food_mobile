@@ -22,6 +22,9 @@ export default function HorizontalSellersList() {
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
+      bounces={false}
+      alwaysBounceHorizontal={false}
+      overScrollMode="never"
       style={styles.container}
       contentContainerStyle={styles.contentContainer}
     >
@@ -80,9 +83,12 @@ function SellerAvatar({ seller, onPress }: SellerAvatarProps) {
 const styles = StyleSheet.create({
   container: {
     width: '100%',
+    overflow: 'visible',
   },
   contentContainer: {
     gap: AVATAR_SIZE * 0.1875,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
   },
   sellerItem: {
     alignItems: 'center',
