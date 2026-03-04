@@ -19,6 +19,45 @@ export interface PaymentWithConfirmation extends Payment {
   confirmation_url?: string;
 }
 
+export interface SellerSystemBalance {
+  seller_id: number;
+  system_balance: string;
+  issued_goods_balance: string;
+  issued_goods_older_than_week_balance: string;
+  currency: string;
+}
+
+export interface RefundByOfferResultItemRequest {
+  purchase_offer_result_id: number;
+  quantity: number;
+}
+
+export interface RefundByOfferResultsRequest {
+  items: RefundByOfferResultItemRequest[];
+  reason: string;
+}
+
+export interface RefundByOfferResultsResponse {
+  refund: {
+    id: number;
+    payment_id: number;
+    amount: string;
+    currency: string;
+    reason: string | null;
+    yookassa_refund_id: string | null;
+    created_at: string;
+    updated_at: string;
+  };
+  purchase_id: number;
+  seller_id: number;
+  items: {
+    purchase_offer_result_id: number;
+    refunded_quantity: number;
+    total_refunded_quantity: number;
+    refundable_quantity_left: number;
+  }[];
+}
+
 /**
  * Получает платеж по purchase_id
  * Платеж создается автоматически при создании заказа
@@ -238,4 +277,63 @@ export async function getPurchaseToken(purchaseId: number): Promise<string> {
   return token;
 }
 
+/**
+ * Делает частичный/полный возврат по результатам выдачи
+ */
+export async function refundByOfferResults(
+  data: RefundByOfferResultsRequest
+): Promise<RefundByOfferResultsResponse> {
+  const response = await authFetch(
+    getApiUrl(API_ENDPOINTS.PAYMENTS.REFUNDS_BY_OFFER_RESULTS),
+    {
+      method: 'POST',
+      requireAuth: true,
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    }
+  );
 
+  if (response.status === 400) {
+    const errorText = await response.text();
+    throw new Error(`Неверные данные для возврата: ${errorText}`);
+  }
+
+  if (response.status === 403) {
+    throw new Error('Нет доступа к выполнению возврата');
+  }
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Ошибка выполнения возврата: ${response.status} ${errorText}`);
+  }
+
+  const responseData = await response.json();
+  return responseData.data || responseData;
+}
+
+/**
+ * Получает системный баланс текущего продавца
+ */
+export async function getSellerSystemBalance(): Promise<SellerSystemBalance> {
+  const response = await authFetch(
+    getApiUrl(API_ENDPOINTS.SELLERS.SYSTEM_BALANCE),
+    {
+      method: 'GET',
+      requireAuth: true,
+    }
+  );
+
+  if (response.status === 403) {
+    throw new Error('Нет доступа к балансу продавца');
+  }
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Ошибка загрузки баланса: ${response.status} ${errorText}`);
+  }
+
+  const responseData = await response.json();
+  return responseData.data || responseData;
+}

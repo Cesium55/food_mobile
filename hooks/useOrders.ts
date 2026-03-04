@@ -9,6 +9,8 @@ export interface OrderItem {
   quantity: number;
   price: string; // decimal формат
   shopName: string;
+  refundedQuantity: number;
+  moneyFlowStatus: 'at_user' | 'in_system' | 'at_seller' | string | null;
 }
 
 export interface Order {
@@ -49,6 +51,11 @@ export const useOrders = () => {
       const productName = (po.offer as any)?.product?.name 
         || offer?.productName 
         || `Товар #${po.offer.product_id}`;
+      const refundedQuantity = Number(
+        po?.purchase_offer_result?.refunded_quantity ?? po?.refunded_quantity ?? 0
+      ) || 0;
+      const moneyFlowStatus =
+        po?.purchase_offer_result?.money_flow_status ?? po?.money_flow_status ?? null;
       
       items.push({
         id: index + 1,
@@ -56,6 +63,8 @@ export const useOrders = () => {
         quantity: po.quantity,
         price: po.cost_at_purchase,
         shopName,
+        refundedQuantity,
+        moneyFlowStatus,
       });
     });
 
@@ -128,6 +137,11 @@ export const useOrders = () => {
           const productName = (po.offer as any)?.product?.name 
             || offer?.productName 
             || `Товар #${po.offer.product_id}`;
+          const refundedQuantity = Number(
+            po?.purchase_offer_result?.refunded_quantity ?? po?.refunded_quantity ?? 0
+          ) || 0;
+          const moneyFlowStatus =
+            po?.purchase_offer_result?.money_flow_status ?? po?.money_flow_status ?? null;
           
           items.push({
             id: index + 1,
@@ -135,6 +149,8 @@ export const useOrders = () => {
             quantity: po.quantity,
             price: po.cost_at_purchase,
             shopName,
+            refundedQuantity,
+            moneyFlowStatus,
           });
         });
 
@@ -209,6 +225,11 @@ export const useOrders = () => {
           const productName = (po.offer as any)?.product?.name 
             || offer?.productName 
             || `Товар #${po.offer.product_id}`;
+          const refundedQuantity = Number(
+            po?.purchase_offer_result?.refunded_quantity ?? po?.refunded_quantity ?? 0
+          ) || 0;
+          const moneyFlowStatus =
+            po?.purchase_offer_result?.money_flow_status ?? po?.money_flow_status ?? null;
           
           items.push({
             id: index + 1,
@@ -216,6 +237,8 @@ export const useOrders = () => {
             quantity: po.quantity,
             price: po.cost_at_purchase,
             shopName,
+            refundedQuantity,
+            moneyFlowStatus,
           });
         });
 
@@ -325,6 +348,11 @@ export const useOrders = () => {
           const productName = (po.offer as any)?.product?.name 
             || offer?.productName 
             || `Товар #${po.offer.product_id}`;
+          const refundedQuantity = Number(
+            po?.purchase_offer_result?.refunded_quantity ?? po?.refunded_quantity ?? 0
+          ) || 0;
+          const moneyFlowStatus =
+            po?.purchase_offer_result?.money_flow_status ?? po?.money_flow_status ?? null;
           
           items.push({
             id: index + 1,
@@ -332,6 +360,8 @@ export const useOrders = () => {
             quantity: po.quantity,
             price: po.cost_at_purchase,
             shopName,
+            refundedQuantity,
+            moneyFlowStatus,
           });
         });
 
@@ -378,4 +408,3 @@ export const useOrders = () => {
     refetchOrders,
   };
 };
-

@@ -20,7 +20,7 @@ function SellerGroup({
 }: {
   sellerId: number;
   shopId: number;
-  items: Array<{ offerId: number; productName: string; quantity: number; currentCost: string; originalCost: string; shopId: number; fulfilledQuantity: number; fulfillmentStatus?: string; imageUrl: string | null }>
+  items: { offerId: number; productName: string; quantity: number; currentCost: string; originalCost: string; shopId: number; fulfilledQuantity: number; fulfillmentStatus?: string; refundedQuantity: number; moneyFlowStatus?: string | null; imageUrl: string | null }[]
 }) {
   const { seller } = usePublicSeller(sellerId);
   const { shopPoint } = useShopPoint(shopId);
@@ -43,6 +43,13 @@ function SellerGroup({
       openModal(content);
     }
   }
+
+  const getMoneyFlowLabel = (status?: string | null) => {
+    if (status === 'at_user') return 'Деньги у покупателя';
+    if (status === 'in_system') return 'Деньги в системе';
+    if (status === 'at_seller') return 'Деньги у продавца';
+    return null;
+  };
 
   return (
     <View style={styles.shopSection}>
@@ -129,6 +136,18 @@ function SellerGroup({
                 <Text style={statusStyle}>
                   {statusText}
                 </Text>
+                {item.refundedQuantity > 0 ? (
+                  <Text style={styles.refundText}>
+                    {item.refundedQuantity >= item.quantity
+                      ? `Полный возврат: ${item.refundedQuantity} шт.`
+                      : `Частичный возврат: ${item.refundedQuantity} шт.`}
+                  </Text>
+                ) : null}
+                {getMoneyFlowLabel(item.moneyFlowStatus) ? (
+                  <Text style={styles.moneyFlowText}>
+                    {getMoneyFlowLabel(item.moneyFlowStatus)}
+                  </Text>
+                ) : null}
               </View>
             </View>
             <Text style={styles.itemTotal}>
@@ -327,8 +346,6 @@ export default function OrderPaidScreen() {
   }
 
   const purchase = orderData.purchase;
-  const offerResults = orderData.offer_results || [];
-
   // Группируем товары по продавцам из purchase_offers
   const sellerGroups = purchase.purchase_offers.reduce((groups, po) => {
     const offer = getOfferById(po.offer_id);
@@ -370,11 +387,20 @@ export default function OrderPaidScreen() {
       shopId: shopId,
       fulfilledQuantity: (po as any).fulfilled_quantity || 0,
       fulfillmentStatus: (po as any).fulfillment_status,
+      refundedQuantity: Number(
+        (po as any).purchase_offer_result?.refunded_quantity ??
+        (po as any).refunded_quantity ??
+        0
+      ) || 0,
+      moneyFlowStatus:
+        (po as any).purchase_offer_result?.money_flow_status ??
+        (po as any).money_flow_status ??
+        null,
       imageUrl: imageUrl,
     });
 
     return groups;
-  }, {} as Record<string, { sellerId: number; shopId: number; items: Array<{ offerId: number; productName: string; quantity: number; currentCost: string; originalCost: string; shopId: number; fulfilledQuantity: number; fulfillmentStatus?: string; imageUrl: string | null }> }>);
+  }, {} as Record<string, { sellerId: number; shopId: number; items: { offerId: number; productName: string; quantity: number; currentCost: string; originalCost: string; shopId: number; fulfilledQuantity: number; fulfillmentStatus?: string; refundedQuantity: number; moneyFlowStatus?: string | null; imageUrl: string | null }[] }>);
 
   const sellerGroupsArray = Object.values(sellerGroups);
 
@@ -639,6 +665,17 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#999',
   },
+  refundText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#B00020',
+    marginTop: 4,
+  },
+  moneyFlowText: {
+    fontSize: 11,
+    color: '#666',
+    marginTop: 2,
+  },
   totalSection: {
     backgroundColor: '#fff',
     borderRadius: 28,
@@ -709,4 +746,3 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 });
-

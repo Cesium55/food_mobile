@@ -12,9 +12,21 @@ export interface CreateOrderRequest {
 
 // Типы для ответа сервера
 export interface PurchaseOffer {
+  id?: number;
   offer_id: number;
   quantity: number;
   cost_at_purchase: string; // decimal формат
+  fulfillment_status?: 'fulfilled' | 'not_fulfilled' | 'unprocessed' | null;
+  fulfilled_quantity?: number | null;
+  fulfilled_at?: string | null;
+  purchase_offer_result_id?: number | null;
+  refunded_quantity?: number | null;
+  money_flow_status?: 'at_user' | 'in_system' | 'at_seller' | string | null;
+  purchase_offer_result?: {
+    id?: number;
+    refunded_quantity?: number | null;
+    money_flow_status?: 'at_user' | 'in_system' | 'at_seller' | string | null;
+  } | null;
   offer: {
     id: number;
     product_id: number;
@@ -49,6 +61,7 @@ export type SellerPurchaseStatus = 'pending' | 'confirmed' | 'cancelled' | 'comp
 export type SellerPurchaseFulfillmentStatus = 'fulfilled' | 'not_fulfilled' | 'unprocessed' | null;
 
 export interface SellerPurchaseOffer {
+  id?: number;
   offer_id: number;
   quantity: number;
   cost_at_purchase: string;
@@ -56,6 +69,15 @@ export interface SellerPurchaseOffer {
   fulfilled_quantity: number | null;
   fulfilled_by_seller_id: number | null;
   unfulfilled_reason: string | null;
+  fulfilled_at?: string | null;
+  purchase_offer_result_id?: number | null;
+  refunded_quantity?: number | null;
+  money_flow_status?: 'at_user' | 'in_system' | 'at_seller' | string | null;
+  purchase_offer_result?: {
+    id?: number;
+    refunded_quantity?: number | null;
+    money_flow_status?: 'at_user' | 'in_system' | 'at_seller' | string | null;
+  } | null;
   offer?: {
     id?: number;
     product_id?: number;
@@ -113,11 +135,17 @@ export interface GetSellerPurchasesParams {
 }
 
 export interface OfferResult {
+  id?: number;
+  purchase_offer_id?: number;
+  purchase_offer_result_id?: number;
   offer_id: number;
   status: 'success' | 'not_found' | 'insufficient_quantity' | 'expired';
   requested_quantity: number;
   processed_quantity?: number;
   available_quantity?: number;
+  refunded_quantity?: number;
+  total_refunded_quantity?: number;
+  money_flow_status?: 'at_user' | 'in_system' | 'at_seller' | string | null;
   message: string;
 }
 

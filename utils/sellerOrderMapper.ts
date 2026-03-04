@@ -55,8 +55,22 @@ export function mapSellerPurchaseToOrder(
       offer?.productName ||
       `Товар #${purchaseOffer.offer?.product_id ?? purchaseOffer.offer_id}`;
 
+    const purchaseOfferResultId =
+      purchaseOffer.purchase_offer_result?.id ??
+      purchaseOffer.purchase_offer_result_id ??
+      null;
+    const refundedQuantity =
+      purchaseOffer.purchase_offer_result?.refunded_quantity ??
+      purchaseOffer.refunded_quantity ??
+      0;
+    const moneyFlowStatus =
+      purchaseOffer.purchase_offer_result?.money_flow_status ??
+      purchaseOffer.money_flow_status ??
+      null;
+
     return {
       id: index + 1,
+      purchaseOfferId: purchaseOffer.id ?? null,
       offerId: purchaseOffer.offer_id,
       productName,
       quantity: purchaseOffer.quantity,
@@ -67,6 +81,9 @@ export function mapSellerPurchaseToOrder(
       fulfillmentStatus: purchaseOffer.fulfillment_status,
       fulfilledQuantity: purchaseOffer.fulfilled_quantity,
       unfulfilledReason: purchaseOffer.unfulfilled_reason,
+      purchaseOfferResultId,
+      refundedQuantity: Number(refundedQuantity) || 0,
+      moneyFlowStatus,
     };
   });
 

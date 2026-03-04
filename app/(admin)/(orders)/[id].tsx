@@ -1,6 +1,8 @@
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { StandardModal } from '@/components/ui/StandardModal';
 import { useOffers } from '@/hooks/useOffers';
 import { getSellerPurchases, SellerPurchase } from '@/services/orderService';
+import { refundByOfferResults } from '@/services/paymentService';
 import { SellerOrderStatus } from '@/types/sellerOrder';
 import {
   getFulfillmentStatusColor,
@@ -11,9 +13,11 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -30,6 +34,15 @@ export default function OrderDetailScreen() {
   const [purchase, setPurchase] = useState<SellerPurchase | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [refundModalVisible, setRefundModalVisible] = useState(false);
+  const [selectedRefundItem, setSelectedRefundItem] = useState<{
+    purchaseOfferResultId: number;
+    maxRefundable: number;
+    productName: string;
+  } | null>(null);
+  const [refundQuantity, setRefundQuantity] = useState('1');
+  const [refundReason, setRefundReason] = useState('Возврат продавцом');
+  const [refunding, setRefunding] = useState(false);
 
   const loadPurchase = useCallback(async () => {
     if (!orderId || Number.isNaN(orderId)) {
@@ -160,6 +173,99 @@ export default function OrderDetailScreen() {
   }, {} as Record<string, { shopName: string; shopAddress?: string; items: typeof order.items }>);
   const groupedItemsArray = Object.values(groupedItems);
 
+  const getMoneyFlowLabel = (status: string | null) => {
+    if (status === 'at_user') return 'Деньги у покупателя';
+    if (status === 'in_system') return 'Деньги в системе';
+    if (status === 'at_seller') return 'Деньги у продавца';
+    return null;
+  };
+
+  const getItemBadge = (item: { refundedQuantity: number; quantity: number; fulfillmentStatus: any }) => {
+    const isFullyRefunded = item.quantity > 0 && item.refundedQuantity >= item.quantity;
+    const isPartiallyRefunded = item.refundedQuantity > 0 && item.refundedQuantity < item.quantity;
+
+    if (isFullyRefunded) {
+      return { label: 'Возвращено', color: '#B00020' };
+    }
+
+    if (isPartiallyRefunded) {
+      return { label: 'Частичный возврат', color: '#C77700' };
+    }
+
+    return {
+      label: getFulfillmentStatusLabel(item.fulfillmentStatus),
+      color: getFulfillmentStatusColor(item.fulfillmentStatus),
+    };
+  };
+
+  const getRefundableLeft = (item: { quantity: number; refundedQuantity: number }) => {
+    const alreadyRefunded = item.refundedQuantity ?? 0;
+    return Math.max(0, item.quantity - alreadyRefunded);
+  };
+
+  const openRefundModal = (item: (typeof order.items)[number]) => {
+    if (!item.purchaseOfferResultId) {
+      Alert.alert('Возврат недоступен', 'Для этого товара не найден ID результата выдачи.');
+      return;
+    }
+
+    const refundableLeft = getRefundableLeft(item);
+
+    if (refundableLeft <= 0) {
+      Alert.alert('Возврат недоступен', 'Для этого товара больше нет доступного количества к возврату.');
+      return;
+    }
+
+    setSelectedRefundItem({
+      purchaseOfferResultId: item.purchaseOfferResultId,
+      maxRefundable: refundableLeft,
+      productName: item.productName,
+    });
+    setRefundQuantity(String(refundableLeft > 0 ? 1 : 0));
+    setRefundReason('Возврат продавцом');
+    setRefundModalVisible(true);
+  };
+
+  const handleSubmitRefund = async () => {
+    if (!selectedRefundItem) return;
+
+    const quantity = parseInt(refundQuantity, 10);
+    if (Number.isNaN(quantity) || quantity <= 0) {
+      Alert.alert('Ошибка', 'Укажите корректное количество для возврата.');
+      return;
+    }
+    if (quantity > selectedRefundItem.maxRefundable) {
+      Alert.alert('Ошибка', `Максимально доступно для возврата: ${selectedRefundItem.maxRefundable} шт.`);
+      return;
+    }
+    if (!refundReason.trim()) {
+      Alert.alert('Ошибка', 'Укажите причину возврата.');
+      return;
+    }
+
+    try {
+      setRefunding(true);
+      await refundByOfferResults({
+        items: [
+          {
+            purchase_offer_result_id: selectedRefundItem.purchaseOfferResultId,
+            quantity,
+          },
+        ],
+        reason: refundReason.trim(),
+      });
+
+      setRefundModalVisible(false);
+      setSelectedRefundItem(null);
+      await loadPurchase();
+      Alert.alert('Успешно', 'Возврат выполнен.');
+    } catch (refundError: any) {
+      Alert.alert('Ошибка возврата', refundError?.message || 'Не удалось выполнить возврат.');
+    } finally {
+      setRefunding(false);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       <View style={styles.header}>
@@ -216,33 +322,57 @@ export default function OrderDetailScreen() {
                 <Text style={styles.shopAddress}>{group.shopAddress}</Text>
               ) : null}
 
-              {group.items.map((item, index) => (
-                <View key={`${item.offerId}-${index}`} style={styles.itemCard}>
-                  <View style={styles.itemLeft}>
-                    <Text style={styles.itemName}>{item.productName}</Text>
-                    <Text style={styles.itemQuantity}>Количество: {item.quantity} шт</Text>
-                    <View
-                      style={[
-                        styles.itemStatusBadge,
-                        { backgroundColor: getFulfillmentStatusColor(item.fulfillmentStatus) },
-                      ]}
-                    >
-                      <Text style={styles.itemStatusText}>
-                        {getFulfillmentStatusLabel(item.fulfillmentStatus)}
-                      </Text>
+              {group.items.map((item, index) => {
+                const badge = getItemBadge(item);
+                const refundableLeft = getRefundableLeft(item);
+                return (
+                  <View key={`${item.offerId}-${index}`} style={styles.itemCard}>
+                    <View style={styles.itemLeft}>
+                      <Text style={styles.itemName}>{item.productName}</Text>
+                      <Text style={styles.itemQuantity}>Количество: {item.quantity} шт</Text>
+                      <View
+                        style={[
+                          styles.itemStatusBadge,
+                          { backgroundColor: badge.color },
+                        ]}
+                      >
+                        <Text style={styles.itemStatusText}>
+                          {badge.label}
+                        </Text>
+                      </View>
+                      {item.unfulfilledReason ? (
+                        <Text style={styles.reasonText}>Причина: {item.unfulfilledReason}</Text>
+                      ) : null}
+                      {item.refundedQuantity > 0 ? (
+                        <Text style={styles.refundedText}>
+                          {item.refundedQuantity >= item.quantity
+                            ? `Полный возврат: ${item.refundedQuantity} шт.`
+                            : `Частичный возврат: ${item.refundedQuantity} шт.`}
+                        </Text>
+                      ) : null}
+                      {getMoneyFlowLabel(item.moneyFlowStatus) ? (
+                        <Text style={styles.moneyFlowText}>{getMoneyFlowLabel(item.moneyFlowStatus)}</Text>
+                      ) : null}
                     </View>
-                    {item.unfulfilledReason ? (
-                      <Text style={styles.reasonText}>Причина: {item.unfulfilledReason}</Text>
-                    ) : null}
+                    <View style={styles.itemRight}>
+                      <Text style={styles.itemPrice}>{item.price} ₽</Text>
+                      <Text style={styles.itemTotal}>
+                        {(parseFloat(item.price || '0') * item.quantity).toFixed(2)} ₽
+                      </Text>
+                      {refundableLeft > 0 ? (
+                        <TouchableOpacity
+                          style={styles.refundButton}
+                          onPress={() => openRefundModal(item)}
+                        >
+                          <Text style={styles.refundButtonText}>Возврат</Text>
+                        </TouchableOpacity>
+                      ) : (
+                        <Text style={styles.refundDoneText}>Возврат завершен</Text>
+                      )}
+                    </View>
                   </View>
-                  <View style={styles.itemRight}>
-                    <Text style={styles.itemPrice}>{item.price} ₽</Text>
-                    <Text style={styles.itemTotal}>
-                      {(parseFloat(item.price || '0') * item.quantity).toFixed(2)} ₽
-                    </Text>
-                  </View>
-                </View>
-              ))}
+                );
+              })}
             </View>
           ))}
         </View>
@@ -261,6 +391,53 @@ export default function OrderDetailScreen() {
 
         <View style={{ height: 40 }} />
       </ScrollView>
+
+      <StandardModal
+        visible={refundModalVisible}
+        onClose={() => setRefundModalVisible(false)}
+        heightPercent={0.55}
+      >
+        <View style={styles.modalContent}>
+          <Text style={styles.modalTitle}>Оформить возврат</Text>
+          {selectedRefundItem ? (
+            <Text style={styles.modalSubtitle}>
+              {selectedRefundItem.productName}. Доступно: {selectedRefundItem.maxRefundable} шт.
+            </Text>
+          ) : null}
+
+          <View style={styles.modalField}>
+            <Text style={styles.modalLabel}>Количество</Text>
+            <TextInput
+              value={refundQuantity}
+              onChangeText={setRefundQuantity}
+              keyboardType="numeric"
+              style={styles.modalInput}
+            />
+          </View>
+
+          <View style={styles.modalField}>
+            <Text style={styles.modalLabel}>Причина</Text>
+            <TextInput
+              value={refundReason}
+              onChangeText={setRefundReason}
+              style={[styles.modalInput, styles.modalInputMultiline]}
+              multiline
+            />
+          </View>
+
+          <TouchableOpacity
+            style={[styles.modalSubmitButton, refunding && styles.modalSubmitButtonDisabled]}
+            onPress={handleSubmitRefund}
+            disabled={refunding}
+          >
+            {refunding ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <Text style={styles.modalSubmitButtonText}>Подтвердить возврат</Text>
+            )}
+          </TouchableOpacity>
+        </View>
+      </StandardModal>
     </SafeAreaView>
   );
 }
@@ -430,8 +607,20 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#666',
   },
+  refundedText: {
+    marginTop: 6,
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#B00020',
+  },
+  moneyFlowText: {
+    marginTop: 2,
+    fontSize: 11,
+    color: '#666',
+  },
   itemRight: {
     alignItems: 'flex-end',
+    gap: 6,
   },
   itemPrice: {
     fontSize: 13,
@@ -442,6 +631,22 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     color: '#333',
+  },
+  refundButton: {
+    backgroundColor: '#007AFF',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  refundButtonText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  refundDoneText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#666',
   },
   totalSection: {
     backgroundColor: '#fff',
@@ -484,5 +689,58 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: '700',
     color: '#007AFF',
+  },
+  modalContent: {
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#333',
+    marginBottom: 8,
+  },
+  modalSubtitle: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 14,
+  },
+  modalField: {
+    marginBottom: 12,
+  },
+  modalLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 6,
+  },
+  modalInput: {
+    borderWidth: 1,
+    borderColor: '#d9d9d9',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 15,
+    backgroundColor: '#fff',
+  },
+  modalInputMultiline: {
+    minHeight: 90,
+    textAlignVertical: 'top',
+  },
+  modalSubmitButton: {
+    marginTop: 8,
+    backgroundColor: '#007AFF',
+    borderRadius: 10,
+    paddingVertical: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalSubmitButtonDisabled: {
+    opacity: 0.7,
+  },
+  modalSubmitButtonText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '700',
   },
 });

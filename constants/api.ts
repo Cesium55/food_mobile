@@ -51,6 +51,7 @@ export const API_ENDPOINTS = {
     POPULAR: '/sellers/popular',
     NEARBY: '/sellers/nearby',
     BY_CATEGORY: '/sellers/category',
+    SYSTEM_BALANCE: '/sellers/me/system-balance',
     UPLOAD_IMAGE: (sellerId: number) => `/sellers/${sellerId}/images`,
     UPLOAD_IMAGES_BATCH: (sellerId: number) => `/sellers/${sellerId}/images/batch`,
     DELETE_IMAGE: (imageId: number) => `/sellers/images/${imageId}`,
@@ -123,6 +124,7 @@ export const API_ENDPOINTS = {
     CHECK: (id: number) => `/payments/${id}/check`,
     CANCEL: (id: number) => `/payments/${id}/cancel`,
     STATUS: (id: number) => `/payments/${id}/status`,
+    REFUNDS_BY_OFFER_RESULTS: '/payments/refunds/by-offer-results',
   },
 
   // Поддержка

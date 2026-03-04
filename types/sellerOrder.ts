@@ -7,6 +7,7 @@ export type SellerOrderStatus =
 
 export interface SellerOrderItem {
   id: number;
+  purchaseOfferId: number | null;
   offerId: number;
   productName: string;
   quantity: number;
@@ -17,6 +18,9 @@ export interface SellerOrderItem {
   fulfillmentStatus: SellerPurchaseFulfillmentStatus;
   fulfilledQuantity: number | null;
   unfulfilledReason: string | null;
+  purchaseOfferResultId: number | null;
+  refundedQuantity: number;
+  moneyFlowStatus: 'at_user' | 'in_system' | 'at_seller' | string | null;
 }
 
 export interface SellerOrder {

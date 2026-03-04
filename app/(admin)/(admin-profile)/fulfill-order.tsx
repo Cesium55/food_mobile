@@ -115,23 +115,13 @@ export default function FulfillOrderScreen() {
     const handleSubmit = async () => {
         if (!orderData) return;
 
-        // Валидация
-        const hasAnyFulfilled = items.some(
-            (item) => parseInt(item.inputQuantity, 10) > 0
-        );
-
-        if (!hasAnyFulfilled) {
-            Alert.alert("Внимание", "Необходимо выдать хотя бы один товар");
-            return;
-        }
-
         try {
             setSubmitting(true);
 
             // Формируем данные для отправки
             const fulfillItems: FulfillItemRequest[] = items.map((item) => {
                 const fulfilledQty = parseInt(item.inputQuantity, 10);
-                let status = "fulfilled";
+                let status: FulfillItemRequest["status"] = "fulfilled";
                 let unfulfilledReason: string | undefined;
 
                 if (fulfilledQty === 0) {
@@ -187,8 +177,8 @@ export default function FulfillOrderScreen() {
                 );
             } else {
                 Alert.alert(
-                    "Ошибка",
-                    "Не удалось выдать товары",
+                    "Заказ обработан",
+                    "Товары не выданы. Для невыданных позиций будет оформлен возврат по правилам API.",
                     [
                         {
                             text: "OK",

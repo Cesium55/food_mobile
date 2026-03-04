@@ -3,7 +3,7 @@ import { useOrders } from "@/hooks/useOrders";
 import { useOffers } from "@/hooks/useOffers";
 import { useFocusEffect, useRouter } from "expo-router";
 import React, { useCallback, useEffect } from "react";
-import { ActivityIndicator, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 export default function History() {
   const router = useRouter();
@@ -115,7 +115,7 @@ export default function History() {
                   }
                   
                   // Если заказ оплачен, подтвержден или завершен, переходим на экран оплаченного заказа
-                  if (order.status === 'paid' || order.status === 'confirmed' || order.status === 'completed') {
+                  if (order.status === 'paid' || order.status === 'completed') {
                     router.push({
                       pathname: '/(tabs)/(profile)/order-paid',
                       params: {
@@ -146,9 +146,18 @@ export default function History() {
                   <View style={styles.itemsContainer}>
                     {order.items.slice(0, 3).map((item, index) => (
                       <View key={item.id} style={styles.itemRow}>
-                        <Text style={styles.itemName} numberOfLines={1}>
-                          {item.productName}
-                        </Text>
+                        <View style={styles.itemMain}>
+                          <Text style={styles.itemName} numberOfLines={1}>
+                            {item.productName}
+                          </Text>
+                          {item.refundedQuantity > 0 ? (
+                            <Text style={styles.refundBadge}>
+                              {item.refundedQuantity >= item.quantity
+                                ? `Полный возврат (${item.refundedQuantity} шт.)`
+                                : `Частичный возврат (${item.refundedQuantity} шт.)`}
+                            </Text>
+                          ) : null}
+                        </View>
                         <Text style={styles.itemQuantity}>×{item.quantity}</Text>
                       </View>
                     ))}
@@ -270,11 +279,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 6,
   },
+  itemMain: {
+    flex: 1,
+    marginRight: 8,
+  },
   itemName: {
     fontSize: 13,
     color: '#666',
-    flex: 1,
-    marginRight: 8,
+  },
+  refundBadge: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#B00020',
+    marginTop: 2,
   },
   itemQuantity: {
     fontSize: 13,

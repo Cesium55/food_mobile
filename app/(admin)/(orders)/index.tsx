@@ -174,6 +174,24 @@ export default function AdminOrdersScreen() {
     return colors[status];
   };
 
+  const getItemBadge = (item: { refundedQuantity: number; quantity: number; fulfillmentStatus: any }) => {
+    const isFullyRefunded = item.quantity > 0 && item.refundedQuantity >= item.quantity;
+    const isPartiallyRefunded = item.refundedQuantity > 0 && item.refundedQuantity < item.quantity;
+
+    if (isFullyRefunded) {
+      return { label: 'Возвращено', color: '#B00020' };
+    }
+
+    if (isPartiallyRefunded) {
+      return { label: 'Частичный возврат', color: '#C77700' };
+    }
+
+    return {
+      label: getFulfillmentStatusLabel(item.fulfillmentStatus),
+      color: getFulfillmentStatusColor(item.fulfillmentStatus),
+    };
+  };
+
   return (
     <TabScreen title="Заказы">
       <View style={styles.container}>
@@ -273,21 +291,33 @@ export default function AdminOrdersScreen() {
                     </View>
 
                     <View style={styles.orderItems}>
-                      {order.items.slice(0, 2).map((item, index) => (
-                        <View key={`${item.offerId}-${index}`} style={styles.itemRow}>
-                          <Text style={styles.itemText}>
-                            {item.productName} x {item.quantity}
-                          </Text>
-                          <Text
-                            style={[
-                              styles.itemStatusBadge,
-                              { backgroundColor: getFulfillmentStatusColor(item.fulfillmentStatus) },
-                            ]}
-                          >
-                            {getFulfillmentStatusLabel(item.fulfillmentStatus)}
-                          </Text>
-                        </View>
-                      ))}
+                      {order.items.slice(0, 2).map((item, index) => {
+                        const badge = getItemBadge(item);
+                        return (
+                          <View key={`${item.offerId}-${index}`} style={styles.itemRow}>
+                            <View style={styles.itemMain}>
+                              <Text style={styles.itemText}>
+                                {item.productName} x {item.quantity}
+                              </Text>
+                              {item.refundedQuantity > 0 ? (
+                                <Text style={styles.itemRefundText}>
+                                  {item.refundedQuantity >= item.quantity
+                                    ? `Полный возврат (${item.refundedQuantity} шт.)`
+                                    : `Частичный возврат (${item.refundedQuantity} шт.)`}
+                                </Text>
+                              ) : null}
+                            </View>
+                            <Text
+                              style={[
+                                styles.itemStatusBadge,
+                                { backgroundColor: badge.color },
+                              ]}
+                            >
+                              {badge.label}
+                            </Text>
+                          </View>
+                        );
+                      })}
                       {order.items.length > 2 && (
                         <Text style={styles.moreItems}>+{order.items.length - 2} еще</Text>
                       )}
@@ -578,10 +608,18 @@ const styles = StyleSheet.create({
     marginBottom: 6,
     gap: 8,
   },
-  itemText: {
+  itemMain: {
     flex: 1,
+  },
+  itemText: {
     fontSize: 14,
     color: '#333',
+  },
+  itemRefundText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#B00020',
+    marginTop: 2,
   },
   itemStatusBadge: {
     color: '#fff',
