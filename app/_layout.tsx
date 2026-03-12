@@ -91,6 +91,15 @@ export default function RootLayout() {
                       animationDuration: 250,
                     }}
                   />
+                  <Stack.Screen
+                    name="search"
+                    options={{
+                      headerShown: false,
+                      presentation: 'modal',
+                      animation: 'slide_from_bottom',
+                      animationDuration: 250,
+                    }}
+                  />
                   <Stack.Screen 
                     name="modal" 
                     options={{ 

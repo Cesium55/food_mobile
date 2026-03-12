@@ -1,9 +1,8 @@
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { spacing } from "@/constants/tokens";
 import { useColors } from "@/contexts/ThemeContext";
-import { useUser } from "@/hooks/useUser";
-import { router, usePathname } from "expo-router";
-import { useState } from "react";
+import { router } from "expo-router";
+import { useEffect, useState } from "react";
 import { StyleSheet, TouchableOpacity, View } from "react-native";
 import Search from "./search/search";
 
@@ -19,16 +18,24 @@ export function TopBar({
   showSearch = true 
 }: TopBarProps) {
   const colors = useColors();
-  const user = useUser();
-  const pathname = usePathname();
   const [localSearchValue, setLocalSearchValue] = useState(searchValue || '');
 
-  // Определяем, находимся ли мы в админ-режиме
-  const isAdminMode = pathname?.includes('/(admin)');
+  useEffect(() => {
+    setLocalSearchValue(searchValue || '');
+  }, [searchValue]);
 
   const handleSearchChange = (text: string) => {
     setLocalSearchValue(text);
     onSearchChange?.(text);
+  };
+
+  const handleSearchSubmit = () => {
+    const trimmedQuery = localSearchValue.trim();
+
+    router.push({
+      pathname: '/search' as any,
+      params: trimmedQuery ? { q: trimmedQuery } : {},
+    });
   };
 
   const handleProfilePress = () => {
@@ -36,9 +43,7 @@ export function TopBar({
   };
 
   return (
-    // <SafeAreaView edges={['top']} style={styles.safeArea}>
       <View style={[styles.container, { backgroundColor: colors.background.default }]}>
-        {/* Кнопка профиля */}
         <TouchableOpacity 
           style={styles.profileButton}
           onPress={handleProfilePress}
@@ -53,18 +58,17 @@ export function TopBar({
           </View>
         </TouchableOpacity>
         
-        {/* Поиск */}
         {showSearch && (
           <View style={styles.searchContainer}>
             <Search
               placeholder="Поиск в SaveFood"
               value={localSearchValue}
               onChangeText={handleSearchChange}
+              onSubmit={handleSearchSubmit}
             />
           </View>
         )}
       </View>
-    //  </SafeAreaView>
   );
 }
 
@@ -102,3 +106,4 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 });
+

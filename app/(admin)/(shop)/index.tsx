@@ -1,4 +1,4 @@
-import { TabScreen } from "@/components/TabScreen";
+﻿import { TabScreen } from "@/components/TabScreen";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useSellerMe } from "@/hooks/useSeller";
 import { deleteSellerImage, ImageFile, uploadSellerImage } from "@/utils/imageUpload";
@@ -19,13 +19,8 @@ import {
 } from "react-native";
 
 export default function ShopScreen() {
-    // Режим редактирования
     const [isEditing, setIsEditing] = useState(false);
-    
-    // Загрузка данных из API
-    const { seller, loading, error } = useSellerMe();
-    
-    // Локальное состояние для редактируемых полей
+    const { seller, loading, error, updateSeller, refetch } = useSellerMe();
     const [fullName, setFullName] = useState("");
     const [shortName, setShortName] = useState("");
     const [description, setDescription] = useState("");
@@ -33,20 +28,18 @@ export default function ShopScreen() {
     const [currentImageId, setCurrentImageId] = useState<number | null>(null);
     const [newImageFile, setNewImageFile] = useState<ImageFile | null>(null);
     const [isUploading, setIsUploading] = useState(false);
-    
     const [hasChanges, setHasChanges] = useState(false);
 
-    // Обновляем локальное состояние при загрузке данных
     useFocusEffect(
         useCallback(() => {
             if (seller) {
-                setFullName(seller.full_name);
-                setShortName(seller.short_name);
-                setDescription(seller.description);
-                const firstImage = seller.images && seller.images.length > 0 
-                    ? seller.images.sort((a, b) => a.order - b.order)[0]
-                    : null;
-                const firstImageUrl = firstImage ? getFirstImageUrl(seller.images) : null;
+                const sortedImages = [...(seller.images || [])].sort((a, b) => a.order - b.order);
+                const firstImage = sortedImages.length > 0 ? sortedImages[0] : null;
+                const firstImageUrl = firstImage ? getFirstImageUrl(sortedImages) : null;
+
+                setFullName(seller.full_name || "");
+                setShortName(seller.short_name || "");
+                setDescription(seller.description || "");
                 setImageUrl(firstImageUrl);
                 setCurrentImageId(firstImage?.id || null);
                 setNewImageFile(null);
@@ -54,6 +47,24 @@ export default function ShopScreen() {
             }
         }, [seller])
     );
+
+    const resetFormFromSeller = useCallback(() => {
+        if (!seller) {
+            return;
+        }
+
+        const sortedImages = [...(seller.images || [])].sort((a, b) => a.order - b.order);
+        const firstImage = sortedImages.length > 0 ? sortedImages[0] : null;
+        const firstImageUrl = firstImage ? getFirstImageUrl(sortedImages) : null;
+
+        setFullName(seller.full_name || "");
+        setShortName(seller.short_name || "");
+        setDescription(seller.description || "");
+        setImageUrl(firstImageUrl);
+        setCurrentImageId(firstImage?.id || null);
+        setNewImageFile(null);
+        setHasChanges(false);
+    }, [seller]);
 
     const handleEdit = () => {
         setIsEditing(true);
@@ -69,20 +80,8 @@ export default function ShopScreen() {
                     text: "Да",
                     style: "destructive",
                     onPress: () => {
-                        if (seller) {
-                            setFullName(seller.full_name);
-                            setShortName(seller.short_name);
-                            setDescription(seller.description);
-                            const firstImage = seller.images && seller.images.length > 0 
-                                ? seller.images.sort((a, b) => a.order - b.order)[0]
-                                : null;
-                            const firstImageUrl = firstImage ? getFirstImageUrl(seller.images) : null;
-                            setImageUrl(firstImageUrl);
-                            setCurrentImageId(firstImage?.id || null);
-                            setNewImageFile(null);
-                        }
+                        resetFormFromSeller();
                         setIsEditing(false);
-                        setHasChanges(false);
                         setIsUploading(false);
                     }
                 }
@@ -93,65 +92,71 @@ export default function ShopScreen() {
     const handleSave = async () => {
         if (!seller) return;
 
+        const normalizedFullName = fullName.trim();
+        const normalizedShortName = shortName.trim();
+        const normalizedDescription = description.trim();
+
+        if (!normalizedFullName || !normalizedShortName) {
+            Alert.alert("Ошибка", "Полное и короткое название обязательны для сохранения");
+            return;
+        }
+
         setIsUploading(true);
         try {
-            // Если изображение было удалено (было изображение, но теперь нет)
+            await updateSeller(seller.id, {
+                full_name: normalizedFullName,
+                short_name: normalizedShortName,
+                description: normalizedDescription,
+            });
+
             if (!imageUrl && currentImageId && !newImageFile) {
                 const deleted = await deleteSellerImage(currentImageId);
-                if (deleted) {
-                    setCurrentImageId(null);
-                } else {
-                    Alert.alert("Ошибка", "Не удалось удалить изображение");
-                    setIsUploading(false);
-                    return;
+                if (!deleted) {
+                    throw new Error("Не удалось удалить изображение");
                 }
+                setCurrentImageId(null);
             }
             
-            // Если есть новое изображение, загружаем его
             if (newImageFile) {
-                // Если есть старое изображение, удаляем его перед загрузкой нового
                 if (currentImageId) {
-                    await deleteSellerImage(currentImageId);
+                    const deleted = await deleteSellerImage(currentImageId);
+                    if (!deleted) {
+                        throw new Error("Не удалось заменить изображение");
+                    }
                 }
                 
-                // Загружаем новое изображение
                 const uploadedImage = await uploadSellerImage(seller.id, newImageFile, 0);
-                if (uploadedImage) {
-                    setCurrentImageId(uploadedImage.id);
-                    setImageUrl(getFirstImageUrl([uploadedImage]));
-                    setNewImageFile(null);
-                } else {
-                    Alert.alert("Ошибка", "Не удалось загрузить изображение");
-                    setIsUploading(false);
-                    return;
+                if (!uploadedImage) {
+                    throw new Error("Не удалось загрузить изображение");
                 }
+
+                setCurrentImageId(uploadedImage.id);
+                setImageUrl(getFirstImageUrl([uploadedImage]));
+                setNewImageFile(null);
             }
 
-            // TODO: Сохранить другие поля (fullName, shortName, description) через API
-            // Пока просто показываем успех
-            Alert.alert(
-                "Сохранение",
-                "Изменения сохранены успешно!",
-                [{ 
-                    text: "OK",
-                    onPress: () => {
-                        setIsEditing(false);
-                        setHasChanges(false);
-                    }
-                }]
-            );
-        } catch (error) {
-            console.error('Ошибка сохранения:', error);
-            Alert.alert("Ошибка", "Не удалось сохранить изменения");
+            await refetch();
+            setIsEditing(false);
+            setHasChanges(false);
+            Alert.alert("Сохранение", "Изменения сохранены успешно");
+        } catch (saveError) {
+            const message = saveError instanceof Error ? saveError.message : "Не удалось сохранить изменения";
+            console.error('Ошибка сохранения:', saveError);
+            Alert.alert("Ошибка", message);
         } finally {
             setIsUploading(false);
         }
     };
 
+    const markImageForDeletion = () => {
+        setImageUrl(null);
+        setNewImageFile(null);
+        setHasChanges(true);
+    };
+
     const handleImageChange = async () => {
         if (!isEditing) return;
         
-        // Запрашиваем разрешение на доступ к медиатеке
         const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
         if (status !== 'granted') {
             Alert.alert(
@@ -178,12 +183,7 @@ export default function ShopScreen() {
                                 {
                                     text: "Удалить",
                                     style: "destructive" as const,
-                                    onPress: () => {
-                                        setImageUrl(null);
-                                        setCurrentImageId(null);
-                                        setNewImageFile(null);
-                                        setHasChanges(true);
-                                    }
+                                    onPress: markImageForDeletion
                                 }
                             ]
                         );
@@ -245,7 +245,6 @@ export default function ShopScreen() {
     return (
         <TabScreen title="Управление магазином">
             <View style={styles.container}>
-                {/* Кнопка редактирования/отмены */}
                 <View style={styles.header}>
                     {!isEditing ? (
                         <TouchableOpacity 
@@ -271,7 +270,6 @@ export default function ShopScreen() {
                     keyboardShouldPersistTaps="handled"
                     keyboardDismissMode="on-drag"
                 >
-                    {/* Блок с изображением */}
                     <View style={styles.imageSection}>
                         <Text style={styles.sectionTitle}>Логотип торговой сети</Text>
                         <TouchableOpacity 
@@ -312,12 +310,7 @@ export default function ShopScreen() {
                                                 {
                                                     text: "Удалить",
                                                     style: "destructive" as const,
-                                                    onPress: () => {
-                                                        setImageUrl(null);
-                                                        setCurrentImageId(null);
-                                                        setNewImageFile(null);
-                                                        setHasChanges(true);
-                                                    }
+                                                    onPress: markImageForDeletion,
                                                 }
                                             ]
                                         );
@@ -329,7 +322,6 @@ export default function ShopScreen() {
                         </TouchableOpacity>
                     </View>
 
-                    {/* Редактируемые поля */}
                     <View style={styles.section}>
                         <Text style={styles.sectionTitle}>Основная информация</Text>
                         
@@ -387,7 +379,6 @@ export default function ShopScreen() {
                         </View>
                     </View>
 
-                    {/* Только для чтения поля (скрыты в режиме редактирования) */}
                     {!isEditing && (
                         <View style={styles.section}>
                             <Text style={styles.sectionTitle}>Дополнительная информация</Text>
@@ -475,7 +466,6 @@ export default function ShopScreen() {
                         </View>
                     )}
 
-                    {/* Кнопка сохранения (только в режиме редактирования) */}
                     {isEditing && (
                         <>
                             <TouchableOpacity 

@@ -180,11 +180,13 @@ export const useOffers = () => {
     sellerId?: number; // Новый параметр для фильтрации по продавцу (для админки)
     categoryIds?: number[]; // Фильтр по ID категорий (OR логика)
     preserveExisting?: boolean; // Сохранять существующие данные при ошибке
+    searchQuery?: string; // Поисковая строка для API search_query
   }) => {
+    const preserveExisting = filters?.preserveExisting ?? false;
+
     try {
       setLoading(true);
       setError(null);
-      const preserveExisting = filters?.preserveExisting ?? false;
       
       // Формируем URL с параметрами фильтрации
       const params = new URLSearchParams();
@@ -212,6 +214,11 @@ export const useOffers = () => {
         filters.categoryIds.forEach(id => {
           params.append('category_ids', id.toString());
         });
+      }
+
+      const normalizedSearchQuery = filters?.searchQuery?.trim();
+      if (normalizedSearchQuery) {
+        params.append('search_query', normalizedSearchQuery);
       }
       
       // Добавляем дефолтные фильтры, если не указано skipDefaultFilters
@@ -391,6 +398,7 @@ export const useOffers = () => {
     maxLatitude: number;
     minLongitude: number;
     maxLongitude: number;
+    searchQuery?: string;
   }) => {
     await fetchOffers(filters);
   }, [fetchOffers]);

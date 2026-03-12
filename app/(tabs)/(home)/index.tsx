@@ -14,33 +14,27 @@ import { getBoundingBox } from '@/utils/locationUtils';
 import { useCallback, useEffect, useState } from 'react';
 
 export default function HomeScreen() {
-  const [searchText, setSearchText] = useState('');
   const [refreshing, setRefreshing] = useState(false);
   const { offers, fetchOffersWithLocation, fetchOffers, loading } = useOffers();
   const { openModal } = useModal();
   const colors = useColors();
   const styles = createStyles(colors);
 
-  // Функция загрузки данных
   const loadData = useCallback(async (forceRefresh: boolean = false) => {
     let location = null;
-    
+
     if (forceRefresh) {
-      // При принудительном обновлении пытаемся получить свежее местоположение
       location = await getCurrentLocation(3000);
-      
+
       if (!location) {
-        // Если не получили свежее, берем из кэша
         const cached = await getLocationWithCache();
         location = cached.location;
       }
     } else {
-      // При обычной загрузке используем кэш
       const { location: cachedLocation } = await getLocationWithCache();
       location = cachedLocation;
     }
-    
-    // Загружаем данные с учетом местоположения (если есть)
+
     if (location) {
       const boundingBox = getBoundingBox(location.latitude, location.longitude, 1000);
       await fetchOffersWithLocation(boundingBox);
@@ -49,10 +43,9 @@ export default function HomeScreen() {
     }
   }, [fetchOffersWithLocation, fetchOffers]);
 
-  // Начальная загрузка при монтировании
   useEffect(() => {
     let isMounted = true;
-    
+
     const initialLoad = async () => {
       if (isMounted) {
         await loadData(false);
@@ -60,38 +53,31 @@ export default function HomeScreen() {
     };
 
     initialLoad();
-    
+
     return () => {
       isMounted = false;
     };
   }, [loadData]);
 
-  // Обработчик pull-to-refresh
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      await loadData(true); // При рефреше запрашиваем свежие данные
+      await loadData(true);
     } finally {
       setRefreshing(false);
     }
   }, [loadData]);
 
-  // Обработчик открытия товара в модалке
   const handleOfferPress = useCallback((offer: Offer) => {
     const { content, footer } = createProductModal(offer);
     openModal(content, footer);
   }, [openModal]);
 
   return (
-    
-    <TabScreen 
-    
+    <TabScreen
       onRefresh={onRefresh}
       refreshing={refreshing}
-      searchValue={searchText}
-      onSearchChange={setSearchText}
     >
-
       <View style={styles.blockContainer}>
         <Text style={styles.blockTitle}>Популярные продавцы</Text>
         <HorizontalSellersList />
