@@ -222,13 +222,54 @@ export async function authFetch(
 
       // Если получили 401 и у нас есть токен, пробуем обновить
       if (response.status === HTTP_STATUS.UNAUTHORIZED && requireAuth && retryCount < maxRetries) {
+        // Если другой запрос уже успел обновить токен, повторяем запрос без refresh.
+        const currentAccessToken = await getAccessToken();
+
+        if (
+          currentAccessToken &&
+          accessToken &&
+          currentAccessToken !== accessToken
+        ) {
+          retryCount++;
+
+          const retryWithCurrentTokenHeaders = createAuthHeaders(
+            customHeaders,
+            currentAccessToken,
+            fetchOptions.body
+          );
+          const retryWithCurrentTokenController = new AbortController();
+          const retryWithCurrentTokenTimeoutId = setTimeout(
+            () => retryWithCurrentTokenController.abort(),
+            env.API_TIMEOUT
+          );
+
+          try {
+            const retryWithCurrentTokenResponse = await fetch(url, {
+              ...fetchOptions,
+              headers: retryWithCurrentTokenHeaders,
+              signal: retryWithCurrentTokenController.signal,
+              redirect: 'follow',
+            });
+
+            clearTimeout(retryWithCurrentTokenTimeoutId);
+            return retryWithCurrentTokenResponse;
+          } catch (retryWithCurrentTokenError) {
+            clearTimeout(retryWithCurrentTokenTimeoutId);
+            throw retryWithCurrentTokenError;
+          }
+        }
+
         // Обновляем токены
         const refreshResult = await refreshAccessToken();
 
         if (refreshResult.success && refreshResult.accessToken) {
           retryCount++;
 
-          const newHeaders = createAuthHeaders(customHeaders, refreshResult.accessToken);
+          const newHeaders = createAuthHeaders(
+            customHeaders,
+            refreshResult.accessToken,
+            fetchOptions.body
+          );
           const newController = new AbortController();
           const newTimeoutId = setTimeout(() => newController.abort(), env.API_TIMEOUT);
 

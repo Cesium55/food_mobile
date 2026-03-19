@@ -5,7 +5,7 @@
 import { API_ENDPOINTS } from '@/constants/api';
 import { getApiUrl } from '@/constants/env';
 import { authFetch } from '@/utils/authFetch';
-import { getLastLocation, saveLastLocation } from '@/utils/storage';
+import { getLastLocation, hasTokens, saveLastLocation } from '@/utils/storage';
 import * as Location from 'expo-location';
 
 /**
@@ -133,7 +133,6 @@ export async function updateLocation(): Promise<boolean> {
  */
 export async function initializeLocationUpdate(): Promise<void> {
   // Проверяем, есть ли токены (пользователь аутентифицирован)
-  const { hasTokens } = await import('@/utils/storage');
   const isAuthenticated = await hasTokens();
   
   if (!isAuthenticated) {
