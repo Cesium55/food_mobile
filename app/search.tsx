@@ -19,8 +19,8 @@ function hasActiveFilters(filters: SearchFiltersValue) {
     filters.searchQuery.trim() ||
       filters.minPrice !== undefined ||
       filters.maxPrice !== undefined ||
-      filters.minExpiryHours !== undefined ||
-      filters.maxExpiryHours !== undefined ||
+      filters.minExpiryDate !== undefined ||
+      filters.maxExpiryDate !== undefined ||
       filters.minCount !== undefined ||
       filters.dynamicPricing !== undefined ||
       filters.categoryIds.length > 0
@@ -28,7 +28,10 @@ function hasActiveFilters(filters: SearchFiltersValue) {
 }
 
 function buildServerFilters(filters: SearchFiltersValue) {
-  const now = Date.now();
+  const toDateOnly = (value?: string) => {
+    if (!value) return undefined;
+    return new Date(value).toISOString().split('T')[0];
+  };
 
   return {
     searchQuery: filters.searchQuery.trim(),
@@ -37,14 +40,8 @@ function buildServerFilters(filters: SearchFiltersValue) {
     maxPrice: filters.maxPrice,
     minCount: filters.minCount,
     isDynamicPricing: filters.dynamicPricing,
-    minExpiresDate:
-      filters.minExpiryHours !== undefined
-        ? new Date(now + filters.minExpiryHours * 60 * 60 * 1000).toISOString()
-        : undefined,
-    maxExpiresDate:
-      filters.maxExpiryHours !== undefined
-        ? new Date(now + filters.maxExpiryHours * 60 * 60 * 1000).toISOString()
-        : undefined,
+    minExpiresDate: toDateOnly(filters.minExpiryDate),
+    maxExpiresDate: toDateOnly(filters.maxExpiryDate),
   };
 }
 
@@ -65,7 +62,6 @@ export default function SearchScreen() {
   });
   const [searchNonce, setSearchNonce] = useState(initialQuery.trim() ? 1 : 0);
   const [hasCompletedSearch, setHasCompletedSearch] = useState(false);
-  const [isFiltersVisible, setIsFiltersVisible] = useState(false);
   const { offers, fetchOffers, fetchOffersWithLocation, loading } = useOffers();
   const { openModal } = useModal();
   const colors = useColors();
@@ -131,15 +127,6 @@ export default function SearchScreen() {
     return offers.filter((offer) => {
       const currentPrice = getOfferCurrentPrice(offer);
       const expiresAt = new Date(offer.expiresDate).getTime();
-      const remainingHours = (expiresAt - now) / (60 * 60 * 1000);
-
-      if (
-        appliedFilters.searchQuery.trim() &&
-        !offer.productName.toLowerCase().includes(appliedFilters.searchQuery.trim().toLowerCase()) &&
-        !(offer.description || '').toLowerCase().includes(appliedFilters.searchQuery.trim().toLowerCase())
-      ) {
-        return false;
-      }
 
       if (appliedFilters.minPrice !== undefined && currentPrice < appliedFilters.minPrice) {
         return false;
@@ -150,15 +137,15 @@ export default function SearchScreen() {
       }
 
       if (
-        appliedFilters.minExpiryHours !== undefined &&
-        remainingHours < appliedFilters.minExpiryHours
+        appliedFilters.minExpiryDate !== undefined &&
+        expiresAt < new Date(appliedFilters.minExpiryDate).getTime()
       ) {
         return false;
       }
 
       if (
-        appliedFilters.maxExpiryHours !== undefined &&
-        remainingHours > appliedFilters.maxExpiryHours
+        appliedFilters.maxExpiryDate !== undefined &&
+        expiresAt > new Date(appliedFilters.maxExpiryDate).getTime()
       ) {
         return false;
       }
@@ -213,6 +200,15 @@ export default function SearchScreen() {
     openModal(content, footer);
   };
 
+  const handleOpenFiltersModal = () => {
+    openModal(
+      <SearchFiltersModal
+        initialValue={appliedFilters}
+        onApply={handleApplyFilters}
+      />
+    );
+  };
+
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       <View style={styles.header}>
@@ -225,7 +221,7 @@ export default function SearchScreen() {
         </TouchableOpacity>
         <View style={styles.searchWrapper}>
           <Search
-            placeholder="Найти товар или продавца"
+            placeholder="Поиск"
             value={searchText}
             onChangeText={setSearchText}
             onSubmit={handleSearchSubmit}
@@ -234,7 +230,7 @@ export default function SearchScreen() {
         </View>
         <TouchableOpacity
           style={styles.filterButton}
-          onPress={() => setIsFiltersVisible(true)}
+          onPress={handleOpenFiltersModal}
           activeOpacity={0.7}
         >
           <IconSymbol name="filter" size={22} color={colors.text.primary} />
@@ -253,7 +249,7 @@ export default function SearchScreen() {
             <Text style={styles.title}>Поиск</Text>
             <Text style={styles.subtitle}>Введите запрос и нажмите кнопку поиска</Text>
           </View>
-        ) : (!hasCompletedSearch || loading) && filteredOffers.length === 0 ? (
+        ) : !hasCompletedSearch || loading ? (
           <View style={styles.centerState}>
             <ActivityIndicator size="large" color="#FF6B00" />
             <Text style={styles.subtitle}>
@@ -279,13 +275,6 @@ export default function SearchScreen() {
           </>
         )}
       </ScrollView>
-
-      <SearchFiltersModal
-        visible={isFiltersVisible}
-        initialValue={appliedFilters}
-        onClose={() => setIsFiltersVisible(false)}
-        onApply={handleApplyFilters}
-      />
     </SafeAreaView>
   );
 }

@@ -5,6 +5,10 @@ import { authFetch } from '@/utils/authFetch';
 import { calculateDynamicPrice } from '@/utils/pricingUtils';
 import { useCallback, useState } from 'react';
 
+function formatDateOnly(date: Date): string {
+  return date.toISOString().split('T')[0];
+}
+
 // Интерфейс изображения товара
 export interface ProductImage {
   id: number;
@@ -253,7 +257,7 @@ export const useOffers = () => {
         // Фильтр по сроку годности - только непросроченные товары
         if (!filters?.minExpiresDate) {
           const now = new Date();
-          const minExpiresDate = now.toISOString();
+          const minExpiresDate = formatDateOnly(now);
           params.append('min_expires_date', minExpiresDate);
         }
         
@@ -269,6 +273,8 @@ export const useOffers = () => {
       if (params.toString()) {
         url += `?${params.toString()}`;
       }
+
+      console.log('[useOffers] fetchOffers URL:', url);
       
 
       const response = await authFetch(url, {
@@ -448,7 +454,7 @@ export const useOffers = () => {
       
       // Дефолтные фильтры (годность и наличие)
       const now = new Date();
-      const minExpiresDate = now.toISOString();
+      const minExpiresDate = formatDateOnly(now);
       params.append('min_expires_date', minExpiresDate);
       params.append('min_count', '1');
       

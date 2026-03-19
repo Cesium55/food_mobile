@@ -1,11 +1,12 @@
 import Search from '@/components/search/search';
 import { Button } from '@/components/ui/Button';
-import { StandardModal } from '@/components/ui/StandardModal';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { spacing, typography } from '@/constants/tokens';
+import { useModal } from '@/contexts/ModalContext';
 import { useColors } from '@/contexts/ThemeContext';
 import { Category, useCategories } from '@/hooks/useCategories';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
+import DateTimePickerModal from 'react-native-modal-datetime-picker';
 import {
   ScrollView,
   StyleSheet,
@@ -19,17 +20,15 @@ export interface SearchFiltersValue {
   searchQuery: string;
   minPrice?: number;
   maxPrice?: number;
-  minExpiryHours?: number;
-  maxExpiryHours?: number;
+  minExpiryDate?: string;
+  maxExpiryDate?: string;
   minCount?: number;
   categoryIds: number[];
   dynamicPricing?: boolean;
 }
 
 interface SearchFiltersModalProps {
-  visible: boolean;
   initialValue: SearchFiltersValue;
-  onClose: () => void;
   onApply: (value: SearchFiltersValue) => void;
 }
 
@@ -71,11 +70,10 @@ function normalizeInteger(value: string): number | undefined {
 }
 
 export function SearchFiltersModal({
-  visible,
   initialValue,
-  onClose,
   onApply,
 }: SearchFiltersModalProps) {
+  const { closeModal } = useModal();
   const { categories } = useCategories();
   const colors = useColors();
   const styles = createStyles(colors);
@@ -83,8 +81,12 @@ export function SearchFiltersModal({
   const [searchQuery, setSearchQuery] = useState(initialValue.searchQuery);
   const [minPrice, setMinPrice] = useState(initialValue.minPrice?.toString() ?? '');
   const [maxPrice, setMaxPrice] = useState(initialValue.maxPrice?.toString() ?? '');
-  const [minExpiryHours, setMinExpiryHours] = useState(initialValue.minExpiryHours?.toString() ?? '');
-  const [maxExpiryHours, setMaxExpiryHours] = useState(initialValue.maxExpiryHours?.toString() ?? '');
+  const [minExpiryDate, setMinExpiryDate] = useState<Date | null>(
+    initialValue.minExpiryDate ? new Date(initialValue.minExpiryDate) : null
+  );
+  const [maxExpiryDate, setMaxExpiryDate] = useState<Date | null>(
+    initialValue.maxExpiryDate ? new Date(initialValue.maxExpiryDate) : null
+  );
   const [minCount, setMinCount] = useState(initialValue.minCount?.toString() ?? '');
   const [categoryIds, setCategoryIds] = useState<number[]>(initialValue.categoryIds);
   const [expandedCategories, setExpandedCategories] = useState<number[]>([]);
@@ -92,22 +94,10 @@ export function SearchFiltersModal({
     getDynamicPricingOption(initialValue.dynamicPricing)
   );
   const [isDynamicPricingOpen, setIsDynamicPricingOpen] = useState(false);
-
-  useEffect(() => {
-    if (!visible) {
-      return;
-    }
-
-    setSearchQuery(initialValue.searchQuery);
-    setMinPrice(initialValue.minPrice?.toString() ?? '');
-    setMaxPrice(initialValue.maxPrice?.toString() ?? '');
-    setMinExpiryHours(initialValue.minExpiryHours?.toString() ?? '');
-    setMaxExpiryHours(initialValue.maxExpiryHours?.toString() ?? '');
-    setMinCount(initialValue.minCount?.toString() ?? '');
-    setCategoryIds(initialValue.categoryIds);
-    setDynamicPricing(getDynamicPricingOption(initialValue.dynamicPricing));
-    setIsDynamicPricingOpen(false);
-  }, [initialValue, visible]);
+  const [isMinExpiryPickerVisible, setIsMinExpiryPickerVisible] = useState(false);
+  const [isMaxExpiryPickerVisible, setIsMaxExpiryPickerVisible] = useState(false);
+  const [isCategoriesOpen, setIsCategoriesOpen] = useState(false);
+  const [validationError, setValidationError] = useState<string | null>(null);
 
   const topLevelCategories = useMemo(
     () => categories.filter((category) => category.parent_category_id === null),
@@ -147,50 +137,52 @@ export function SearchFiltersModal({
     setSearchQuery('');
     setMinPrice('');
     setMaxPrice('');
-    setMinExpiryHours('');
-    setMaxExpiryHours('');
+    setMinExpiryDate(null);
+    setMaxExpiryDate(null);
     setMinCount('');
     setCategoryIds([]);
     setDynamicPricing('all');
     setIsDynamicPricingOpen(false);
+    setIsCategoriesOpen(false);
+    setValidationError(null);
   };
 
   const handleApply = () => {
-    let normalizedMinPrice = normalizeNumber(minPrice);
-    let normalizedMaxPrice = normalizeNumber(maxPrice);
-    let normalizedMinExpiryHours = normalizeInteger(minExpiryHours);
-    let normalizedMaxExpiryHours = normalizeInteger(maxExpiryHours);
-
-    if (
-      normalizedMinPrice !== undefined &&
-      normalizedMaxPrice !== undefined &&
-      normalizedMaxPrice < normalizedMinPrice
-    ) {
-      [normalizedMinPrice, normalizedMaxPrice] = [normalizedMaxPrice, normalizedMinPrice];
+    if (minPrice.trim() && normalizeNumber(minPrice) === undefined) {
+      setValidationError('Минимальная цена должна быть числом.');
+      return;
     }
 
-    if (
-      normalizedMinExpiryHours !== undefined &&
-      normalizedMaxExpiryHours !== undefined &&
-      normalizedMaxExpiryHours < normalizedMinExpiryHours
-    ) {
-      [normalizedMinExpiryHours, normalizedMaxExpiryHours] = [
-        normalizedMaxExpiryHours,
-        normalizedMinExpiryHours,
-      ];
+    if (maxPrice.trim() && normalizeNumber(maxPrice) === undefined) {
+      setValidationError('Максимальная цена должна быть числом.');
+      return;
     }
 
-    setMinPrice(normalizedMinPrice?.toString() ?? '');
-    setMaxPrice(normalizedMaxPrice?.toString() ?? '');
-    setMinExpiryHours(normalizedMinExpiryHours?.toString() ?? '');
-    setMaxExpiryHours(normalizedMaxExpiryHours?.toString() ?? '');
+    if (minCount.trim() && normalizeInteger(minCount) === undefined) {
+      setValidationError('Минимальное количество должно быть числом.');
+      return;
+    }
+
+    const normalizedMinPrice = normalizeNumber(minPrice);
+    const normalizedMaxPrice = normalizeNumber(maxPrice);
+
+    if (normalizedMinPrice !== undefined && normalizedMaxPrice !== undefined && normalizedMaxPrice < normalizedMinPrice) {
+      setValidationError('Максимальная цена не может быть меньше минимальной.');
+      return;
+    }
+
+    if (minExpiryDate && maxExpiryDate && maxExpiryDate.getTime() < minExpiryDate.getTime()) {
+      setValidationError('Максимальная дата срока годности не может быть раньше минимальной.');
+      return;
+    }
+    setValidationError(null);
 
     const normalizedValue: SearchFiltersValue = {
       searchQuery: searchQuery.trim(),
       minPrice: normalizedMinPrice,
       maxPrice: normalizedMaxPrice,
-      minExpiryHours: normalizedMinExpiryHours,
-      maxExpiryHours: normalizedMaxExpiryHours,
+      minExpiryDate: minExpiryDate?.toISOString(),
+      maxExpiryDate: maxExpiryDate?.toISOString(),
       minCount: normalizeInteger(minCount),
       categoryIds,
       dynamicPricing:
@@ -200,7 +192,7 @@ export function SearchFiltersModal({
     };
 
     onApply(normalizedValue);
-    onClose();
+    closeModal();
   };
 
   const dynamicPricingOptions: Array<{ label: string; value: DynamicPricingOption }> = [
@@ -208,6 +200,20 @@ export function SearchFiltersModal({
     { label: 'Только динамическая', value: 'dynamic' },
     { label: 'Только фиксированная', value: 'fixed' },
   ];
+
+  const formatDateTime = (value: Date | null) => {
+    if (!value) {
+      return '';
+    }
+
+    return value.toLocaleString('ru-RU', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
 
   const renderCategoryItem = (category: Category, level = 0) => {
     const subCategories = categories.filter((item) => item.parent_category_id === category.id);
@@ -298,126 +304,146 @@ export function SearchFiltersModal({
   };
 
   return (
-    <StandardModal visible={visible} onClose={onClose} heightPercent={0.92}>
-      <View style={styles.container}>
-        <Text style={styles.title}>Фильтры поиска</Text>
+    <View style={styles.container}>
+      <Text style={styles.title}>Фильтры поиска</Text>
 
-        <View style={styles.section}>
-          <Text style={styles.label}>Поиск</Text>
-          <Search
-            placeholder="Найти товар или продавца"
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            onSubmit={handleApply}
-          />
-        </View>
+      <View style={styles.section}>
+        <Text style={styles.label}>Поиск</Text>
+        <Search
+          placeholder="Поиск"
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          onSubmit={handleApply}
+        />
+      </View>
 
-        <View style={styles.section}>
-          <Text style={styles.label}>Цена</Text>
-          <View style={styles.row}>
-            <TextInput
-              style={[styles.input, styles.halfInput]}
-              value={minPrice}
-              onChangeText={setMinPrice}
-              placeholder="Мин цена"
-              keyboardType="numeric"
-            />
-            <TextInput
-              style={[styles.input, styles.halfInput]}
-              value={maxPrice}
-              onChangeText={setMaxPrice}
-              placeholder="Макс цена"
-              keyboardType="numeric"
-            />
-          </View>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.label}>Время до истечения срока годности</Text>
-          <Text style={styles.hint}>Укажите диапазон в часах от текущего момента</Text>
-          <View style={styles.row}>
-            <TextInput
-              style={[styles.input, styles.halfInput]}
-              value={minExpiryHours}
-              onChangeText={setMinExpiryHours}
-              placeholder="Мин часов"
-              keyboardType="numeric"
-            />
-            <TextInput
-              style={[styles.input, styles.halfInput]}
-              value={maxExpiryHours}
-              onChangeText={setMaxExpiryHours}
-              placeholder="Макс часов"
-              keyboardType="numeric"
-            />
-          </View>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.label}>Динамическая цена</Text>
-          <View style={styles.selectWrapper}>
-            <TouchableOpacity
-              style={styles.selectTrigger}
-              onPress={() => setIsDynamicPricingOpen((current) => !current)}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.selectTriggerText}>
-                {dynamicPricingOptions.find((option) => option.value === dynamicPricing)?.label}
-              </Text>
-              <IconSymbol
-                name={isDynamicPricingOpen ? 'chevron.down' : 'chevron.right'}
-                size={18}
-                color={colors.text.secondary}
-              />
-            </TouchableOpacity>
-
-            {isDynamicPricingOpen && (
-              <View style={styles.selectOptions}>
-                {dynamicPricingOptions.map((option, index) => (
-                  <TouchableOpacity
-                    key={option.value}
-                    style={[
-                      styles.selectOption,
-                      index === dynamicPricingOptions.length - 1 && styles.selectOptionLast,
-                    ]}
-                    onPress={() => {
-                      setDynamicPricing(option.value);
-                      setIsDynamicPricingOpen(false);
-                    }}
-                    activeOpacity={0.7}
-                  >
-                    <Text
-                      style={[
-                        styles.selectOptionText,
-                        dynamicPricing === option.value && styles.selectOptionTextActive,
-                      ]}
-                    >
-                      {option.label}
-                    </Text>
-                    {dynamicPricing === option.value && (
-                      <IconSymbol name="checkmark" size={16} color={colors.primary[500]} />
-                    )}
-                  </TouchableOpacity>
-                ))}
-              </View>
-            )}
-          </View>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.label}>Минимальное количество</Text>
+      <View style={styles.section}>
+        <Text style={styles.label}>Цена</Text>
+        <View style={styles.row}>
           <TextInput
-            style={styles.input}
-            value={minCount}
-            onChangeText={setMinCount}
-            placeholder="Например, 3"
+            style={[styles.input, styles.halfInput]}
+            value={minPrice}
+            onChangeText={setMinPrice}
+            placeholder="Мин цена"
+            keyboardType="numeric"
+          />
+          <TextInput
+            style={[styles.input, styles.halfInput]}
+            value={maxPrice}
+            onChangeText={setMaxPrice}
+            placeholder="Макс цена"
             keyboardType="numeric"
           />
         </View>
+      </View>
+      {validationError && (
+        <Text style={styles.errorText}>{validationError}</Text>
+      )}
 
-        <View style={styles.section}>
-          <Text style={styles.label}>Категории</Text>
-          <Text style={styles.hint}>Выберите одну или несколько категорий</Text>
+      <View style={styles.section}>
+        <Text style={styles.label}>Срок годности</Text>
+        <Text style={styles.hint}>Укажите минимальную и максимальную дату через календарь</Text>
+        <View style={styles.row}>
+          <TouchableOpacity
+            style={[styles.input, styles.halfInput, styles.dateInput]}
+            onPress={() => setIsMinExpiryPickerVisible(true)}
+            activeOpacity={0.7}
+          >
+            <Text style={minExpiryDate ? styles.dateInputText : styles.dateInputPlaceholder}>
+              {minExpiryDate ? formatDateTime(minExpiryDate) : 'Мин дата'}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.input, styles.halfInput, styles.dateInput]}
+            onPress={() => setIsMaxExpiryPickerVisible(true)}
+            activeOpacity={0.7}
+          >
+            <Text style={maxExpiryDate ? styles.dateInputText : styles.dateInputPlaceholder}>
+              {maxExpiryDate ? formatDateTime(maxExpiryDate) : 'Макс дата'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.label}>Динамическая цена</Text>
+        <View style={styles.selectWrapper}>
+          <TouchableOpacity
+            style={styles.selectTrigger}
+            onPress={() => setIsDynamicPricingOpen((current) => !current)}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.selectTriggerText}>
+              {dynamicPricingOptions.find((option) => option.value === dynamicPricing)?.label}
+            </Text>
+            <IconSymbol
+              name={isDynamicPricingOpen ? 'chevron.down' : 'chevron.right'}
+              size={18}
+              color={colors.text.secondary}
+            />
+          </TouchableOpacity>
+
+          {isDynamicPricingOpen && (
+            <View style={styles.selectOptions}>
+              {dynamicPricingOptions.map((option, index) => (
+                <TouchableOpacity
+                  key={option.value}
+                  style={[
+                    styles.selectOption,
+                    index === dynamicPricingOptions.length - 1 && styles.selectOptionLast,
+                  ]}
+                  onPress={() => {
+                    setDynamicPricing(option.value);
+                    setIsDynamicPricingOpen(false);
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Text
+                    style={[
+                      styles.selectOptionText,
+                      dynamicPricing === option.value && styles.selectOptionTextActive,
+                    ]}
+                  >
+                    {option.label}
+                  </Text>
+                  {dynamicPricing === option.value && (
+                    <IconSymbol name="checkmark" size={16} color={colors.primary[500]} />
+                  )}
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+        </View>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.label}>Минимальное количество</Text>
+        <TextInput
+          style={styles.input}
+          value={minCount}
+          onChangeText={setMinCount}
+          placeholder="Например, 3"
+          keyboardType="numeric"
+        />
+      </View>
+
+      <View style={styles.section}>
+        <TouchableOpacity
+          style={styles.sectionToggle}
+          onPress={() => setIsCategoriesOpen((current) => !current)}
+          activeOpacity={0.7}
+        >
+          <View>
+            <Text style={styles.label}>Категории</Text>
+            <Text style={styles.hint}>Выберите одну или несколько категорий</Text>
+          </View>
+          <IconSymbol
+            name={isCategoriesOpen ? 'chevron.down' : 'chevron.right'}
+            size={20}
+            color={colors.text.secondary}
+          />
+        </TouchableOpacity>
+        {isCategoriesOpen && (
           <ScrollView
             style={styles.categoryTree}
             contentContainerStyle={styles.categoryTreeContent}
@@ -425,18 +451,44 @@ export function SearchFiltersModal({
           >
             {topLevelCategories.map((category) => renderCategoryItem(category))}
           </ScrollView>
-        </View>
-
-        <View style={styles.actions}>
-          <Button variant="outline" size="lg" fullWidth style={styles.actionButton} onPress={handleClear}>
-            Очистить
-          </Button>
-          <Button size="lg" fullWidth style={styles.actionButton} onPress={handleApply}>
-            Применить фильтры
-          </Button>
-        </View>
+        )}
       </View>
-    </StandardModal>
+
+      <View style={styles.actions}>
+        <Button size="lg" fullWidth style={[styles.actionButton, styles.clearActionButton]} onPress={handleClear}>
+          Очистить
+        </Button>
+        <Button size="lg" fullWidth style={styles.actionButton} onPress={handleApply}>
+          Применить
+        </Button>
+      </View>
+
+      <DateTimePickerModal
+        isVisible={isMinExpiryPickerVisible}
+        mode="datetime"
+        date={minExpiryDate || new Date()}
+        minimumDate={new Date()}
+        onConfirm={(date) => {
+          setMinExpiryDate(date);
+          setIsMinExpiryPickerVisible(false);
+          setValidationError(null);
+        }}
+        onCancel={() => setIsMinExpiryPickerVisible(false)}
+      />
+
+      <DateTimePickerModal
+        isVisible={isMaxExpiryPickerVisible}
+        mode="datetime"
+        date={maxExpiryDate || minExpiryDate || new Date()}
+        minimumDate={minExpiryDate || new Date()}
+        onConfirm={(date) => {
+          setMaxExpiryDate(date);
+          setIsMaxExpiryPickerVisible(false);
+          setValidationError(null);
+        }}
+        onCancel={() => setIsMaxExpiryPickerVisible(false)}
+      />
+    </View>
   );
 }
 
@@ -465,9 +517,21 @@ const createStyles = (colors: any) =>
       fontFamily: typography.fontFamily.regular,
       color: colors.text.secondary,
     },
+    errorText: {
+      fontSize: typography.fontSize.sm,
+      fontFamily: typography.fontFamily.medium,
+      color: '#D64545',
+      marginTop: -spacing.sm,
+    },
     row: {
       flexDirection: 'row',
       gap: spacing.sm,
+    },
+    sectionToggle: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: spacing.md,
     },
     input: {
       minHeight: 48,
@@ -482,6 +546,19 @@ const createStyles = (colors: any) =>
     },
     halfInput: {
       flex: 1,
+    },
+    dateInput: {
+      justifyContent: 'center',
+    },
+    dateInputText: {
+      fontSize: typography.fontSize.base,
+      fontFamily: typography.fontFamily.regular,
+      color: colors.text.primary,
+    },
+    dateInputPlaceholder: {
+      fontSize: typography.fontSize.base,
+      fontFamily: typography.fontFamily.regular,
+      color: colors.text.secondary,
     },
     selectWrapper: {
       gap: spacing.xs,
@@ -628,5 +705,8 @@ const createStyles = (colors: any) =>
     },
     actionButton: {
       flex: 1,
+    },
+    clearActionButton: {
+      backgroundColor: '#D9D9D9',
     },
   });
