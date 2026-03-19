@@ -181,6 +181,12 @@ export const useOffers = () => {
     categoryIds?: number[]; // Фильтр по ID категорий (OR логика)
     preserveExisting?: boolean; // Сохранять существующие данные при ошибке
     searchQuery?: string; // Поисковая строка для API search_query
+    minPrice?: number;
+    maxPrice?: number;
+    minExpiresDate?: string;
+    maxExpiresDate?: string;
+    minCount?: number;
+    isDynamicPricing?: boolean;
   }) => {
     const preserveExisting = filters?.preserveExisting ?? false;
 
@@ -220,17 +226,41 @@ export const useOffers = () => {
       if (normalizedSearchQuery) {
         params.append('search_query', normalizedSearchQuery);
       }
+
+      if (filters?.minPrice !== undefined) {
+        params.append('min_price', filters.minPrice.toString());
+      }
+
+      if (filters?.maxPrice !== undefined) {
+        params.append('max_price', filters.maxPrice.toString());
+      }
+
+      if (filters?.minExpiresDate) {
+        params.append('min_expires_date', filters.minExpiresDate);
+      }
+
+      if (filters?.maxExpiresDate) {
+        params.append('max_expires_date', filters.maxExpiresDate);
+      }
+
+      if (filters?.isDynamicPricing !== undefined) {
+        params.append('is_dynamic_pricing', String(filters.isDynamicPricing));
+      }
       
       // Добавляем дефолтные фильтры, если не указано skipDefaultFilters
       // Это нужно для главной страницы, чтобы показывать только годные товары в наличии
       if (!filters?.skipDefaultFilters) {
         // Фильтр по сроку годности - только непросроченные товары
-        const now = new Date();
-        const minExpiresDate = now.toISOString();
-        params.append('min_expires_date', minExpiresDate);
+        if (!filters?.minExpiresDate) {
+          const now = new Date();
+          const minExpiresDate = now.toISOString();
+          params.append('min_expires_date', minExpiresDate);
+        }
         
         // Фильтр по количеству - только товары в наличии (count > 0)
-        params.append('min_count', '1');
+        params.append('min_count', String(filters?.minCount ?? 1));
+      } else if (filters?.minCount !== undefined) {
+        params.append('min_count', filters.minCount.toString());
       }
       
       // Всегда используем /offers/with-products для получения данных с продуктами
@@ -399,6 +429,13 @@ export const useOffers = () => {
     minLongitude: number;
     maxLongitude: number;
     searchQuery?: string;
+    categoryIds?: number[];
+    minPrice?: number;
+    maxPrice?: number;
+    minExpiresDate?: string;
+    maxExpiresDate?: string;
+    minCount?: number;
+    isDynamicPricing?: boolean;
   }) => {
     await fetchOffers(filters);
   }, [fetchOffers]);

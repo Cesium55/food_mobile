@@ -25,6 +25,14 @@ interface OfferActionsProps {
   isMaxQuantity: boolean;
 }
 
+function formatPrice(value: number): string {
+  if (!Number.isFinite(value)) {
+    return '0.00';
+  }
+
+  return value.toFixed(2);
+}
+
 export function OfferActions({
   isInCart,
   currentPrice,
@@ -108,12 +116,12 @@ export function OfferActions({
         <View style={[styles.priceContainer, isInCart && styles.priceContainerCenter]}>
           <View style={styles.priceRow}>
             <Text style={styles.currentPrice}>
-              {isInCart ? (currentPrice * quantity).toFixed(0) : currentPrice.toFixed(0)} ₽
+              {isInCart ? formatPrice(currentPrice * quantity) : formatPrice(currentPrice)} ₽
             </Text>
             {/* Зачеркнутая цена - уезжает вправо */}
             {!isInCart && currentPrice < originalPrice && (
               <Animated.Text style={[styles.originalPrice, strikethroughStyle]}>
-                {originalPrice.toFixed(0)} ₽
+                {formatPrice(originalPrice)} ₽
               </Animated.Text>
             )}
           </View>

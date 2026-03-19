@@ -1,5 +1,6 @@
 ﻿import { GridOfferList } from '@/components/offers/GridOfferList';
 import { createProductModal } from '@/components/product/ProductModalContent';
+import { SearchFiltersModal, SearchFiltersValue } from '@/components/search/SearchFiltersModal';
 import Search from '@/components/search/search';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { spacing, typography } from '@/constants/tokens';
@@ -9,17 +10,62 @@ import { Offer, useOffers } from '@/hooks/useOffers';
 import { getLocationWithCache } from '@/services/locationService';
 import { getBoundingBox } from '@/utils/locationUtils';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+
+function hasActiveFilters(filters: SearchFiltersValue) {
+  return Boolean(
+    filters.searchQuery.trim() ||
+      filters.minPrice !== undefined ||
+      filters.maxPrice !== undefined ||
+      filters.minExpiryHours !== undefined ||
+      filters.maxExpiryHours !== undefined ||
+      filters.minCount !== undefined ||
+      filters.dynamicPricing !== undefined ||
+      filters.categoryIds.length > 0
+  );
+}
+
+function buildServerFilters(filters: SearchFiltersValue) {
+  const now = Date.now();
+
+  return {
+    searchQuery: filters.searchQuery.trim(),
+    categoryIds: filters.categoryIds,
+    minPrice: filters.minPrice,
+    maxPrice: filters.maxPrice,
+    minCount: filters.minCount,
+    isDynamicPricing: filters.dynamicPricing,
+    minExpiresDate:
+      filters.minExpiryHours !== undefined
+        ? new Date(now + filters.minExpiryHours * 60 * 60 * 1000).toISOString()
+        : undefined,
+    maxExpiresDate:
+      filters.maxExpiryHours !== undefined
+        ? new Date(now + filters.maxExpiryHours * 60 * 60 * 1000).toISOString()
+        : undefined,
+  };
+}
+
+function getOfferCurrentPrice(offer: Offer) {
+  const rawValue = offer.currentCost ?? offer.originalCost;
+  const parsedValue = Number(rawValue);
+  return Number.isFinite(parsedValue) ? parsedValue : 0;
+}
 
 export default function SearchScreen() {
   const { q } = useLocalSearchParams<{ q?: string }>();
   const initialQuery = typeof q === 'string' ? q : '';
   const [searchText, setSearchText] = useState(initialQuery);
   const [submittedQuery, setSubmittedQuery] = useState(initialQuery.trim());
+  const [appliedFilters, setAppliedFilters] = useState<SearchFiltersValue>({
+    searchQuery: initialQuery.trim(),
+    categoryIds: [],
+  });
   const [searchNonce, setSearchNonce] = useState(initialQuery.trim() ? 1 : 0);
   const [hasCompletedSearch, setHasCompletedSearch] = useState(false);
+  const [isFiltersVisible, setIsFiltersVisible] = useState(false);
   const { offers, fetchOffers, fetchOffersWithLocation, loading } = useOffers();
   const { openModal } = useModal();
   const colors = useColors();
@@ -29,16 +75,21 @@ export default function SearchScreen() {
     const normalizedQuery = initialQuery.trim();
     setSearchText(initialQuery);
     setSubmittedQuery(normalizedQuery);
+    setAppliedFilters({
+      searchQuery: normalizedQuery,
+      categoryIds: [],
+    });
     setSearchNonce(normalizedQuery ? 1 : 0);
     setHasCompletedSearch(false);
   }, [initialQuery]);
 
   useEffect(() => {
-    if (!submittedQuery || searchNonce === 0) {
+    if (searchNonce === 0 || !hasActiveFilters(appliedFilters)) {
       return;
     }
 
     let isActive = true;
+    const requestFilters = buildServerFilters(appliedFilters);
 
     const runSearch = async () => {
       setHasCompletedSearch(false);
@@ -52,7 +103,7 @@ export default function SearchScreen() {
         const boundingBox = getBoundingBox(location.latitude, location.longitude, 1000);
         await fetchOffersWithLocation({
           ...boundingBox,
-          searchQuery: submittedQuery,
+          ...requestFilters,
         });
 
         if (isActive) {
@@ -61,7 +112,7 @@ export default function SearchScreen() {
         return;
       }
 
-      await fetchOffers({ searchQuery: submittedQuery });
+      await fetchOffers(requestFilters);
       if (isActive) {
         setHasCompletedSearch(true);
       }
@@ -72,11 +123,88 @@ export default function SearchScreen() {
     return () => {
       isActive = false;
     };
-  }, [fetchOffers, fetchOffersWithLocation, searchNonce, submittedQuery]);
+  }, [appliedFilters, fetchOffers, fetchOffersWithLocation, searchNonce]);
+
+  const filteredOffers = useMemo(() => {
+    const now = Date.now();
+
+    return offers.filter((offer) => {
+      const currentPrice = getOfferCurrentPrice(offer);
+      const expiresAt = new Date(offer.expiresDate).getTime();
+      const remainingHours = (expiresAt - now) / (60 * 60 * 1000);
+
+      if (
+        appliedFilters.searchQuery.trim() &&
+        !offer.productName.toLowerCase().includes(appliedFilters.searchQuery.trim().toLowerCase()) &&
+        !(offer.description || '').toLowerCase().includes(appliedFilters.searchQuery.trim().toLowerCase())
+      ) {
+        return false;
+      }
+
+      if (appliedFilters.minPrice !== undefined && currentPrice < appliedFilters.minPrice) {
+        return false;
+      }
+
+      if (appliedFilters.maxPrice !== undefined && currentPrice > appliedFilters.maxPrice) {
+        return false;
+      }
+
+      if (
+        appliedFilters.minExpiryHours !== undefined &&
+        remainingHours < appliedFilters.minExpiryHours
+      ) {
+        return false;
+      }
+
+      if (
+        appliedFilters.maxExpiryHours !== undefined &&
+        remainingHours > appliedFilters.maxExpiryHours
+      ) {
+        return false;
+      }
+
+      if (appliedFilters.minCount !== undefined && offer.count < appliedFilters.minCount) {
+        return false;
+      }
+
+      if (
+        appliedFilters.dynamicPricing !== undefined &&
+        offer.isDynamicPricing !== appliedFilters.dynamicPricing
+      ) {
+        return false;
+      }
+
+      if (
+        appliedFilters.categoryIds.length > 0 &&
+        !appliedFilters.categoryIds.some((categoryId) => offer.productCategoryIds.includes(categoryId))
+      ) {
+        return false;
+      }
+
+      return true;
+    });
+  }, [appliedFilters, offers]);
 
   const handleSearchSubmit = () => {
     const trimmedQuery = searchText.trim();
+    const nextFilters = {
+      ...appliedFilters,
+      searchQuery: trimmedQuery,
+    };
     setSubmittedQuery(trimmedQuery);
+    setAppliedFilters(nextFilters);
+    setSearchNonce((current) => current + 1);
+  };
+
+  const handleApplyFilters = (value: SearchFiltersValue) => {
+    const normalizedQuery = value.searchQuery.trim();
+    const nextFilters = {
+      ...value,
+      searchQuery: normalizedQuery,
+    };
+    setSearchText(normalizedQuery);
+    setSubmittedQuery(normalizedQuery);
+    setAppliedFilters(nextFilters);
     setSearchNonce((current) => current + 1);
   };
 
@@ -104,6 +232,14 @@ export default function SearchScreen() {
             autoFocus={!initialQuery}
           />
         </View>
+        <TouchableOpacity
+          style={styles.filterButton}
+          onPress={() => setIsFiltersVisible(true)}
+          activeOpacity={0.7}
+        >
+          <IconSymbol name="filter" size={22} color={colors.text.primary} />
+          {hasActiveFilters({ ...appliedFilters, searchQuery: '' }) && <View style={styles.filterBadge} />}
+        </TouchableOpacity>
       </View>
 
       <ScrollView
@@ -112,31 +248,44 @@ export default function SearchScreen() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        {!submittedQuery ? (
+        {!hasActiveFilters(appliedFilters) ? (
           <View style={styles.centerState}>
             <Text style={styles.title}>Поиск</Text>
             <Text style={styles.subtitle}>Введите запрос и нажмите кнопку поиска</Text>
           </View>
-        ) : (!hasCompletedSearch || loading) && offers.length === 0 ? (
+        ) : (!hasCompletedSearch || loading) && filteredOffers.length === 0 ? (
           <View style={styles.centerState}>
             <ActivityIndicator size="large" color="#FF6B00" />
-            <Text style={styles.subtitle}>Ищем результаты по запросу "{submittedQuery}"</Text>
+            <Text style={styles.subtitle}>
+              {submittedQuery
+                ? `Ищем результаты по запросу "${submittedQuery}"`
+                : 'Ищем результаты по заданным фильтрам'}
+            </Text>
           </View>
-        ) : hasCompletedSearch && offers.length === 0 ? (
+        ) : hasCompletedSearch && filteredOffers.length === 0 ? (
           <View style={styles.centerState}>
             <Text style={styles.title}>Ничего не найдено</Text>
             <Text style={styles.subtitle}>Попробуйте другой запрос</Text>
           </View>
         ) : (
           <>
-            <Text style={styles.resultsTitle}>Результаты: {submittedQuery}</Text>
+            <Text style={styles.resultsTitle}>
+              {submittedQuery ? `Результаты: ${submittedQuery}` : 'Результаты по фильтрам'}
+            </Text>
             <GridOfferList
-              offers={offers}
+              offers={filteredOffers}
               onOfferPress={handleOfferPress}
             />
           </>
         )}
       </ScrollView>
+
+      <SearchFiltersModal
+        visible={isFiltersVisible}
+        initialValue={appliedFilters}
+        onClose={() => setIsFiltersVisible(false)}
+        onApply={handleApplyFilters}
+      />
     </SafeAreaView>
   );
 }
@@ -165,6 +314,24 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   searchWrapper: {
     flex: 1,
+  },
+  filterButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+    position: 'relative',
+  },
+  filterBadge: {
+    position: 'absolute',
+    top: 9,
+    right: 9,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#FF6B00',
   },
   content: {
     flex: 1,

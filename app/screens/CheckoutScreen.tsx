@@ -1,7 +1,7 @@
 import { PaymentWebView } from "@/components/payment/PaymentWebView";
 import { IconSymbol } from "@/components/ui/icon-symbol";
-import { spacing } from "@/constants/tokens";
 import { Colors } from "@/constants/theme";
+import { spacing } from "@/constants/tokens";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useCart } from "@/hooks/useCart";
 import { useOffers } from "@/hooks/useOffers";
@@ -790,7 +790,7 @@ export default function CheckoutScreen() {
 
   if (loadingOrder) {
     return (
-      <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]} edges={['top']}>
+      <SafeAreaView style={[styles.safeArea]} edges={['top']}>
         <View style={styles.header}>
           <TouchableOpacity 
             style={styles.backButton}
@@ -802,12 +802,12 @@ export default function CheckoutScreen() {
               size={24}
             />
           </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: colors.text }]}>Оформление заказа</Text>
+          <Text style={[styles.headerTitle]}>Оформление заказа</Text>
           <View style={styles.headerSpacer} />
         </View>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#4CAF50" />
-          <Text style={[styles.loadingText, { color: colors.text }]}>Загрузка данных заказа...</Text>
+          <Text style={[styles.loadingText]}>Загрузка данных заказа...</Text>
         </View>
       </SafeAreaView>
     );
@@ -815,10 +815,10 @@ export default function CheckoutScreen() {
 
   if (!orderData || !purchase) {
     return (
-      <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]} edges={['top']}>
-        <View style={styles.header}>
+      <SafeAreaView style={[styles.safeArea]} edges={['top']}>
+        <View >
           <TouchableOpacity 
-            style={styles.backButton}
+            
             onPress={handleBackPress}
           >
             <IconSymbol 
@@ -827,7 +827,7 @@ export default function CheckoutScreen() {
               size={24}
             />
           </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: colors.text }]}>Оформление заказа</Text>
+          <Text style={[styles.headerTitle]}>Оформление заказа</Text>
           <View style={styles.headerSpacer} />
         </View>
         <View style={styles.errorContainer}>
@@ -838,7 +838,7 @@ export default function CheckoutScreen() {
   }
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]} edges={['top']}>
+    <SafeAreaView style={[styles.safeArea]} edges={['top']}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity 
@@ -847,11 +847,11 @@ export default function CheckoutScreen() {
         >
           <IconSymbol 
             name="arrow.left" 
-            color={colors.text}
+            color={"#888888"}
             size={24}
           />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>
+        <Text style={[styles.headerTitle]} numberOfLines={1}>
           Оформление заказа
         </Text>
         <View style={styles.headerSpacer} />
