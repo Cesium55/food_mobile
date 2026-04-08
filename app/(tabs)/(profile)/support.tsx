@@ -62,6 +62,14 @@ function formatMessageDateTime(dateString: string): string {
   return `${day}.${month}.${year} ${hours}:${minutes}`;
 }
 
+type WsConnectionStatus = 'disconnected' | 'connecting' | 'connected';
+
+const WS_STATUS_META: Record<WsConnectionStatus, { label: string; color: string }> = {
+  disconnected: { label: 'Нет подключения', color: '#DC2626' },
+  connecting: { label: 'Подключение', color: '#EAB308' },
+  connected: { label: 'Подключено', color: '#16A34A' },
+};
+
 export default function SupportScreen() {
   const [messages, setMessages] = useState<SupportMessage[]>([]);
   const [inputValue, setInputValue] = useState('');
@@ -69,6 +77,7 @@ export default function SupportScreen() {
   const [sending, setSending] = useState(false);
   const [errorText, setErrorText] = useState<string | null>(null);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const [wsStatus, setWsStatus] = useState<WsConnectionStatus>('connecting');
   const insets = useSafeAreaInsets();
 
   const wsRef = useRef<WebSocket | null>(null);
@@ -80,6 +89,8 @@ export default function SupportScreen() {
   const unreadIncomingCount = useMemo(() => {
     return messages.filter((item) => item.sender_type !== 'user' && !item.is_read).length;
   }, [messages]);
+
+  const wsStatusMeta = WS_STATUS_META[wsStatus];
 
   const clearSocketArtifacts = useCallback(() => {
     if (pingIntervalRef.current) {
@@ -133,17 +144,24 @@ export default function SupportScreen() {
   }, []);
 
   const connectWs = useCallback(async () => {
+    setWsStatus('connecting');
+
     try {
       const ws = await openSupportWebSocket();
       wsRef.current = ws;
 
       ws.onopen = () => {
+        setWsStatus('connected');
         setErrorText(null);
         pingIntervalRef.current = setInterval(() => {
           if (ws.readyState === WebSocket.OPEN) {
             ws.send(JSON.stringify({ action: 'ping' }));
           }
         }, 25000);
+      };
+
+      ws.onerror = () => {
+        setWsStatus('disconnected');
       };
 
       ws.onmessage = (event) => {
@@ -157,6 +175,7 @@ export default function SupportScreen() {
 
       ws.onclose = () => {
         clearSocketArtifacts();
+        setWsStatus('disconnected');
         if (!unmountedRef.current) {
           reconnectTimeoutRef.current = setTimeout(() => {
             connectWs();
@@ -164,6 +183,7 @@ export default function SupportScreen() {
         }
       };
     } catch {
+      setWsStatus('disconnected');
       if (!unmountedRef.current) {
         reconnectTimeoutRef.current = setTimeout(() => {
           connectWs();
@@ -268,6 +288,11 @@ export default function SupportScreen() {
       avoidKeyboard={false}
     >
       <View style={[styles.screenContent, { paddingBottom: keyboardOffset }]}>
+        <View style={styles.statusBar}>
+          <View style={[styles.statusDot, { backgroundColor: wsStatusMeta.color }]} />
+          <Text style={styles.statusText}>{wsStatusMeta.label}</Text>
+        </View>
+
         <View style={styles.messagesSection}>
           {loading ? (
             <View style={styles.loaderContainer}>
@@ -368,6 +393,22 @@ const styles = StyleSheet.create({
     marginTop: -40,
     paddingTop: 40,
     backgroundColor: '#eee',
+  },
+  statusBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingBottom: 8,
+  },
+  statusDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 999,
+  },
+  statusText: {
+    fontSize: 13,
+    color: '#4B5563',
   },
   container: {
     flex: 1,
@@ -521,4 +562,3 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
 });
-
