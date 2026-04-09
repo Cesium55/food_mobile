@@ -127,14 +127,18 @@ export default function Cart() {
   );
 
   useEffect(() => {
-    if (cartItems.length === 0) return;
+    if (isLoading) return;
+
+    const uniqueOfferIds = cartOfferIdsKey
+      ? cartOfferIdsKey.split(',').map(id => Number(id)).filter(id => Number.isFinite(id))
+      : [];
+
+    if (uniqueOfferIds.length === 0) return;
 
     let cancelled = false;
 
     const loadCartOffers = async () => {
-      const uniqueOfferIds = cartOfferIdsKey
-        ? cartOfferIdsKey.split(',').map(id => Number(id)).filter(id => Number.isFinite(id))
-        : [];
+      console.log('[Cart] load offers for cart ids:', uniqueOfferIds);
 
       await fetchOffers({
         skipDefaultFilters: true,
@@ -156,7 +160,7 @@ export default function Cart() {
     return () => {
       cancelled = true;
     };
-  }, [cartItems.length, cartOfferIdsKey, fetchOffers, fetchOfferById]);
+  }, [isLoading, cartOfferIdsKey, fetchOffers, fetchOfferById]);
   
   // Простые функции для изменения количества
   const handleIncrease = (itemId: number) => {
