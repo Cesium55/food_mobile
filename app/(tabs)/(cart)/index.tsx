@@ -98,9 +98,6 @@ export default function Cart() {
   const navigation = useNavigation();
   const scrollViewRef = useRef<ScrollView>(null);
   const { 
-    getCartByShops, 
-    getTotalAmount, 
-    getTotalAmountSelected,
     increaseQuantity,
     decreaseQuantity,
     removeItem,
@@ -115,7 +112,7 @@ export default function Cart() {
     refreshCart,
   } = useCart();
   
-  const { getOfferById, fetchOffers, fetchOfferById } = useOffers();
+  const { getOfferById, fetchOfferWithProductById } = useOffers();
   const { getShopById } = useShops();
   
   const [currentOrder, setCurrentOrder] = useState<{ id: number; total: number } | null>(null);
@@ -138,20 +135,9 @@ export default function Cart() {
     let cancelled = false;
 
     const loadCartOffers = async () => {
-      console.log('[Cart] load offers for cart ids:', uniqueOfferIds);
-
-      await fetchOffers({
-        skipDefaultFilters: true,
-        minCount: 0,
-        preserveExisting: true,
-        offerIds: uniqueOfferIds,
-        limit: Math.max(uniqueOfferIds.length, 50),
-      });
-
-      // Fallback: гарантированно подгружаем офферы именно из корзины по ID
       await Promise.all(uniqueOfferIds.map(async (id) => {
         if (cancelled) return;
-        await fetchOfferById(id);
+        await fetchOfferWithProductById(id);
       }));
     };
 
@@ -160,7 +146,7 @@ export default function Cart() {
     return () => {
       cancelled = true;
     };
-  }, [isLoading, cartOfferIdsKey, fetchOffers, fetchOfferById]);
+  }, [isLoading, cartOfferIdsKey, fetchOfferWithProductById]);
   
   // Простые функции для изменения количества
   const handleIncrease = (itemId: number) => {
@@ -179,16 +165,53 @@ export default function Cart() {
     decreaseQuantity(itemId);
   };
   
-  // Вычисляем данные корзины
-  const cartByShops = getCartByShops();
+  // Вычисляем данные корзины на основе офферов
   const selectedCartItems = cartItems.filter(item => selectedItems.has(item.id));
   const selectedItemsCount = selectedCartItems.reduce((sum, item) => sum + item.quantity, 0);
   const originalTotalSelected = selectedCartItems.reduce((sum, item) => {
-    return sum + (parseFloat(item.originalCost) * item.quantity);
+    const offer = getOfferById(item.offerId);
+    if (!offer) return sum;
+    return sum + (parseFloat(offer.originalCost) * item.quantity);
   }, 0);
-  const totalAmountSelected = getTotalAmountSelected();
+  const totalAmountSelected = selectedCartItems.reduce((sum, item) => {
+    const offer = getOfferById(item.offerId);
+    if (!offer) return sum;
+    const current = offer.currentCost !== null ? parseFloat(offer.currentCost) : parseFloat(offer.originalCost);
+    return sum + (current * item.quantity);
+  }, 0);
   const totalDiscountSelected = originalTotalSelected - totalAmountSelected;
   const finalTotal = totalAmountSelected;
+
+  const cartByShops = useMemo(() => {
+    const grouped = new Map<number, {
+      shopId: number;
+      shopName: string;
+      shopAddress: string;
+      items: any[];
+      total: number;
+    }>();
+
+    cartItems.forEach(item => {
+      const offer = getOfferById(item.offerId);
+      if (!offer) return;
+      const current = offer.currentCost !== null ? parseFloat(offer.currentCost) : parseFloat(offer.originalCost);
+      const key = offer.shopId;
+      if (!grouped.has(key)) {
+        grouped.set(key, {
+          shopId: offer.shopId,
+          shopName: offer.shopShortName || `Магазин #${offer.shopId}`,
+          shopAddress: '',
+          items: [],
+          total: 0,
+        });
+      }
+      const group = grouped.get(key)!;
+      group.items.push(item);
+      group.total += current * item.quantity;
+    });
+
+    return Array.from(grouped.values());
+  }, [cartItems, getOfferById]);
   
   const statusValidators = [expiredItemValidator];
 

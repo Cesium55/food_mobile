@@ -1,22 +1,9 @@
-import { ProductImage } from '@/hooks/useOffers';
-
 // Экспортируем только типы, сама логика перенесена в CartContext
 export interface CartItem {
-  id: number;
+  id: number; // Технический идентификатор в рантайме (равен offerId)
   offerId: number; // product_entry.id
-  productName: string;
-  productImages?: ProductImage[];
-  productImageUrl?: string | null;
-  shopId: number;
-  shopName: string;
-  sellerId?: number; // ID продавца
-  originalCost: string; // Цена без скидки (decimal формат)
-  currentCost: string | null; // Цена со скидкой (может быть null для динамического ценообразования, decimal формат)
-  discount: number; // Процент скидки
+  status: 'active' | 'inactive';
   quantity: number;
-  expiresDate: Date;
-  maxQuantity?: number; // Доступное количество на складе
-  selected?: boolean; // Выбран ли товар для покупки
 }
 
 export interface CartGroup {

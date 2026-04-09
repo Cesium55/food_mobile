@@ -1,6 +1,5 @@
 import { CartGroup } from "@/hooks/useCart";
 import { Offer } from "@/hooks/useOffers";
-import { getFirstImageUrl } from "@/utils/imageUtils";
 import { StyleSheet, Text, View } from "react-native";
 import { CartItem } from "./CartItem";
 import { ItemStatusValidator } from "./types";
@@ -53,7 +52,7 @@ export function ShopGroup({
           <CartItem
             key={item.id}
             item={item}
-            imageUrl={getFirstImageUrl(getOfferById?.(item.offerId)?.productImages)}
+            offer={getOfferById?.(item.offerId)}
             status={itemStatus}
             selected={selectedItems?.has(item.id) ?? true}
             onIncrease={onIncrease}

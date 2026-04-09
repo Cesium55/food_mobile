@@ -557,6 +557,39 @@ export const useOffers = () => {
     }
   }, [transformOffer]);
 
+  const fetchOfferWithProductById = useCallback(async (offerId: number): Promise<Offer | null> => {
+    try {
+      const url = getApiUrl(API_ENDPOINTS.OFFERS.WITH_PRODUCT_BY_ID(offerId));
+      const response = await authFetch(url, {
+        method: 'GET',
+        requireAuth: false,
+      });
+
+      if (!response.ok) {
+        return null;
+      }
+
+      const data = await response.json();
+      const offerData = data.data || data;
+      const transformedOffer = transformOffer(offerData as OfferApi);
+
+      setOffers(prevOffers => {
+        const existingIndex = prevOffers.findIndex(o => o.id === transformedOffer.id);
+        if (existingIndex === -1) {
+          return [...prevOffers, transformedOffer];
+        }
+
+        const next = [...prevOffers];
+        next[existingIndex] = transformedOffer;
+        return next;
+      });
+
+      return transformedOffer;
+    } catch {
+      return null;
+    }
+  }, [transformOffer]);
+
   const getOfferById = (id: number): Offer | undefined => {
     return offers.find((offer) => offer.id === id);
   };
@@ -688,6 +721,7 @@ export const useOffers = () => {
     fetchOffersWithLocation,
     fetchOffersByCategory,
     fetchOfferById,
+    fetchOfferWithProductById,
     getOfferById,
     getOffersByShop,
     getOffersBySeller,

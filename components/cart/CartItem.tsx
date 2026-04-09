@@ -1,17 +1,16 @@
 import { CartItem as CartItemType } from "@/hooks/useCart";
-import { API_ENDPOINTS } from "@/constants/api";
-import { getApiUrl } from "@/constants/env";
+import { Offer } from "@/hooks/useOffers";
 import { IconSymbol } from "@/components/ui/icon-symbol";
-import { authFetch } from "@/utils/authFetch";
 import { getFirstImageUrl } from "@/utils/imageUtils";
+import { getCurrentPrice } from "@/utils/pricingUtils";
 import { useRouter, useSegments } from "expo-router";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { ItemStatus } from "./types";
 
 interface CartItemProps {
   item: CartItemType;
-  imageUrl?: string | null;
+  offer?: Offer;
   status: ItemStatus;
   selected?: boolean;
   onIncrease: (itemId: number) => void;
@@ -20,69 +19,22 @@ interface CartItemProps {
   onToggleSelection?: (itemId: number) => void;
 }
 
-export function CartItem({ item, imageUrl, status, selected = true, onIncrease, onDecrease, onRemove, onToggleSelection }: CartItemProps) {
+export function CartItem({ item, offer, status, selected = true, onIncrease, onDecrease, onRemove, onToggleSelection }: CartItemProps) {
   const router = useRouter();
   const segments = useSegments();
   const [imageError, setImageError] = useState(false);
-  const [resolvedImageUrl, setResolvedImageUrl] = useState<string | null>(imageUrl ?? null);
+  const imageUrl = offer ? getFirstImageUrl(offer.productImages) : null;
+  const hasImage = imageUrl && !imageError;
 
-  useEffect(() => {
-    setResolvedImageUrl(imageUrl ?? null);
-    setImageError(false);
-  }, [imageUrl]);
-
-  useEffect(() => {
-    if (imageUrl) return;
-
-    let cancelled = false;
-
-    const loadImageByOfferId = async () => {
-      try {
-        const url = `${getApiUrl(API_ENDPOINTS.OFFERS.WITH_PRODUCTS)}?offer_ids=${item.offerId}&skip=0&limit=1&min_count=0`;
-        const response = await authFetch(url, {
-          method: "GET",
-          requireAuth: false,
-        });
-
-        if (!response.ok) return;
-
-        const data = await response.json();
-        const offersData = data.data || data;
-        if (!Array.isArray(offersData) || offersData.length === 0) return;
-
-        const rawOffer = offersData.find((offer: any) => Number(offer.id) === Number(item.offerId)) || offersData[0];
-        const images = rawOffer?.product?.images || [];
-        const nextImageUrl = getFirstImageUrl(images);
-
-        if (!cancelled && nextImageUrl) {
-          setResolvedImageUrl(nextImageUrl);
-          setImageError(false);
-        }
-      } catch {
-        // ignore
-      }
-    };
-
-    loadImageByOfferId();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [item.offerId, imageUrl]);
-
-  const hasImage = resolvedImageUrl && !imageError;
+  const expiryDate = offer?.expiresDate ? new Date(offer.expiresDate) : null;
   
-  // Безопасная конвертация expiresDate в Date объект
-  const expiryDate = item.expiresDate instanceof Date 
-    ? item.expiresDate 
-    : new Date(item.expiresDate || new Date());
-  
-  const daysUntilExpiry = Math.ceil(
-    (expiryDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)
-  );
+  const daysUntilExpiry = expiryDate
+    ? Math.ceil((expiryDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
+    : null;
 
   const getExpiryColor = () => {
-    if (daysUntilExpiry < 0) return { bg: '#F5F5F5', text: '#999' }; // Просрочен
+    if (daysUntilExpiry === null) return { bg: '#F5F5F5', text: '#999' };
+    if (daysUntilExpiry < 0) return { bg: '#F5F5F5', text: '#999' };
     if (daysUntilExpiry >= 7) return { bg: '#E8F5E9', text: '#4CAF50' };
     if (daysUntilExpiry >= 3) return { bg: '#FFF3E0', text: '#F57C00' };
     return { bg: '#FFEBEE', text: '#F44336' };
@@ -97,7 +49,11 @@ export function CartItem({ item, imageUrl, status, selected = true, onIncrease, 
 
   const expiryColors = getExpiryColor();
   const isInactive = status.isInactive;
-  const isAtMax = item.maxQuantity !== undefined && item.quantity >= item.maxQuantity;
+  const isAtMax = offer ? item.quantity >= offer.count : false;
+  const productName = offer?.productName || `Товар #${item.offerId}`;
+  const currentCost = offer ? getCurrentPrice(offer) : null;
+  const originalCost = offer ? offer.originalCost : null;
+  const discount = offer ? offer.discount : 0;
 
   const handleProductPress = () => {
     // Определяем текущую вкладку
@@ -115,7 +71,7 @@ export function CartItem({ item, imageUrl, status, selected = true, onIncrease, 
       >
         {hasImage ? (
           <Image
-            source={{ uri: resolvedImageUrl! }}
+            source={{ uri: imageUrl! }}
             style={[styles.itemImage, isInactive && styles.inactiveImage]}
             onError={() => setImageError(true)}
             resizeMode="cover"
@@ -123,7 +79,7 @@ export function CartItem({ item, imageUrl, status, selected = true, onIncrease, 
         ) : (
           <View style={[styles.itemImagePlaceholder, isInactive && styles.inactiveImage]}>
             <Text style={[styles.itemImageText, isInactive && styles.inactiveText]}>
-              {item.productName.charAt(0)}
+              {productName.charAt(0)}
             </Text>
           </View>
         )}
@@ -132,7 +88,7 @@ export function CartItem({ item, imageUrl, status, selected = true, onIncrease, 
       <View style={styles.itemInfo}>
         <TouchableOpacity onPress={handleProductPress} activeOpacity={0.7}>
           <Text style={[styles.itemName, isInactive && styles.inactiveTextColor]} numberOfLines={2}>
-            {item.productName}
+            {productName}
           </Text>
         </TouchableOpacity>
         
@@ -143,24 +99,24 @@ export function CartItem({ item, imageUrl, status, selected = true, onIncrease, 
           </View>
         )}
         
-        {/* Цена со скидкой */}
+        {/* Цена */}
         <View style={styles.priceRow}>
-          {item.currentCost !== null && (
+          {currentCost !== null && originalCost !== null && (
             <>
               <Text style={[styles.originalPrice, isInactive && styles.inactiveTextColor]}>
-                {item.originalCost} ₽
+                {originalCost} ₽
               </Text>
               <Text style={[styles.currentPrice, isInactive && styles.inactiveTextColor]}>
-                {item.currentCost} ₽
+                {currentCost} ₽
               </Text>
-              {item.discount > 0 && (
+              {discount > 0 && (
                 <View style={[styles.itemDiscountBadge, isInactive && styles.inactiveBadge]}>
-                  <Text style={styles.discountBadgeText}>-{item.discount}%</Text>
+                  <Text style={styles.discountBadgeText}>-{discount}%</Text>
                 </View>
               )}
             </>
           )}
-          {item.currentCost === null && (
+          {currentCost === null && (
             <Text style={[styles.currentPrice, isInactive && styles.inactiveTextColor]}>
               Цена рассчитывается
             </Text>
@@ -170,7 +126,11 @@ export function CartItem({ item, imageUrl, status, selected = true, onIncrease, 
         {/* Срок годности с цветовой индикацией */}
         <View style={[styles.expiryContainer, { backgroundColor: expiryColors.bg }]}>
           <Text style={[styles.expiryText, { color: expiryColors.text }]}>
-            {daysUntilExpiry < 0 ? 'Просрочен' : `${daysUntilExpiry} ${getDaysWord(daysUntilExpiry)}`}
+            {daysUntilExpiry === null
+              ? 'Срок не указан'
+              : daysUntilExpiry < 0
+                ? 'Просрочен'
+                : `${daysUntilExpiry} ${getDaysWord(daysUntilExpiry)}`}
           </Text>
         </View>
         
@@ -197,15 +157,6 @@ export function CartItem({ item, imageUrl, status, selected = true, onIncrease, 
             </TouchableOpacity>
           </View>
         )}
-      </View>
-
-      <View style={styles.itemPriceContainer}>
-        <Text style={[styles.itemTotal, isInactive && styles.inactiveTextColor]}>
-          {item.currentCost !== null 
-            ? (parseFloat(item.currentCost) * item.quantity).toFixed(2) + ' ₽'
-            : 'Рассчитывается'
-          }
-        </Text>
       </View>
 
       <View style={styles.actions}>

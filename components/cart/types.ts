@@ -21,14 +21,10 @@ export type ItemStatusValidator = (item: CartItem) => ItemStatus;
  * Проверка на просроченность товара
  */
 export const expiredItemValidator: ItemStatusValidator = (item: CartItem): ItemStatus => {
-  const daysUntilExpiry = Math.ceil(
-    (item.expiresDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)
-  );
-  
-  if (daysUntilExpiry < 0) {
+  if (item.status === 'inactive') {
     return {
       isInactive: true,
-      inactiveReason: 'Продукт просрочен',
+      inactiveReason: 'Продукт недоступен',
     };
   }
   
@@ -60,4 +56,3 @@ export const combineValidators = (
   }
   return { isInactive: false };
 };
-
