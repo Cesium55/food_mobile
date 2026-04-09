@@ -1,7 +1,11 @@
 import { CartItem as CartItemType } from "@/hooks/useCart";
+import { API_ENDPOINTS } from "@/constants/api";
+import { getApiUrl } from "@/constants/env";
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import { authFetch } from "@/utils/authFetch";
+import { getFirstImageUrl } from "@/utils/imageUtils";
 import { useRouter, useSegments } from "expo-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { ItemStatus } from "./types";
 
@@ -20,8 +24,53 @@ export function CartItem({ item, imageUrl, status, selected = true, onIncrease, 
   const router = useRouter();
   const segments = useSegments();
   const [imageError, setImageError] = useState(false);
+  const [resolvedImageUrl, setResolvedImageUrl] = useState<string | null>(imageUrl ?? null);
 
-  const hasImage = imageUrl && !imageError;
+  useEffect(() => {
+    setResolvedImageUrl(imageUrl ?? null);
+    setImageError(false);
+  }, [imageUrl]);
+
+  useEffect(() => {
+    if (imageUrl) return;
+
+    let cancelled = false;
+
+    const loadImageByOfferId = async () => {
+      try {
+        const url = `${getApiUrl(API_ENDPOINTS.OFFERS.WITH_PRODUCTS)}?offer_ids=${item.offerId}&skip=0&limit=1&min_count=0`;
+        const response = await authFetch(url, {
+          method: "GET",
+          requireAuth: false,
+        });
+
+        if (!response.ok) return;
+
+        const data = await response.json();
+        const offersData = data.data || data;
+        if (!Array.isArray(offersData) || offersData.length === 0) return;
+
+        const rawOffer = offersData.find((offer: any) => Number(offer.id) === Number(item.offerId)) || offersData[0];
+        const images = rawOffer?.product?.images || [];
+        const nextImageUrl = getFirstImageUrl(images);
+
+        if (!cancelled && nextImageUrl) {
+          setResolvedImageUrl(nextImageUrl);
+          setImageError(false);
+        }
+      } catch {
+        // ignore
+      }
+    };
+
+    loadImageByOfferId();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [item.offerId, imageUrl]);
+
+  const hasImage = resolvedImageUrl && !imageError;
   
   // Безопасная конвертация expiresDate в Date объект
   const expiryDate = item.expiresDate instanceof Date 
@@ -66,7 +115,7 @@ export function CartItem({ item, imageUrl, status, selected = true, onIncrease, 
       >
         {hasImage ? (
           <Image
-            source={{ uri: imageUrl! }}
+            source={{ uri: resolvedImageUrl! }}
             style={[styles.itemImage, isInactive && styles.inactiveImage]}
             onError={() => setImageError(true)}
             resizeMode="cover"
