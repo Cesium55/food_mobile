@@ -1,9 +1,18 @@
 // Экспортируем только типы, сама логика перенесена в CartContext
 export interface CartItem {
-  id: number; // Технический идентификатор в рантайме (равен offerId)
+  id: number;
   offerId: number; // product_entry.id
-  status: 'active' | 'inactive';
+  productName: string;
+  shopId: number;
+  shopName: string;
+  sellerId?: number; // ID продавца
+  originalCost: string; // Цена без скидки (decimal формат)
+  currentCost: string | null; // Цена со скидкой (может быть null для динамического ценообразования, decimal формат)
+  discount: number; // Процент скидки
   quantity: number;
+  expiresDate: Date;
+  maxQuantity?: number; // Доступное количество на складе
+  selected?: boolean; // Выбран ли товар для покупки
 }
 
 export interface CartGroup {
@@ -16,3 +25,4 @@ export interface CartGroup {
 
 // Реэкспортируем useCart из CartContext для обратной совместимости
 export { useCart } from '@/contexts/CartContext';
+

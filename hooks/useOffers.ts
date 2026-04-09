@@ -191,9 +191,6 @@ export const useOffers = () => {
     maxExpiresDate?: string;
     minCount?: number;
     isDynamicPricing?: boolean;
-    limit?: number;
-    skip?: number;
-    offerIds?: number[];
   }) => {
     const preserveExisting = filters?.preserveExisting ?? false;
 
@@ -252,20 +249,6 @@ export const useOffers = () => {
 
       if (filters?.isDynamicPricing !== undefined) {
         params.append('is_dynamic_pricing', String(filters.isDynamicPricing));
-      }
-
-      if (filters?.limit !== undefined) {
-        params.append('limit', String(filters.limit));
-      }
-
-      if (filters?.skip !== undefined) {
-        params.append('skip', String(filters.skip));
-      }
-
-      if (filters?.offerIds && filters.offerIds.length > 0) {
-        filters.offerIds.forEach(id => {
-          params.append('offer_ids', String(id));
-        });
       }
       
       // Добавляем дефолтные фильтры, если не указано skipDefaultFilters
@@ -503,93 +486,6 @@ export const useOffers = () => {
     }
   }, [transformOffer]);
 
-  // Функция для загрузки конкретного оффера по ID
-  // Нужна как fallback для экранов, где важны конкретные offerId (например, корзина)
-  const fetchOfferById = useCallback(async (offerId: number): Promise<Offer | null> => {
-    try {
-      const directUrl = getApiUrl(API_ENDPOINTS.OFFERS.UPDATE(offerId));
-      const directResponse = await authFetch(directUrl, {
-        method: 'GET',
-        requireAuth: false,
-      });
-
-      if (!directResponse.ok) {
-        return null;
-      }
-
-      const directData = await directResponse.json();
-      const directOfferData = directData.data || directData;
-      let transformedOffer = transformOffer(directOfferData as OfferApi);
-
-      // Некоторые бэкенд-эндпоинты по /offers/{id} не включают product.images.
-      // В этом случае добираем оффер через /offers/with-products?offer_ids={id}.
-      if (!transformedOffer.productImages || transformedOffer.productImages.length === 0) {
-        const fallbackUrl = `${getApiUrl(API_ENDPOINTS.OFFERS.WITH_PRODUCTS)}?offer_ids=${offerId}&skip=0&limit=1`;
-        const fallbackResponse = await authFetch(fallbackUrl, {
-          method: 'GET',
-          requireAuth: false,
-        });
-
-        if (fallbackResponse.ok) {
-          const fallbackData = await fallbackResponse.json();
-          const fallbackOffersData = fallbackData.data || fallbackData;
-          if (Array.isArray(fallbackOffersData) && fallbackOffersData.length > 0) {
-            const byId = fallbackOffersData.find((item: OfferApi) => Number(item.id) === offerId) || fallbackOffersData[0];
-            transformedOffer = transformOffer(byId as OfferApi);
-          }
-        }
-      }
-
-      setOffers(prevOffers => {
-        const existingIndex = prevOffers.findIndex(o => o.id === transformedOffer.id);
-        if (existingIndex === -1) {
-          return [...prevOffers, transformedOffer];
-        }
-
-        const next = [...prevOffers];
-        next[existingIndex] = transformedOffer;
-        return next;
-      });
-
-      return transformedOffer;
-    } catch {
-      return null;
-    }
-  }, [transformOffer]);
-
-  const fetchOfferWithProductById = useCallback(async (offerId: number): Promise<Offer | null> => {
-    try {
-      const url = getApiUrl(API_ENDPOINTS.OFFERS.WITH_PRODUCT_BY_ID(offerId));
-      const response = await authFetch(url, {
-        method: 'GET',
-        requireAuth: false,
-      });
-
-      if (!response.ok) {
-        return null;
-      }
-
-      const data = await response.json();
-      const offerData = data.data || data;
-      const transformedOffer = transformOffer(offerData as OfferApi);
-
-      setOffers(prevOffers => {
-        const existingIndex = prevOffers.findIndex(o => o.id === transformedOffer.id);
-        if (existingIndex === -1) {
-          return [...prevOffers, transformedOffer];
-        }
-
-        const next = [...prevOffers];
-        next[existingIndex] = transformedOffer;
-        return next;
-      });
-
-      return transformedOffer;
-    } catch {
-      return null;
-    }
-  }, [transformOffer]);
-
   const getOfferById = (id: number): Offer | undefined => {
     return offers.find((offer) => offer.id === id);
   };
@@ -720,8 +616,6 @@ export const useOffers = () => {
     fetchOffersForAdmin,
     fetchOffersWithLocation,
     fetchOffersByCategory,
-    fetchOfferById,
-    fetchOfferWithProductById,
     getOfferById,
     getOffersByShop,
     getOffersBySeller,

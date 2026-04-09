@@ -12,7 +12,7 @@ import { useShops } from "@/hooks/useShops";
 import { createOrderFromCart, getCurrentPendingPurchase, getPurchaseById } from "@/services/orderService";
 import { useNavigation } from "@react-navigation/native";
 import { useFocusEffect, useRouter } from "expo-router";
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 // Компонент для получения адреса магазина и названия продавца
@@ -86,7 +86,6 @@ function ShopGroupWithAddress({
       onDecrease={onDecrease}
       onRemove={onRemove}
       onToggleSelection={onToggleSelection}
-      getOfferById={getOfferById}
     />
   );
 }
@@ -98,6 +97,9 @@ export default function Cart() {
   const navigation = useNavigation();
   const scrollViewRef = useRef<ScrollView>(null);
   const { 
+    getCartByShops, 
+    getTotalAmount, 
+    getTotalAmountSelected,
     increaseQuantity,
     decreaseQuantity,
     removeItem,
@@ -112,41 +114,12 @@ export default function Cart() {
     refreshCart,
   } = useCart();
   
-  const { getOfferById, fetchOfferWithProductById } = useOffers();
+  const { getOfferById } = useOffers();
   const { getShopById } = useShops();
   
   const [currentOrder, setCurrentOrder] = useState<{ id: number; total: number } | null>(null);
   const [isCheckingOrder, setIsCheckingOrder] = useState(true);
   const [isCreatingOrder, setIsCreatingOrder] = useState(false);
-  const cartOfferIdsKey = useMemo(
-    () => cartItems.map(item => item.offerId).sort((a, b) => a - b).join(','),
-    [cartItems]
-  );
-
-  useEffect(() => {
-    if (isLoading) return;
-
-    const uniqueOfferIds = cartOfferIdsKey
-      ? cartOfferIdsKey.split(',').map(id => Number(id)).filter(id => Number.isFinite(id))
-      : [];
-
-    if (uniqueOfferIds.length === 0) return;
-
-    let cancelled = false;
-
-    const loadCartOffers = async () => {
-      await Promise.all(uniqueOfferIds.map(async (id) => {
-        if (cancelled) return;
-        await fetchOfferWithProductById(id);
-      }));
-    };
-
-    loadCartOffers();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [isLoading, cartOfferIdsKey, fetchOfferWithProductById]);
   
   // Простые функции для изменения количества
   const handleIncrease = (itemId: number) => {
@@ -165,53 +138,16 @@ export default function Cart() {
     decreaseQuantity(itemId);
   };
   
-  // Вычисляем данные корзины на основе офферов
+  // Вычисляем данные корзины
+  const cartByShops = getCartByShops();
   const selectedCartItems = cartItems.filter(item => selectedItems.has(item.id));
   const selectedItemsCount = selectedCartItems.reduce((sum, item) => sum + item.quantity, 0);
   const originalTotalSelected = selectedCartItems.reduce((sum, item) => {
-    const offer = getOfferById(item.offerId);
-    if (!offer) return sum;
-    return sum + (parseFloat(offer.originalCost) * item.quantity);
+    return sum + (parseFloat(item.originalCost) * item.quantity);
   }, 0);
-  const totalAmountSelected = selectedCartItems.reduce((sum, item) => {
-    const offer = getOfferById(item.offerId);
-    if (!offer) return sum;
-    const current = offer.currentCost !== null ? parseFloat(offer.currentCost) : parseFloat(offer.originalCost);
-    return sum + (current * item.quantity);
-  }, 0);
+  const totalAmountSelected = getTotalAmountSelected();
   const totalDiscountSelected = originalTotalSelected - totalAmountSelected;
   const finalTotal = totalAmountSelected;
-
-  const cartByShops = useMemo(() => {
-    const grouped = new Map<number, {
-      shopId: number;
-      shopName: string;
-      shopAddress: string;
-      items: any[];
-      total: number;
-    }>();
-
-    cartItems.forEach(item => {
-      const offer = getOfferById(item.offerId);
-      if (!offer) return;
-      const current = offer.currentCost !== null ? parseFloat(offer.currentCost) : parseFloat(offer.originalCost);
-      const key = offer.shopId;
-      if (!grouped.has(key)) {
-        grouped.set(key, {
-          shopId: offer.shopId,
-          shopName: offer.shopShortName || `Магазин #${offer.shopId}`,
-          shopAddress: '',
-          items: [],
-          total: 0,
-        });
-      }
-      const group = grouped.get(key)!;
-      group.items.push(item);
-      group.total += current * item.quantity;
-    });
-
-    return Array.from(grouped.values());
-  }, [cartItems, getOfferById]);
   
   const statusValidators = [expiredItemValidator];
 
