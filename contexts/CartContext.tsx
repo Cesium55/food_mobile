@@ -9,6 +9,7 @@ interface CartItemStorage {
   id: number;
   offerId: number;
   productName: string;
+  productImages?: Offer['productImages'];
   shopId: number;
   shopName: string;
   sellerId?: number;
@@ -339,6 +340,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
           id: newItemId,
           offerId: offer.id,
           productName: offer.productName,
+          productImages: offer.productImages,
           shopId: offer.shopId,
           shopName: offer.shopShortName || 'Магазин',
           sellerId: offer.sellerId,
@@ -611,4 +613,3 @@ export const useCart = () => {
   }
   return context;
 };
-

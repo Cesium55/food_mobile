@@ -1,5 +1,4 @@
 import { CartItem as CartItemType } from "@/hooks/useCart";
-import { useOffers } from "@/hooks/useOffers";
 import { getFirstImageUrl } from "@/utils/imageUtils";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useRouter, useSegments } from "expo-router";
@@ -20,12 +19,9 @@ interface CartItemProps {
 export function CartItem({ item, status, selected = true, onIncrease, onDecrease, onRemove, onToggleSelection }: CartItemProps) {
   const router = useRouter();
   const segments = useSegments();
-  const { getOfferById } = useOffers();
   const [imageError, setImageError] = useState(false);
   
-  // Получаем offer для доступа к изображениям
-  const offer = getOfferById(item.offerId);
-  const imageUrl = offer ? getFirstImageUrl(offer.productImages) : null;
+  const imageUrl = getFirstImageUrl(item.productImages);
   const hasImage = imageUrl && !imageError;
   
   // Безопасная конвертация expiresDate в Date объект
@@ -378,4 +374,3 @@ const styles = StyleSheet.create({
     color: '#BDBDBD',
   },
 });
-

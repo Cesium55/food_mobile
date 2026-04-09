@@ -1,8 +1,11 @@
+import { ProductImage } from '@/hooks/useOffers';
+
 // Экспортируем только типы, сама логика перенесена в CartContext
 export interface CartItem {
   id: number;
   offerId: number; // product_entry.id
   productName: string;
+  productImages?: ProductImage[];
   shopId: number;
   shopName: string;
   sellerId?: number; // ID продавца
@@ -25,4 +28,3 @@ export interface CartGroup {
 
 // Реэкспортируем useCart из CartContext для обратной совместимости
 export { useCart } from '@/contexts/CartContext';
-
