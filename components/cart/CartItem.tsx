@@ -1,5 +1,4 @@
 import { CartItem as CartItemType } from "@/hooks/useCart";
-import { getFirstImageUrl } from "@/utils/imageUtils";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useRouter, useSegments } from "expo-router";
 import { useState } from "react";
@@ -8,6 +7,7 @@ import { ItemStatus } from "./types";
 
 interface CartItemProps {
   item: CartItemType;
+  imageUrl?: string | null;
   status: ItemStatus;
   selected?: boolean;
   onIncrease: (itemId: number) => void;
@@ -16,12 +16,11 @@ interface CartItemProps {
   onToggleSelection?: (itemId: number) => void;
 }
 
-export function CartItem({ item, status, selected = true, onIncrease, onDecrease, onRemove, onToggleSelection }: CartItemProps) {
+export function CartItem({ item, imageUrl, status, selected = true, onIncrease, onDecrease, onRemove, onToggleSelection }: CartItemProps) {
   const router = useRouter();
   const segments = useSegments();
   const [imageError, setImageError] = useState(false);
-  
-  const imageUrl = item.productImageUrl ?? getFirstImageUrl(item.productImages);
+
   const hasImage = imageUrl && !imageError;
   
   // Безопасная конвертация expiresDate в Date объект
