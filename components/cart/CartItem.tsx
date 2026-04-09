@@ -28,6 +28,9 @@ export function CartItem({ item, status, selected = true, onIncrease, onDecrease
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   
   const hasImage = imageUrl && !imageError;
+  const safeProductName = typeof item.productName === "string" && item.productName.trim().length > 0
+    ? item.productName
+    : "Товар";
 
   useEffect(() => {
     let isCancelled = false;
@@ -129,7 +132,7 @@ export function CartItem({ item, status, selected = true, onIncrease, onDecrease
         ) : (
           <View style={[styles.itemImagePlaceholder, isInactive && styles.inactiveImage]}>
             <Text style={[styles.itemImageText, isInactive && styles.inactiveText]}>
-              {item.productName.charAt(0)}
+              {safeProductName.charAt(0)}
             </Text>
           </View>
         )}
@@ -138,7 +141,7 @@ export function CartItem({ item, status, selected = true, onIncrease, onDecrease
       <View style={styles.itemInfo}>
         <TouchableOpacity onPress={handleProductPress} activeOpacity={0.7}>
           <Text style={[styles.itemName, isInactive && styles.inactiveTextColor]} numberOfLines={2}>
-            {item.productName}
+            {safeProductName}
           </Text>
         </TouchableOpacity>
         
