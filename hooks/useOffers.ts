@@ -191,6 +191,9 @@ export const useOffers = () => {
     maxExpiresDate?: string;
     minCount?: number;
     isDynamicPricing?: boolean;
+    limit?: number;
+    skip?: number;
+    offerIds?: number[];
   }) => {
     const preserveExisting = filters?.preserveExisting ?? false;
 
@@ -249,6 +252,20 @@ export const useOffers = () => {
 
       if (filters?.isDynamicPricing !== undefined) {
         params.append('is_dynamic_pricing', String(filters.isDynamicPricing));
+      }
+
+      if (filters?.limit !== undefined) {
+        params.append('limit', String(filters.limit));
+      }
+
+      if (filters?.skip !== undefined) {
+        params.append('skip', String(filters.skip));
+      }
+
+      if (filters?.offerIds && filters.offerIds.length > 0) {
+        filters.offerIds.forEach(id => {
+          params.append('offer_ids', String(id));
+        });
       }
       
       // Добавляем дефолтные фильтры, если не указано skipDefaultFilters

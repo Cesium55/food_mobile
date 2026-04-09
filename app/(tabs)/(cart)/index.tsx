@@ -132,16 +132,19 @@ export default function Cart() {
     let cancelled = false;
 
     const loadCartOffers = async () => {
+      const uniqueOfferIds = cartOfferIdsKey
+        ? cartOfferIdsKey.split(',').map(id => Number(id)).filter(id => Number.isFinite(id))
+        : [];
+
       await fetchOffers({
         skipDefaultFilters: true,
         minCount: 0,
         preserveExisting: true,
+        offerIds: uniqueOfferIds,
+        limit: Math.max(uniqueOfferIds.length, 50),
       });
 
       // Fallback: гарантированно подгружаем офферы именно из корзины по ID
-      const uniqueOfferIds = cartOfferIdsKey
-        ? cartOfferIdsKey.split(',').map(id => Number(id)).filter(id => Number.isFinite(id))
-        : [];
       await Promise.all(uniqueOfferIds.map(async (id) => {
         if (cancelled) return;
         await fetchOfferById(id);
