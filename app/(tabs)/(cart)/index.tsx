@@ -115,7 +115,7 @@ export default function Cart() {
     refreshCart,
   } = useCart();
   
-  const { getOfferById, fetchOffers } = useOffers();
+  const { getOfferById, fetchOffers, fetchOfferById } = useOffers();
   const { getShopById } = useShops();
   
   const [currentOrder, setCurrentOrder] = useState<{ id: number; total: number } | null>(null);
@@ -129,12 +129,31 @@ export default function Cart() {
   useEffect(() => {
     if (cartItems.length === 0) return;
 
-    fetchOffers({
-      skipDefaultFilters: true,
-      minCount: 0,
-      preserveExisting: true,
-    });
-  }, [cartItems.length, cartOfferIdsKey, fetchOffers]);
+    let cancelled = false;
+
+    const loadCartOffers = async () => {
+      await fetchOffers({
+        skipDefaultFilters: true,
+        minCount: 0,
+        preserveExisting: true,
+      });
+
+      // Fallback: гарантированно подгружаем офферы именно из корзины по ID
+      const uniqueOfferIds = cartOfferIdsKey
+        ? cartOfferIdsKey.split(',').map(id => Number(id)).filter(id => Number.isFinite(id))
+        : [];
+      await Promise.all(uniqueOfferIds.map(async (id) => {
+        if (cancelled) return;
+        await fetchOfferById(id);
+      }));
+    };
+
+    loadCartOffers();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [cartItems.length, cartOfferIdsKey, fetchOffers, fetchOfferById]);
   
   // Простые функции для изменения количества
   const handleIncrease = (itemId: number) => {
