@@ -208,6 +208,15 @@ export function CartItem({ item, status, selected = true, onIncrease, onDecrease
         )}
       </View>
 
+      <View style={styles.itemPriceContainer}>
+        <Text style={[styles.itemTotal, isInactive && styles.inactiveTextColor]}>
+          {item.currentCost !== null 
+            ? (parseFloat(item.currentCost) * item.quantity).toFixed(2) + ' ₽'
+            : 'Рассчитывается'
+          }
+        </Text>
+      </View>
+
       <View style={styles.actions}>
         <TouchableOpacity
           style={styles.removeIconButton}
@@ -389,6 +398,16 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#333',
     paddingHorizontal: 16,
+  },
+  itemPriceContainer: {
+    justifyContent: 'center',
+    alignItems: 'flex-end',
+    minWidth: 90,
+  },
+  itemTotal: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
   },
   actions: {
     marginLeft: 12,

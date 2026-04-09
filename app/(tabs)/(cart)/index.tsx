@@ -5,6 +5,7 @@ import { expiredItemValidator } from "@/components/cart/types";
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useCart } from "@/hooks/useCart";
+import { useOffers } from "@/hooks/useOffers";
 import { usePublicSeller } from "@/hooks/usePublicSeller";
 import { useShopPoint } from "@/hooks/useShopPoints";
 import { useShops } from "@/hooks/useShops";
@@ -24,6 +25,7 @@ function ShopGroupWithAddress({
   onRemove, 
   onToggleSelection,
   getShopById,
+  getOfferById,
 }: {
   group: {
     shopId: number;
@@ -39,6 +41,7 @@ function ShopGroupWithAddress({
   onRemove: (itemId: number) => void;
   onToggleSelection?: (itemId: number) => void;
   getShopById: (id: number) => any;
+  getOfferById: (id: number) => any;
 }) {
   const { shopPoint } = useShopPoint(group.shopId);
   const shop = getShopById(group.shopId);
@@ -51,6 +54,17 @@ function ShopGroupWithAddress({
     if (itemSellerId && typeof itemSellerId === 'number' && itemSellerId > 0) {
       sellerId = itemSellerId;
       break;
+    }
+  }
+
+  if (!sellerId) {
+    for (const item of group.items) {
+      const offer = getOfferById(item.offerId);
+      const offerSellerId = offer?.sellerId;
+      if (offerSellerId && typeof offerSellerId === 'number' && offerSellerId > 0) {
+        sellerId = offerSellerId;
+        break;
+      }
     }
   }
   
@@ -100,6 +114,7 @@ export default function Cart() {
     refreshCart,
   } = useCart();
   
+  const { getOfferById } = useOffers();
   const { getShopById } = useShops();
   
   const [currentOrder, setCurrentOrder] = useState<{ id: number; total: number } | null>(null);
@@ -110,7 +125,12 @@ export default function Cart() {
   const handleIncrease = (itemId: number) => {
     const cartItem = cartItems.find(item => item.id === itemId);
     if (cartItem) {
-      increaseQuantity(itemId, cartItem.maxQuantity);
+      const offer = getOfferById(cartItem.offerId);
+      if (offer) {
+        increaseQuantity(itemId, offer.count);
+      } else {
+        increaseQuantity(itemId);
+      }
     }
   };
   
@@ -468,6 +488,7 @@ export default function Cart() {
               onRemove={removeItem}
               onToggleSelection={toggleItemSelection}
               getShopById={getShopById}
+              getOfferById={getOfferById}
             />
           ))}
 

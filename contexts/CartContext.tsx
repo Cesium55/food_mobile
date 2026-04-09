@@ -53,9 +53,6 @@ const saveCartToStorage = async (items: CartItem[]): Promise<void> => {
 
       return {
         ...item,
-        productName: typeof item.productName === 'string' && item.productName.trim().length > 0
-          ? item.productName
-          : 'Товар',
         expiresDate: expiresDateString,
       };
     });
@@ -87,9 +84,6 @@ const loadCartFromStorage = async (): Promise<CartItem[]> => {
           if (!item.expiresDate) {
             return {
               ...item,
-              productName: typeof item.productName === 'string' && item.productName.trim().length > 0
-                ? item.productName
-                : 'Товар',
               expiresDate: new Date(),
             };
           }
@@ -102,18 +96,12 @@ const loadCartFromStorage = async (): Promise<CartItem[]> => {
           if (isNaN(date.getTime())) {
             return {
               ...item,
-              productName: typeof item.productName === 'string' && item.productName.trim().length > 0
-                ? item.productName
-                : 'Товар',
               expiresDate: new Date(),
             };
           }
           
           return {
             ...item,
-            productName: typeof item.productName === 'string' && item.productName.trim().length > 0
-              ? item.productName
-              : 'Товар',
             expiresDate: date,
             sellerId: item.sellerId, // Сохраняем sellerId при загрузке
             maxQuantity: typeof item.maxQuantity === 'number' ? item.maxQuantity : undefined,
@@ -121,9 +109,6 @@ const loadCartFromStorage = async (): Promise<CartItem[]> => {
         } catch {
           return {
             ...item,
-            productName: typeof item.productName === 'string' && item.productName.trim().length > 0
-              ? item.productName
-              : 'Товар',
             expiresDate: new Date(),
           };
         }
@@ -353,9 +338,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const newItem: CartItem = {
           id: newItemId,
           offerId: offer.id,
-          productName: (typeof offer.productName === 'string' && offer.productName.trim().length > 0)
-            ? offer.productName
-            : 'Товар',
+          productName: offer.productName,
           shopId: offer.shopId,
           shopName: offer.shopShortName || 'Магазин',
           sellerId: offer.sellerId,
