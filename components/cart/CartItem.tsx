@@ -1,9 +1,11 @@
 import { CartItem as CartItemType } from "@/hooks/useCart";
 import { useOffers } from "@/hooks/useOffers";
 import { getFirstImageUrl } from "@/utils/imageUtils";
+import { authFetch } from "@/utils/authFetch";
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import { getApiUrl } from "@/constants/env";
 import { useRouter, useSegments } from "expo-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { ItemStatus } from "./types";
 
@@ -22,10 +24,48 @@ export function CartItem({ item, status, selected = true, onIncrease, onDecrease
   const segments = useSegments();
   const { getOfferById } = useOffers();
   const [imageError, setImageError] = useState(false);
+  const [offerImageUrl, setOfferImageUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchOfferImage = async () => {
+      try {
+        const response = await authFetch(getApiUrl(`/offers/${item.offerId}/with-product`), {
+          method: "GET",
+          requireAuth: false,
+        });
+
+        if (!response.ok) {
+          return;
+        }
+
+        const payload = await response.json();
+        const offerWithProduct = payload?.data ?? payload;
+        const imageUrlFromApi = getFirstImageUrl(offerWithProduct?.product?.images);
+
+        if (isMounted) {
+          setOfferImageUrl(imageUrlFromApi);
+        }
+      } catch {
+        if (isMounted) {
+          setOfferImageUrl(null);
+        }
+      }
+    };
+
+    setImageError(false);
+    setOfferImageUrl(null);
+    fetchOfferImage();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [item.offerId]);
   
   // Получаем offer для доступа к изображениям
   const offer = getOfferById(item.offerId);
-  const imageUrl = offer ? getFirstImageUrl(offer.productImages) : null;
+  const imageUrl = offerImageUrl ?? (offer ? getFirstImageUrl(offer.productImages) : null);
   const hasImage = imageUrl && !imageError;
   
   // Безопасная конвертация expiresDate в Date объект
@@ -378,4 +418,3 @@ const styles = StyleSheet.create({
     color: '#BDBDBD',
   },
 });
-
