@@ -6,6 +6,7 @@ export interface CartItem {
   offerId: number; // product_entry.id
   productName: string;
   productImages?: ProductImage[];
+  productImageUrl?: string | null;
   shopId: number;
   shopName: string;
   sellerId?: number; // ID продавца

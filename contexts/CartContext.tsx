@@ -1,5 +1,6 @@
 import { CartGroup, CartItem } from '@/hooks/useCart';
 import { Offer } from '@/hooks/useOffers';
+import { getFirstImageUrl } from '@/utils/imageUtils';
 import { getCurrentPrice } from '@/utils/pricingUtils';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
@@ -10,6 +11,7 @@ interface CartItemStorage {
   offerId: number;
   productName: string;
   productImages?: Offer['productImages'];
+  productImageUrl?: string | null;
   shopId: number;
   shopName: string;
   sellerId?: number;
@@ -105,6 +107,7 @@ const loadCartFromStorage = async (): Promise<CartItem[]> => {
             ...item,
             expiresDate: date,
             sellerId: item.sellerId, // Сохраняем sellerId при загрузке
+            productImageUrl: item.productImageUrl ?? getFirstImageUrl(item.productImages),
             maxQuantity: typeof item.maxQuantity === 'number' ? item.maxQuantity : undefined,
           };
         } catch {
@@ -284,7 +287,16 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (existingItem) {
         const maxCount = Number.isFinite(offer.count) ? offer.count : undefined;
         if (maxCount !== undefined && maxCount <= existingItem.quantity) {
-          return prevItems;
+          return prevItems.map(item =>
+            item.id === existingItem.id
+              ? {
+                  ...item,
+                  productImages: item.productImages?.length ? item.productImages : offer.productImages,
+                  productImageUrl: item.productImageUrl ?? getFirstImageUrl(offer.productImages),
+                  maxQuantity: maxCount ?? item.maxQuantity,
+                }
+              : item
+          );
         }
         // Если товар уже есть, увеличиваем количество (но не больше доступного количества)
         const newQuantity = maxCount !== undefined
@@ -292,7 +304,13 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
           : existingItem.quantity + 1;
         const updatedItems = prevItems.map(item =>
           item.id === existingItem.id
-            ? { ...item, quantity: newQuantity, maxQuantity: maxCount ?? item.maxQuantity }
+            ? {
+                ...item,
+                quantity: newQuantity,
+                productImages: item.productImages?.length ? item.productImages : offer.productImages,
+                productImageUrl: item.productImageUrl ?? getFirstImageUrl(offer.productImages),
+                maxQuantity: maxCount ?? item.maxQuantity,
+              }
             : item
         );
         
@@ -341,6 +359,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
           offerId: offer.id,
           productName: offer.productName,
           productImages: offer.productImages,
+          productImageUrl: getFirstImageUrl(offer.productImages),
           shopId: offer.shopId,
           shopName: offer.shopShortName || 'Магазин',
           sellerId: offer.sellerId,

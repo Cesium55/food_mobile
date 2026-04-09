@@ -21,7 +21,7 @@ export function CartItem({ item, status, selected = true, onIncrease, onDecrease
   const segments = useSegments();
   const [imageError, setImageError] = useState(false);
   
-  const imageUrl = getFirstImageUrl(item.productImages);
+  const imageUrl = item.productImageUrl ?? getFirstImageUrl(item.productImages);
   const hasImage = imageUrl && !imageError;
   
   // Безопасная конвертация expiresDate в Date объект
