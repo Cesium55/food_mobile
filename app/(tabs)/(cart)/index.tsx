@@ -56,7 +56,7 @@ function ShopGroupWithAddress({
       break;
     }
   }
-
+  
   if (!sellerId) {
     for (const item of group.items) {
       const offer = getOfferById(item.offerId);

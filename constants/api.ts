@@ -111,7 +111,6 @@ export const API_ENDPOINTS = {
   OFFERS: {
     BASE: '/offers',
     WITH_PRODUCTS: '/offers/with-products',
-    WITH_PRODUCT: (id: number) => `/offers/${id}/with-product`,
     PRICING_STRATEGIES: '/offers/pricing-strategies',
     PRICING_STRATEGY_BY_ID: (id: number) => `/offers/pricing-strategies/${id}`,
     UPDATE: (id: number) => `/offers/${id}`,

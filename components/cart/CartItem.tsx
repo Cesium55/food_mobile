@@ -1,15 +1,11 @@
 import { CartItem as CartItemType } from "@/hooks/useCart";
-import { API_ENDPOINTS } from "@/constants/api";
-import { getApiUrl } from "@/constants/env";
+import { useOffers } from "@/hooks/useOffers";
 import { getFirstImageUrl } from "@/utils/imageUtils";
-import { authFetch } from "@/utils/authFetch";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useRouter, useSegments } from "expo-router";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { ItemStatus } from "./types";
-
-const offerImageCache = new Map<number, string | null>();
 
 interface CartItemProps {
   item: CartItemType;
@@ -24,62 +20,13 @@ interface CartItemProps {
 export function CartItem({ item, status, selected = true, onIncrease, onDecrease, onRemove, onToggleSelection }: CartItemProps) {
   const router = useRouter();
   const segments = useSegments();
+  const { getOfferById } = useOffers();
   const [imageError, setImageError] = useState(false);
-  const [imageUrl, setImageUrl] = useState<string | null>(null);
   
+  // Получаем offer для доступа к изображениям
+  const offer = getOfferById(item.offerId);
+  const imageUrl = offer ? getFirstImageUrl(offer.productImages) : null;
   const hasImage = imageUrl && !imageError;
-  const safeProductName = typeof item.productName === "string" && item.productName.trim().length > 0
-    ? item.productName
-    : "Товар";
-
-  useEffect(() => {
-    let isCancelled = false;
-
-    const fetchOfferWithProduct = async () => {
-      const cachedImage = offerImageCache.get(item.offerId);
-      if (cachedImage !== undefined) {
-        setImageUrl(cachedImage);
-        return;
-      }
-
-      try {
-        setImageError(false);
-        const response = await authFetch(getApiUrl(API_ENDPOINTS.OFFERS.WITH_PRODUCT(item.offerId)), {
-          method: "GET",
-          requireAuth: false,
-        });
-
-        if (!response.ok) {
-          if (!isCancelled) {
-            setImageUrl(null);
-          }
-          offerImageCache.set(item.offerId, null);
-          return;
-        }
-
-        const payload = await response.json();
-        const offerData = payload?.data ?? payload;
-        const productImages = Array.isArray(offerData?.product?.images) ? offerData.product.images : [];
-        const firstImageUrl = getFirstImageUrl(productImages);
-        offerImageCache.set(item.offerId, firstImageUrl);
-
-        if (!isCancelled) {
-          setImageUrl(firstImageUrl);
-        }
-      } catch {
-        offerImageCache.set(item.offerId, null);
-        if (!isCancelled) {
-          setImageUrl(null);
-        }
-      }
-    };
-
-    fetchOfferWithProduct();
-
-    return () => {
-      isCancelled = true;
-    };
-  }, [item.offerId]);
   
   // Безопасная конвертация expiresDate в Date объект
   const expiryDate = item.expiresDate instanceof Date 
@@ -132,7 +79,7 @@ export function CartItem({ item, status, selected = true, onIncrease, onDecrease
         ) : (
           <View style={[styles.itemImagePlaceholder, isInactive && styles.inactiveImage]}>
             <Text style={[styles.itemImageText, isInactive && styles.inactiveText]}>
-              {safeProductName.charAt(0)}
+              {item.productName.charAt(0)}
             </Text>
           </View>
         )}
@@ -141,7 +88,7 @@ export function CartItem({ item, status, selected = true, onIncrease, onDecrease
       <View style={styles.itemInfo}>
         <TouchableOpacity onPress={handleProductPress} activeOpacity={0.7}>
           <Text style={[styles.itemName, isInactive && styles.inactiveTextColor]} numberOfLines={2}>
-            {safeProductName}
+            {item.productName}
           </Text>
         </TouchableOpacity>
         
@@ -431,3 +378,4 @@ const styles = StyleSheet.create({
     color: '#BDBDBD',
   },
 });
+
