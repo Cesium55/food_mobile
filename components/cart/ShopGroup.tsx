@@ -1,4 +1,6 @@
 import { CartGroup } from "@/hooks/useCart";
+import { Offer } from "@/hooks/useOffers";
+import { getFirstImageUrl } from "@/utils/imageUtils";
 import { StyleSheet, Text, View } from "react-native";
 import { CartItem } from "./CartItem";
 import { ItemStatusValidator } from "./types";
@@ -11,6 +13,7 @@ interface ShopGroupProps {
   onDecrease: (itemId: number) => void;
   onRemove: (itemId: number) => void;
   onToggleSelection?: (itemId: number) => void;
+  getOfferById?: (id: number) => Offer | undefined;
 }
 
 export function ShopGroup({ 
@@ -20,7 +23,8 @@ export function ShopGroup({
   onIncrease, 
   onDecrease, 
   onRemove,
-  onToggleSelection
+  onToggleSelection,
+  getOfferById
 }: ShopGroupProps) {
   return (
     <View style={styles.shopGroup}>
@@ -49,6 +53,7 @@ export function ShopGroup({
           <CartItem
             key={item.id}
             item={item}
+            imageUrl={getFirstImageUrl(getOfferById?.(item.offerId)?.productImages)}
             status={itemStatus}
             selected={selectedItems?.has(item.id) ?? true}
             onIncrease={onIncrease}
@@ -98,4 +103,3 @@ const styles = StyleSheet.create({
     marginLeft: 12,
   },
 });
-

@@ -12,7 +12,7 @@ import { useShops } from "@/hooks/useShops";
 import { createOrderFromCart, getCurrentPendingPurchase, getPurchaseById } from "@/services/orderService";
 import { useNavigation } from "@react-navigation/native";
 import { useFocusEffect, useRouter } from "expo-router";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 // Компонент для получения адреса магазина и названия продавца
@@ -86,6 +86,7 @@ function ShopGroupWithAddress({
       onDecrease={onDecrease}
       onRemove={onRemove}
       onToggleSelection={onToggleSelection}
+      getOfferById={getOfferById}
     />
   );
 }
@@ -114,12 +115,26 @@ export default function Cart() {
     refreshCart,
   } = useCart();
   
-  const { getOfferById } = useOffers();
+  const { getOfferById, fetchOffers } = useOffers();
   const { getShopById } = useShops();
   
   const [currentOrder, setCurrentOrder] = useState<{ id: number; total: number } | null>(null);
   const [isCheckingOrder, setIsCheckingOrder] = useState(true);
   const [isCreatingOrder, setIsCreatingOrder] = useState(false);
+  const cartOfferIdsKey = useMemo(
+    () => cartItems.map(item => item.offerId).sort((a, b) => a - b).join(','),
+    [cartItems]
+  );
+
+  useEffect(() => {
+    if (cartItems.length === 0) return;
+
+    fetchOffers({
+      skipDefaultFilters: true,
+      minCount: 0,
+      preserveExisting: true,
+    });
+  }, [cartItems.length, cartOfferIdsKey, fetchOffers]);
   
   // Простые функции для изменения количества
   const handleIncrease = (itemId: number) => {
