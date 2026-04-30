@@ -1,7 +1,14 @@
 import { CartItem as CartItemType } from "@/hooks/useCart";
+<<<<<<< HEAD
+=======
+import { useOffers } from "@/hooks/useOffers";
+import { getFirstImageUrl } from "@/utils/imageUtils";
+import { authFetch } from "@/utils/authFetch";
+>>>>>>> d77442f17639673a66bb54f8f030be7f6a8fe509
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import { getApiUrl } from "@/constants/env";
 import { useRouter, useSegments } from "expo-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { ItemStatus } from "./types";
 
@@ -20,7 +27,52 @@ export function CartItem({ item, imageUrl, status, selected = true, onIncrease, 
   const router = useRouter();
   const segments = useSegments();
   const [imageError, setImageError] = useState(false);
+<<<<<<< HEAD
 
+=======
+  const [offerImageUrl, setOfferImageUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchOfferImage = async () => {
+      try {
+        const response = await authFetch(getApiUrl(`/offers/${item.offerId}/with-product`), {
+          method: "GET",
+          requireAuth: false,
+        });
+
+        if (!response.ok) {
+          return;
+        }
+
+        const payload = await response.json();
+        const offerWithProduct = payload?.data ?? payload;
+        const imageUrlFromApi = getFirstImageUrl(offerWithProduct?.product?.images);
+
+        if (isMounted) {
+          setOfferImageUrl(imageUrlFromApi);
+        }
+      } catch {
+        if (isMounted) {
+          setOfferImageUrl(null);
+        }
+      }
+    };
+
+    setImageError(false);
+    setOfferImageUrl(null);
+    fetchOfferImage();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [item.offerId]);
+  
+  // Получаем offer для доступа к изображениям
+  const offer = getOfferById(item.offerId);
+  const imageUrl = offerImageUrl ?? (offer ? getFirstImageUrl(offer.productImages) : null);
+>>>>>>> d77442f17639673a66bb54f8f030be7f6a8fe509
   const hasImage = imageUrl && !imageError;
   
   // Безопасная конвертация expiresDate в Date объект
