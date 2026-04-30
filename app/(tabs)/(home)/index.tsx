@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { NativeScrollEvent, NativeSyntheticEvent, StyleSheet, Text, View } from 'react-native';
 
 import { GridOfferList } from '@/components/offers/GridOfferList';
 import { createProductModal } from '@/components/product/ProductModalContent';
@@ -11,14 +11,35 @@ import { Offer } from '@/hooks/useOffers';
 import { useOffers } from '@/hooks/useOffers';
 import { getCurrentLocation, getLocationWithCache } from '@/services/locationService';
 import { getBoundingBox } from '@/utils/locationUtils';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+
+const OFFERS_BATCH_SIZE = 10;
+const LOAD_MORE_THRESHOLD = 240;
 
 export default function HomeScreen() {
   const [refreshing, setRefreshing] = useState(false);
+  const [visibleOffersCount, setVisibleOffersCount] = useState(OFFERS_BATCH_SIZE);
   const { offers, fetchOffersWithLocation, fetchOffers, loading } = useOffers();
   const { openModal } = useModal();
   const colors = useColors();
   const styles = createStyles(colors);
+
+  const visibleOffers = useMemo(
+    () => offers.slice(0, visibleOffersCount),
+    [offers, visibleOffersCount]
+  );
+
+  const hasMoreOffers = visibleOffersCount < offers.length;
+
+  const loadMoreOffers = useCallback(() => {
+    setVisibleOffersCount(currentCount => {
+      if (currentCount >= offers.length) {
+        return currentCount;
+      }
+
+      return Math.min(currentCount + OFFERS_BATCH_SIZE, offers.length);
+    });
+  }, [offers.length]);
 
   const loadData = useCallback(async (forceRefresh: boolean = false) => {
     let location = null;
@@ -44,6 +65,16 @@ export default function HomeScreen() {
   }, [fetchOffersWithLocation, fetchOffers]);
 
   useEffect(() => {
+    setVisibleOffersCount(currentCount => {
+      if (offers.length === 0) {
+        return OFFERS_BATCH_SIZE;
+      }
+
+      return Math.min(Math.max(currentCount, OFFERS_BATCH_SIZE), offers.length);
+    });
+  }, [offers.length]);
+
+  useEffect(() => {
     let isMounted = true;
 
     const initialLoad = async () => {
@@ -61,6 +92,7 @@ export default function HomeScreen() {
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
+    setVisibleOffersCount(OFFERS_BATCH_SIZE);
     try {
       await loadData(true);
     } finally {
@@ -73,10 +105,24 @@ export default function HomeScreen() {
     openModal(content, footer);
   }, [openModal]);
 
+  const handleScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    if (loading || !hasMoreOffers) {
+      return;
+    }
+
+    const { layoutMeasurement, contentOffset, contentSize } = event.nativeEvent;
+    const distanceFromBottom = contentSize.height - (layoutMeasurement.height + contentOffset.y);
+
+    if (distanceFromBottom <= LOAD_MORE_THRESHOLD) {
+      loadMoreOffers();
+    }
+  }, [hasMoreOffers, loadMoreOffers, loading]);
+
   return (
     <TabScreen
       onRefresh={onRefresh}
       refreshing={refreshing}
+      onScroll={handleScroll}
     >
       <View style={styles.blockContainer}>
         <Text style={styles.blockTitle}>Популярные продавцы</Text>
@@ -90,11 +136,15 @@ export default function HomeScreen() {
         ) : offers.length === 0 ? (
           <Text style={styles.emptyText}>Нет доступных предложений</Text>
         ) : (
-          <GridOfferList
-            offers={offers}
-            limit={10}
-            onOfferPress={handleOfferPress}
-          />
+          <>
+            <GridOfferList
+              offers={visibleOffers}
+              onOfferPress={handleOfferPress}
+            />
+            {hasMoreOffers && (
+              <Text style={styles.moreText}>Прокрутите ниже, чтобы загрузить ещё</Text>
+            )}
+          </>
         )}
       </View>
     </TabScreen>
@@ -129,5 +179,13 @@ const createStyles = (colors: any) => StyleSheet.create({
     textAlign: 'center',
     color: colors.text.tertiary,
     marginVertical: spacing.xl,
+  },
+  moreText: {
+    fontSize: typography.fontSize.sm,
+    fontFamily: typography.fontFamily.medium,
+    textAlign: 'center',
+    color: colors.text.secondary,
+    marginTop: spacing.sm,
+    marginBottom: spacing.xs,
   },
 });

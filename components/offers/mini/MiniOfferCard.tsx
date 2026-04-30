@@ -6,28 +6,43 @@
 import { useCart } from '@/hooks/useCart';
 import { Offer } from '@/hooks/useOffers';
 import { usePublicSeller } from '@/hooks/usePublicSeller';
+import { useShopPoint } from '@/hooks/useShopPoints';
 import { useThemedStyles } from '@/hooks/useThemeTokens';
 import { getDaysUntilExpiry, getExpiryText } from '@/utils/expiryUtils';
 import { getFirstImageUrl } from '@/utils/imageUtils';
+import { calculateDistance, formatDistance } from '@/utils/locationUtils';
 import { canPriceDecrease, getCurrentPrice } from '@/utils/pricingUtils';
 import { router } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { OfferActions } from './OfferActions';
 import { OfferImage } from './OfferImage';
 import { OfferInfo } from './OfferInfo';
 
+interface UserLocation {
+  latitude: number;
+  longitude: number;
+}
+
 interface MiniOfferCardProps {
   offer: Offer;
   distance?: number;
+  userLocation?: UserLocation | null;
   onPress?: () => void;
   showCheaperBadge?: boolean;
 }
 
-export function MiniOfferCard({ offer, distance, onPress, showCheaperBadge = false }: MiniOfferCardProps) {
+export function MiniOfferCard({
+  offer,
+  distance,
+  userLocation,
+  onPress,
+  showCheaperBadge = false,
+}: MiniOfferCardProps) {
   const styles = useThemedStyles(createStyles);
   const { cartItems, addToCart, increaseQuantity, decreaseQuantity } = useCart();
   const { seller } = usePublicSeller(offer.sellerId || null);
+  const { shopPoint } = useShopPoint(offer.shopId);
   
   // Проверяем корзину
   const cartItem = cartItems.find(item => item.offerId === offer.id);
@@ -61,12 +76,24 @@ export function MiniOfferCard({ offer, distance, onPress, showCheaperBadge = fal
     }
   }, [offer.expiresDate, daysUntilExpiry]);
   
-  // Расстояние - если передано, форматируем (distance уже в километрах)
-  const distanceText = distance !== undefined
-    ? distance < 1 
-      ? `${Math.round(distance * 1000)} м`
-      : `${distance.toFixed(1)} км`
-    : null;
+  const distanceText = useMemo(() => {
+    if (distance !== undefined) {
+      return formatDistance(distance);
+    }
+
+    if (!userLocation || !shopPoint?.latitude || !shopPoint?.longitude) {
+      return null;
+    }
+
+    const computedDistance = calculateDistance(
+      userLocation.latitude,
+      userLocation.longitude,
+      shopPoint.latitude,
+      shopPoint.longitude
+    );
+
+    return formatDistance(computedDistance);
+  }, [distance, shopPoint?.latitude, shopPoint?.longitude, userLocation]);
   
   // Изображение товара
   const productImage = getFirstImageUrl(offer.productImages);

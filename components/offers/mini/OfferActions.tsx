@@ -97,51 +97,53 @@ export function OfferActions({
   
   return (
     <View style={styles.container}>
-      <View style={styles.footerRow}>
-        {/* Минус - появляется слева */}
-        {isInCart && (
-          <Animated.View style={[styles.minusButton, minusStyle]}>
-            <Pressable 
-              style={styles.cartButton}
-              onPress={onDecrease}
+      <View style={[styles.priceContainer, isInCart && styles.priceContainerCenter]}>
+        <View style={styles.priceRow}>
+          <Text style={styles.currentPrice} numberOfLines={1}>
+            {isInCart ? formatPrice(currentPrice * quantity) : formatPrice(currentPrice)} ₽
+          </Text>
+          {!isInCart && currentPrice < originalPrice && (
+            <Animated.Text
+              numberOfLines={1}
+              style={[styles.originalPrice, strikethroughStyle]}
             >
-              <View style={styles.buttonTouchable}>
-                <Text style={styles.cartButtonText}>−</Text>
-              </View>
-            </Pressable>
-          </Animated.View>
-        )}
-        
-        {/* Цена и информация - всегда видна */}
-        <View style={[styles.priceContainer, isInCart && styles.priceContainerCenter]}>
-          <View style={styles.priceRow}>
-            <Text style={styles.currentPrice}>
-              {isInCart ? formatPrice(currentPrice * quantity) : formatPrice(currentPrice)} ₽
-            </Text>
-            {/* Зачеркнутая цена - уезжает вправо */}
-            {!isInCart && currentPrice < originalPrice && (
-              <Animated.Text style={[styles.originalPrice, strikethroughStyle]}>
-                {formatPrice(originalPrice)} ₽
-              </Animated.Text>
-            )}
-          </View>
-          
-          {/* Расстояние или количество */}
-          {!isInCart && distance && (
-            <Animated.Text style={[styles.distance, distanceStyle]}>
-              {distance}
+              {formatPrice(originalPrice)} ₽
             </Animated.Text>
           )}
-          {isInCart && quantity > 0 && (
-            <Text style={styles.cartQuantity}>
-              {quantity} шт
-            </Text>
-          )}
         </View>
-        
-        {/* Плюс - всегда на месте */}
+
+      </View>
+
+      <View style={styles.controlsRow}>
+        {isInCart ? (
+          <>
+            <Animated.View style={[styles.minusButton, minusStyle]}>
+              <Pressable
+                style={styles.cartButton}
+                onPress={onDecrease}
+              >
+                <View style={styles.buttonTouchable}>
+                  <Text style={styles.cartButtonText}>−</Text>
+                </View>
+              </Pressable>
+            </Animated.View>
+
+            <Animated.View style={[styles.quantityBadge, quantityStyle]}>
+              <Text style={styles.cartQuantity}>
+                {quantity} шт
+              </Text>
+            </Animated.View>
+          </>
+        ) : distance ? (
+          <Animated.View style={[styles.distanceBadge, distanceStyle]}>
+            <Text style={styles.distance}>{distance}</Text>
+          </Animated.View>
+        ) : (
+          <View style={styles.controlsSpacer} />
+        )}
+
         {isMaxQuantity ? (
-          <View 
+          <View
             style={styles.cartButton}
             onStartShouldSetResponder={() => true}
             onResponderRelease={(e) => {
@@ -154,13 +156,13 @@ export function OfferActions({
               styles.buttonTouchableDisabled
             ]}>
               <Text style={[
-              styles.cartButtonText,
-              styles.cartButtonTextDisabled
-            ]}>+</Text>
+                styles.cartButtonText,
+                styles.cartButtonTextDisabled
+              ]}>+</Text>
             </View>
           </View>
         ) : (
-          <Pressable 
+          <Pressable
             style={styles.addButton}
             onPress={isInCart ? onIncrease : onAdd}
           >
@@ -180,46 +182,52 @@ const createStyles = (tokens: any) => {
   return StyleSheet.create({
     container: {
       position: 'relative',
-      minHeight: 40,
+      minHeight: 72,
     },
-    // Обычное состояние
-    footerRow: {
+    controlsRow: {
       flexDirection: 'row',
       justifyContent: 'space-between',
-      alignItems: 'flex-end',
+      alignItems: 'center',
       gap: spacing.xs,
+      minHeight: 32,
+      marginTop: spacing.xs,
     },
     minusButton: {
       width: 32,
       height: 32,
     },
-    priceContainer: {
+    controlsSpacer: {
       flex: 1,
     },
+    priceContainer: {
+      minHeight: 38,
+    },
     priceContainerCenter: {
-      alignItems: 'center',
+      alignItems: 'flex-start',
     },
     priceRow: {
       flexDirection: 'row',
       alignItems: 'baseline',
+      flexWrap: 'nowrap',
       gap: spacing.xs,
     },
     currentPrice: {
+      flexShrink: 1,
       fontSize: typography.fontSize.lg,
       fontFamily: typography.fontFamily.bold,
       color: colors.text.primary,
     },
     originalPrice: {
+      flexShrink: 1,
       fontSize: typography.fontSize.xs,
       fontFamily: typography.fontFamily.regular,
       color: colors.text.tertiary,
       textDecorationLine: 'line-through',
     },
     distance: {
-      fontSize: typography.fontSize.xs,
+      fontSize: typography.fontSize.sm,
       fontFamily: typography.fontFamily.regular,
       color: colors.text.secondary,
-      marginTop: spacing.xxs,
     },
     addButton: {
       width: 32,
@@ -259,8 +267,17 @@ const createStyles = (tokens: any) => {
       fontSize: typography.fontSize.sm,
       fontFamily: typography.fontFamily.semibold,
       color: colors.text.primary,
-      marginTop: spacing.xxs,
       textAlign: 'center',
+    },
+    quantityBadge: {
+      flex: 1,
+      justifyContent: 'center',
+      minHeight: 24,
+    },
+    distanceBadge: {
+      flex: 1,
+      justifyContent: 'center',
+      minHeight: 24,
     },
   });
 };

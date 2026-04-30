@@ -4,7 +4,16 @@ import { spacing, typography } from "@/constants/tokens";
 import { useColors } from "@/contexts/ThemeContext";
 import { router, usePathname, useSegments } from "expo-router";
 import { useState } from "react";
-import { RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import {
+  NativeScrollEvent,
+  NativeSyntheticEvent,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 interface TabScreenProps {
   title?: string;
@@ -17,6 +26,8 @@ interface TabScreenProps {
   searchValue?: string;
   onSearchChange?: (text: string) => void;
   useScrollView?: boolean;
+  onScroll?: (event: NativeSyntheticEvent<NativeScrollEvent>) => void;
+  scrollEventThrottle?: number;
 }
 
 export function TabScreen({ 
@@ -30,18 +41,21 @@ export function TabScreen({
   searchValue,
   onSearchChange,
   useScrollView = true,
+  onScroll,
+  scrollEventThrottle = 16,
 }: TabScreenProps) {
   const colors = useColors();
   const pathname = usePathname();
   const segments = useSegments();
+  const normalizedSegments = segments as string[];
   const [isRefreshing, setIsRefreshing] = useState(false);
   const insets = useSafeAreaInsets();
 
   // Определяем, находимся ли мы в админ-режиме
   // Проверяем через сегменты пути (более надежно) и pathname
-  const isAdminMode = segments.length > 0 && (
-    segments[0] === '(admin)' || 
-    segments.some(segment => 
+  const isAdminMode = normalizedSegments.length > 0 && (
+    normalizedSegments[0] === '(admin)' || 
+    normalizedSegments.some(segment => 
       segment === '(admin)' || 
       segment === 'admin' ||
       (typeof segment === 'string' && (segment.includes('admin') || segment.includes('(admin)')))
@@ -108,6 +122,8 @@ export function TabScreen({
             style={styles.content}
             contentContainerStyle={[styles.scrollContent, shouldShowTopBar && styles.scrollContentWithTopBar]}
             showsVerticalScrollIndicator={false}
+            onScroll={onScroll}
+            scrollEventThrottle={scrollEventThrottle}
             refreshControl={
               onRefresh ? (
                 <RefreshControl

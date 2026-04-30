@@ -47,7 +47,15 @@ export const useShopPoints = (sellerId?: number) => {
 
         if (response.ok) {
           const data = await response.json();
-          setShopPoints(data.data || []);
+          const nextShopPoints = data.data || [];
+
+          if (Array.isArray(nextShopPoints)) {
+            nextShopPoints.forEach((shopPoint: ShopPoint) => {
+              shopPointCache.set(shopPoint.id, shopPoint);
+            });
+          }
+
+          setShopPoints(nextShopPoints);
         } else if (response.status === 404) {
           setError('Торговые точки не найдены');
           setShopPoints([]);
@@ -75,8 +83,47 @@ export const useShopPoints = (sellerId?: number) => {
 
 // Глобальный кэш для shop points (вне хука, чтобы сохранялся между монтированиями)
 const shopPointCache = new Map<number, ShopPoint>();
-// Отслеживаем, для каких shop points уже был сделан запрос (чтобы не делать повторные запросы)
-const shopPointRequestsMade = new Set<number>();
+const shopPointLoadingPromises = new Map<number, Promise<ShopPoint | null>>();
+
+async function fetchShopPointById(pointId: number): Promise<ShopPoint | null> {
+  const cached = shopPointCache.get(pointId);
+  if (cached) {
+    return cached;
+  }
+
+  const existingPromise = shopPointLoadingPromises.get(pointId);
+  if (existingPromise) {
+    return existingPromise;
+  }
+
+  const promise = (async () => {
+    try {
+      const response = await authFetch(getApiUrl(`${API_ENDPOINTS.SHOP_POINTS.BASE}/${pointId}`), {
+        method: 'GET',
+      });
+
+      if (!response.ok) {
+        return null;
+      }
+
+      const data = await response.json();
+      const shopPointData = data.data || null;
+
+      if (shopPointData) {
+        shopPointCache.set(pointId, shopPointData);
+      }
+
+      return shopPointData;
+    } catch (err) {
+      return null;
+    } finally {
+      shopPointLoadingPromises.delete(pointId);
+    }
+  })();
+
+  shopPointLoadingPromises.set(pointId, promise);
+  return promise;
+}
 
 export const useShopPoint = (pointId: number | null) => {
   const [shopPoint, setShopPoint] = useState<ShopPoint | null>(pointId ? shopPointCache.get(pointId) || null : null);
@@ -96,37 +143,20 @@ export const useShopPoint = (pointId: number | null) => {
       if (cached) {
         setShopPoint(cached);
         setLoading(false);
+        setError(null);
         return;
       }
 
-      // Если запрос уже был сделан для этого shop point, не делаем его снова
-      if (shopPointRequestsMade.has(pointId)) {
-        return;
-      }
       try {
         setLoading(true);
         setError(null);
-        shopPointRequestsMade.add(pointId); // Отмечаем, что запрос был сделан
-        
-        const response = await authFetch(getApiUrl(`${API_ENDPOINTS.SHOP_POINTS.BASE}/${pointId}`), {
-          method: 'GET',
-        });
 
-        if (response.ok) {
-          const data = await response.json();
-          const shopPointData = data.data || null;
-          if (shopPointData) {
-            // Кэшируем данные
-            shopPointCache.set(pointId, shopPointData);
-            setShopPoint(shopPointData);
-          } else {
-            setShopPoint(null);
-          }
-        } else if (response.status === 404) {
-          setError('Торговая точка не найдена');
-          setShopPoint(null);
+        const shopPointData = await fetchShopPointById(pointId);
+
+        if (shopPointData) {
+          setShopPoint(shopPointData);
         } else {
-          setError('Ошибка загрузки торговой точки');
+          setError('Торговая точка не найдена');
           setShopPoint(null);
         }
       } catch (err) {
